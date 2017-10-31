@@ -1,0 +1,37 @@
+================================================================================
+__value value _value_
+================================================================================
+Field/Record
+	# [self] is object instance of Field() or Record()
+	# Field() is a class represents the normal field of a record.
+	# Record() is a class represents a database row/record.
+	# Record() object instance represents record of referenced field of foreign
+	# key.
+	# [value] and [_value_] are two properties of Field() and Record().
+	# normal field of type Field() that doesn't reference any other field so
+	# referenced Record() type field has no absolute value so it doesn't have
+	# [__value] attribute.
+	========================================
+	*Field():set
+		[value]:property -> [__value]attribute
+	========================================
+	*Field():get:
+		[value]/[_value_]property <- [__value]attribute
+	========================================
+	# call Read() method to map database record to Record() object instance.
+	# [__pk] attribute of Record() type field is object instance of Field().
+	*Record():set:
+		[value]property -> [_pk]property -> [__pk]attribute + Read()
+		*Field():set
+			[value]:property -> [__value]attribute
+	========================================
+	*Record():get:
+		[value]property <- self
+	========================================
+	*Record():get:
+		[_value_]property <- [_pk]property <- [__pk]attribute
+		*Field():get:
+				*Field():get:
+				[value]/[_value_]property <- [__value]attribute
+	========================================
+================================================================================
