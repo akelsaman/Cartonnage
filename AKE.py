@@ -263,7 +263,9 @@ class _values_lists(Record):
 		self.__fields	= [self.__value, self.__list_pk]
 		Record.__init__(self, pk, table = self.__ttable, name=name, index=index, fields=self.__fields, verbose=verbose)
 		
-		#if(pk): self.selfReference(pk)
+		if(pk):
+			print("pk:" + str(pk))
+			self.selfReference(pk)
 	#--------------------------------------#
 	#no setter without property(getter)
 	#property (getter) declaration must preceed setter declaration
@@ -287,7 +289,8 @@ class _values_lists(Record):
 	@value.setter
 	def value(self, value):
 		self._pk = value
-		#self.selfReference(value)
+		print("value:" + str(value))
+		self.selfReference(value)
 	
 	@_value.setter
 	def _value(self, _value): self.__value.value = _value
@@ -305,7 +308,7 @@ class _values_lists(Record):
 				if(sameRecord):
 					pass
 				else:
-					self._list_pk = _values_lists_instance
+					self.__list_pk = _values_lists_instance
 #================================================================================#
 class _tables(Record):
 	def __init__(self, pk=None, name=None, index=None, verbose=0):
