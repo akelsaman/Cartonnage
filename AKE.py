@@ -168,17 +168,20 @@ class Record:
 	def verbose(self, verbose): self.__verbose = verbose
 	#--------------------------------------#
 	def read(self, verbose=0):
+		print("=================Read()=================")
 		statement = selectStatementTemplate.substitute({'table': self.__ttable, 'pk': str(self._pk)})
 		#print(statement)
 		record = self.__database.select(statement)
 		
 		if(record):
 			self.__new = 0
+
 			for field in self.__fields:
 				field.value = record[field.index]
-		
+				print(str(field.name) + " : " + str(field.value))
 		if(self.verbose):	self.print(readHeader)
 		if(verbose):		self.print(readHeader)
+		print("=================()Dear=================")
 	#--------------------------------------#
 	def save(self, verbose=0):
 		if(self.__new):
@@ -209,7 +212,8 @@ class Record:
 		
 		if(lastrowid):
 			# if user doesn't define pk to be generated update the instance with it after insertion
-			self._pk = lastrowid
+			#self._pk = lastrowid
+			self.__pk.value = lastrowid
 			if(self.verbose):	self.print(insertHeader)
 			if(verbose):		self.print(insertHeader)
 	#--------------------------------------#
@@ -248,7 +252,7 @@ class Record:
 	def print(self, header=readHeader):
 		instanceStringLines = ''
 		for field in self.__fields:
-			instanceStringLines += instanceStringLineTemplate.substitute({'table': self.__ttable, 'field': field.name, 'value': str(field._value_)})
+			instanceStringLines += instanceStringLineTemplate.substitute({'table': self.__ttable, 'field': field.name, 'value': str(field.value)})
 		instanceString = instanceStringTemplate.substitute({'status': self.new, 'instanceStringLines': instanceStringLines})
 		print(header)
 		print(instanceString)
@@ -263,8 +267,8 @@ class _values_lists(Record):
 		self.__fields	= [self.__value, self.__list_pk]
 		Record.__init__(self, pk, table = self.__ttable, name=name, index=index, fields=self.__fields, verbose=verbose)
 		
-		if(pk):
-			print("pk:" + str(pk))
+		if(pk): 
+			print(" ===>>> pk : " + str(pk))
 			self.selfReference(pk)
 	#--------------------------------------#
 	#no setter without property(getter)
@@ -288,8 +292,8 @@ class _values_lists(Record):
 	
 	@value.setter
 	def value(self, value):
+		print(" ===>>> value : " + str(value))
 		self._pk = value
-		print("value:" + str(value))
 		self.selfReference(value)
 	
 	@_value.setter
@@ -298,17 +302,20 @@ class _values_lists(Record):
 	def _list_pk(self, _list_pk): self.__list_pk.value = _list_pk
 	#--------------------------------------#
 	def selfReference(self, value):
+		#print("==================== ====================")
+		print("============selfReference()============")
 		if(isinstance(value, int)):
 			if(value>=0):
 				_values_lists_instance	= _values_lists(self._list_pk, index=2, name='[_list_pk]')
 				sameRecord = 0
 				for i in range(0, len(_values_lists_instance.fields)):
-					#print(str(_values_lists_instance.fields[i].value) + " == " + str(self.fields[i].value))
+					print(str(self.fields[i].name) + "	:	" +str(self.fields[i].value) + " == " + str(_values_lists_instance.fields[i].value))
 					if(_values_lists_instance.fields[i].value==self.fields[i].value): sameRecord = 1
 				if(sameRecord):
 					pass
 				else:
 					self.__list_pk = _values_lists_instance
+		print("============()ecnerefeRfles============")
 #================================================================================#
 class _tables(Record):
 	def __init__(self, pk=None, name=None, index=None, verbose=0):
