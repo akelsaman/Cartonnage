@@ -9,45 +9,63 @@
 # make the primay key is choosable from the columns and can be composite.
 # what is the difference between [.value] [._value_] [.__value] and where are they used ?
 # 
+# revise the commented lines
 
 import sqlite3
 from string import Template
 
 databaseFile = 'queueing_system.db'
-
-selectStatementTemplate		= Template('''SELECT * FROM ${table} WHERE ${table}.[_pk]='${pk}';''')
-insertStatementTemplate		= Template('''INSERT INTO ${table}(${fields}) VALUES (${values});''')
-updateStatementTemplate		= Template('''UPDATE ${table} SET ${fieldsValues} WHERE ${table}.[_pk]='${pk}';''')
-deleteStatementTemplate		= Template('''DELETE FROM ${table} WHERE ${table}.[_pk]='${pk}';''')
-
-fieldValueTemplate			= Template('''${field}='${value}', ''')
-instanceStringLineTemplate	= Template('''${table}.${field}: ${value}\n''')
-instanceStringTemplate		= Template('''Record status: ${status}\n${instanceStringLines}''')
-recordNotExistTemplate		= Template('''Record ${pk} is not exist''')
-
-readHeader='''
-#--------------------------------------#
-#                 Read                 #
-#--------------------------------------#
-'''
-
-insertHeader='''
-#--------------------------------------#
-#                Insert                #
-#--------------------------------------#
-'''
-
-updateHeader='''
-#--------------------------------------#
-#                Update                #
-#--------------------------------------#
-'''
-
-deleteHeader='''
-#--------------------------------------#
-#                Delete                #
-#--------------------------------------#
-'''
+#================================================================================#
+class debugTracer:
+	defStartTemplate	= Template('''${indentation}>>>>>>>> call ${name}()''')
+	defEndTemplate		= Template('''${indentation}-------- exit ()${name}''')
+	attributeTemplate	= Template('''${indentation}@      @ ${name} : ${value}''')
+	ifTemplate			= Template('''${indentation}if      fi ${name} : ${value1} == ${value2}''')
+	statementTemplate	= Template('''${indentation} . . . . ${statement}''')
+	#--------------------------------------#
+	def __init__(self):
+		self.__context = ''
+		self.__indentationTabsCount = 0
+		self.__indentation = '\n'
+		#self.__indentations = 'n'
+	#--------------------------------------#
+	@property
+	def context(self): return self.__context
+	#--------------------------------------#
+	def indentationTabs(self):
+		self.__indentation = '\n'
+		for i in range(0, self.__indentationTabsCount): self.__indentation += '\t'
+	def print(self):
+		print(self.__context)
+	def save(self, fileName):
+		with open(fileName, 'w') as f:
+			f.write(self.__context)
+		f.close()
+	#--------------------------------------#
+	def defStart(self, name):
+		self.__context += debugTracer.defStartTemplate.substitute({'indentation': self.__indentation, 'name': name})
+		self.__indentationTabsCount += 1
+		self.indentationTabs()
+		return self
+	def defEnd(self, name):
+		self.__indentationTabsCount -= 1
+		self.indentationTabs()
+		self.__context += debugTracer.defEndTemplate.substitute({'indentation': self.__indentation, 'name': name})
+		return self
+	def attribute_(self, name, value):
+		self.__context += debugTracer.attributeTemplate.substitute({'indentation': self.__indentation, 'name': name, 'value': value})
+		return self
+	def if_(self, name, value1, value2):
+		self.__context += debugTracer.ifTemplate.substitute({'indentation': self.__indentation, 'name': name, 'value1': value1, 'value2': value2})
+		return self
+	def statement_(self, statement):
+		self.__context += debugTracer.statementTemplate.substitute({'indentation': self.__indentation, 'statement': statement})
+		return self
+#================================================================================#
+debug_tracer = debugTracer()
+#debug_tracer.defStart('Ahmed').defEnd('Kamal')
+#debug_tracer.defStart('Ahmed')
+#debug_tracer.defEnd('Kamal')
 #================================================================================#
 class Database:
 	def __init__(self, database):
@@ -55,7 +73,7 @@ class Database:
 		self.__connection			= None
 		self.__cursor				= None
 		cursor = self.connectionCursor()
-	#--------------------------------------#		
+	#--------------------------------------#
 	def connectionCursor(self):
 		self.__connection	= sqlite3.connect(self.__database)
 		self.__cursor		= self.__connection.cursor()
@@ -119,7 +137,42 @@ class Field:
 	
 #================================================================================#
 class Record:
+	selectStatementTemplate		= Template('''SELECT * FROM ${table} WHERE ${table}.[_pk]='${pk}';''')
+	insertStatementTemplate		= Template('''INSERT INTO ${table}(${fields}) VALUES (${values});''')
+	updateStatementTemplate		= Template('''UPDATE ${table} SET ${fieldsValues} WHERE ${table}.[_pk]='${pk}';''')
+	deleteStatementTemplate		= Template('''DELETE FROM ${table} WHERE ${table}.[_pk]='${pk}';''')
+
+	fieldValueTemplate			= Template('''${field}='${value}', ''')
+	instanceStringLineTemplate	= Template('''${table}.${field}: ${value}\n''')
+	instanceStringTemplate		= Template('''Record status: ${status}\n${instanceStringLines}''')
+	recordNotExistTemplate		= Template('''Record ${pk} is not exist''')
+
+	readHeader='''
+	#--------------------------------------#
+	#                 Read                 #
+	#--------------------------------------#
+	'''
+
+	insertHeader='''
+	#--------------------------------------#
+	#                Insert                #
+	#--------------------------------------#
+	'''
+
+	updateHeader='''
+	#--------------------------------------#
+	#                Update                #
+	#--------------------------------------#
+	'''
+
+	deleteHeader='''
+	#--------------------------------------#
+	#                Delete                #
+	#--------------------------------------#
+	'''
+	
 	def __init__(self, pk=None, table=None, name=None, index=None, fields=[], verbose=0):
+		#print("==================== ====================")
 		#print(self.__class__.__name__)
 		#arrange of attributes is important
 		#cannot declare self.__fields before self.__pk
@@ -168,20 +221,22 @@ class Record:
 	def verbose(self, verbose): self.__verbose = verbose
 	#--------------------------------------#
 	def read(self, verbose=0):
-		print("=================Read()=================")
-		statement = selectStatementTemplate.substitute({'table': self.__ttable, 'pk': str(self._pk)})
+		debug_tracer.defStart('Record.read').attribute_("self.__ttable", self.__ttable).attribute_("self._pk", self._pk)
+		statement = Record.selectStatementTemplate.substitute({'table': self.__ttable, 'pk': str(self._pk)})
 		#print(statement)
+		debug_tracer.statement_(statement)
 		record = self.__database.select(statement)
 		
 		if(record):
 			self.__new = 0
-
+			debug_tracer.attribute_("record", record).attribute_("self.__new", self.__new)
+			
 			for field in self.__fields:
 				field.value = record[field.index]
-				print(str(field.name) + " : " + str(field.value))
+				debug_tracer.attribute_(field.name, field.value)
 		if(self.verbose):	self.print(readHeader)
 		if(verbose):		self.print(readHeader)
-		print("=================()Dear=================")
+		debug_tracer.defEnd('Record.read')
 	#--------------------------------------#
 	def save(self, verbose=0):
 		if(self.__new):
@@ -203,7 +258,7 @@ class Record:
 		values	= values[:-2] # without comma and space
 		
 		lastrowid = None # prevent-> UnboundLocalError: local variable 'lastrowid' referenced before assignment
-		statement = insertStatementTemplate.substitute({'table': self.__ttable, 'fields': fields, 'values': values})
+		statement = Record.insertStatementTemplate.substitute({'table': self.__ttable, 'fields': fields, 'values': values})
 		#print(statement)
 				
 		if(fields):
@@ -212,8 +267,8 @@ class Record:
 		
 		if(lastrowid):
 			# if user doesn't define pk to be generated update the instance with it after insertion
-			#self._pk = lastrowid
-			self.__pk.value = lastrowid
+			self._pk = lastrowid
+			#self.__pk.value = lastrowid
 			if(self.verbose):	self.print(insertHeader)
 			if(verbose):		self.print(insertHeader)
 	#--------------------------------------#
@@ -224,11 +279,11 @@ class Record:
 			# field.value may contains integer 0
 			# if(None) = if(0) # field will be excluded in this way
 			if(field.value is not None):
-				fieldsValues += fieldValueTemplate.substitute({'field': field.name, 'value': str(field._value_)})
+				fieldsValues += Record.fieldValueTemplate.substitute({'field': field.name, 'value': str(field._value_)})
 		fieldsValues = fieldsValues[:-2]
 		
 		rowcount=None # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
-		statement	= updateStatementTemplate.substitute({'table': self.__ttable, 'fieldsValues': fieldsValues, 'pk': self._pk})
+		statement	= Record.updateStatementTemplate.substitute({'table': self.__ttable, 'fieldsValues': fieldsValues, 'pk': self._pk})
 		#print(statement)
 		rowcount	= self.__database.update(statement)
 		
@@ -238,10 +293,10 @@ class Record:
 	#--------------------------------------#
 	def delete(self, verbose=0):
 		if(self.__new):
-			print(recordNotExistTemplate.substitute({'pk': self._pk}))
+			print(Record.recordNotExistTemplate.substitute({'pk': self._pk}))
 		else:			
 			rowcount=None  # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
-			statement = deleteStatementTemplate.substitute({'table': self.__ttable, 'pk': self._pk})
+			statement = Record.deleteStatementTemplate.substitute({'table': self.__ttable, 'pk': self._pk})
 			#print(statement)
 			rowcount = self.__database.delete(statement)
 			
@@ -252,8 +307,8 @@ class Record:
 	def print(self, header=readHeader):
 		instanceStringLines = ''
 		for field in self.__fields:
-			instanceStringLines += instanceStringLineTemplate.substitute({'table': self.__ttable, 'field': field.name, 'value': str(field.value)})
-		instanceString = instanceStringTemplate.substitute({'status': self.new, 'instanceStringLines': instanceStringLines})
+			instanceStringLines += Record.instanceStringLineTemplate.substitute({'table': self.__ttable, 'field': field.name, 'value': str(field.value)})
+		instanceString = Record.instanceStringTemplate.substitute({'status': self.new, 'instanceStringLines': instanceStringLines})
 		print(header)
 		print(instanceString)
 		return instanceString
@@ -268,7 +323,7 @@ class _values_lists(Record):
 		Record.__init__(self, pk, table = self.__ttable, name=name, index=index, fields=self.__fields, verbose=verbose)
 		
 		if(pk): 
-			print(" ===>>> pk : " + str(pk))
+			debug_tracer.defStart('_values_lists.__init__').attribute_("pk", pk).defEnd('_values_lists.__init__')
 			self.selfReference(pk)
 	#--------------------------------------#
 	#no setter without property(getter)
@@ -292,30 +347,34 @@ class _values_lists(Record):
 	
 	@value.setter
 	def value(self, value):
-		print(" ===>>> value : " + str(value))
+		debug_tracer.defStart('_value_lists.value').attribute_("value", value)
 		self._pk = value
 		self.selfReference(value)
-	
+		debug_tracer.defEnd('_value_lists.value')
+		
 	@_value.setter
-	def _value(self, _value): self.__value.value = _value
+	def _value(self, _value):
+		debug_tracer.defStart('_values_lists._value')
+		self.__value.value = _value
+		debug_tracer.defEnd('_values_lists._value')
+		
 	@_list_pk.setter
 	def _list_pk(self, _list_pk): self.__list_pk.value = _list_pk
 	#--------------------------------------#
 	def selfReference(self, value):
-		#print("==================== ====================")
-		print("============selfReference()============")
+		debug_tracer.defStart('_value_lists.selfReference')
 		if(isinstance(value, int)):
 			if(value>=0):
 				_values_lists_instance	= _values_lists(self._list_pk, index=2, name='[_list_pk]')
 				sameRecord = 0
 				for i in range(0, len(_values_lists_instance.fields)):
-					print(str(self.fields[i].name) + "	:	" +str(self.fields[i].value) + " == " + str(_values_lists_instance.fields[i].value))
+					debug_tracer.if_(self.fields[i].name, self.fields[i].value, _values_lists_instance.fields[i].value)
 					if(_values_lists_instance.fields[i].value==self.fields[i].value): sameRecord = 1
 				if(sameRecord):
 					pass
 				else:
 					self.__list_pk = _values_lists_instance
-		print("============()ecnerefeRfles============")
+		debug_tracer.defEnd('_value_lists.selfReference')
 #================================================================================#
 class _tables(Record):
 	def __init__(self, pk=None, name=None, index=None, verbose=0):
