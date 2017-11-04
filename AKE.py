@@ -22,6 +22,7 @@ class debugTracer:
 	attributeTemplate	= Template('''${indentation}@      @ ${name} : ${value}''')
 	ifTemplate			= Template('''${indentation}if      fi ${name} : ${value1} == ${value2}''')
 	statementTemplate	= Template('''${indentation} . . . . ${statement}''')
+	breakPointTemplate	= Template('''\n\n{{CODE}} ${codeStatement}\n\n''')
 	#--------------------------------------#
 	def __init__(self):
 		self.__context = ''
@@ -60,6 +61,9 @@ class debugTracer:
 		return self
 	def statement_(self, statement):
 		self.__context += debugTracer.statementTemplate.substitute({'indentation': self.__indentation, 'statement': statement})
+		return self
+	def breakPoint(self, codeStatement):
+		self.__context += debugTracer.breakPointTemplate.substitute({'indentation': self.__indentation, 'codeStatement': codeStatement})
 		return self
 #================================================================================#
 debug_tracer = debugTracer()
@@ -106,10 +110,12 @@ databaseInstance = Database(databaseFile)
 #================================================================================#
 class Field:
 	def __init__(self, value=None, name=None, index=None):
+		debug_tracer.defStart('Field._init')
 		self.__nname	= name
 		self.__value	= value
 		self.__oldValue	= None
 		self.__index	= index
+		debug_tracer.attribute_('self.__nname', self.__nname).attribute_('self.__value', self.__value).attribute_('self.__oldValue', self.__oldValue).attribute_('self.__index', self.__index).defEnd('Field._init')
 	#--------------------------------------#
 	@property
 	def name(self): return self.__nname
@@ -123,7 +129,10 @@ class Field:
 	#@name.setter
 	#def name(self, name): self.__nname = name
 	@value.setter
-	def value(self, value): self.__value = value
+	def value(self, value):
+		debug_tracer.defStart('Field.value')
+		self.__value = value
+		debug_tracer.attribute_('self.__value', self.__value).defEnd('Field.value')
 	#@index.setter
 	#def index(self, index): self.__index = index
 	#--------------------------------------#
@@ -172,6 +181,7 @@ class Record:
 	'''
 	
 	def __init__(self, pk=None, table=None, name=None, index=None, fields=[], verbose=0):
+		debug_tracer.defStart('Record.__init__')
 		#print("==================== ====================")
 		#print(self.__class__.__name__)
 		#arrange of attributes is important
@@ -189,6 +199,7 @@ class Record:
 
 		self._pk				= pk # to call read()
 		#print(self.__dict__)
+		debug_tracer.attribute_('self.__ttable', self.__ttable).attribute_('self.__pk', self.__pk).attribute_('self.__fields', self.__fields).attribute_('self.__nname', self.__nname).attribute_('self.__index', self.__index).attribute_('self.__new', self.__new).attribute_('self.__verbose', self.__verbose).defEnd('Record.__init__')
 	#--------------------------------------#
 	@property
 	def _pk(self): return self.__pk.value
@@ -211,12 +222,18 @@ class Record:
 	#--------------------------------------#
 	@_pk.setter
 	def _pk(self, _pk):
+		debug_tracer.defStart('Record._pk')
 		#if(isinstance(_pk, int)):
 		if(_pk is not None):
 			self.__pk.value = _pk
+			debug_tracer.attribute_('self.__pk.value', self.__pk.value)
 			self.read()
+		debug_tracer.defEnd('Record._pk')
 	@value.setter
-	def value(self, value): self._pk = value
+	def value(self, value):
+		debug_tracer.defStart('Record.value').attribute_('value', value)
+		self._pk = value
+		debug_tracer.defEnd('Record.value')
 	@verbose.setter
 	def verbose(self, verbose): self.__verbose = verbose
 	#--------------------------------------#
