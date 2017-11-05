@@ -24,52 +24,71 @@ class debugTracer:
 	statementTemplate	= Template('''${indentation} . . . . ${statement}''')
 	breakPointTemplate	= Template('''\n\n{{CODE}} ${codeStatement}\n\n''')
 	#--------------------------------------#
+	class defDebugTracer:
+		def __init__(self, debugTracer):
+			self.debugTracer = debugTracer
+		def start(self, name):
+			self.debugTracer.context = debugTracer.defStartTemplate.substitute({'indentation': self.debugTracer.indentation, 'name': name})
+			self.debugTracer.increaseIndentationTabsCount()
+			return self.debugTracer
+		def end(self, name):
+			self.debugTracer.context = debugTracer.defEndTemplate.substitute({'indentation': self.debugTracer.indentation, 'name': name})
+			self.debugTracer.decreaseIndentationTabsCount()
+			return self.debugTracer
+	#--------------------------------------#
 	def __init__(self):
 		self.__context = ''
 		self.__indentationTabsCount = 0
 		self.__indentation = '\n'
-		#self.__indentations = 'n'
+		self.defDT = self.defDebugTracer(self)
 	#--------------------------------------#
 	@property
 	def context(self): return self.__context
+	@property
+	def indentation(self): return self.__indentation
+	@property
+	def def_(self): return self.defDT
 	#--------------------------------------#
-	def indentationTabs(self):
+	@context.setter
+	def context(self, context): self.__context += context
+	#--------------------------------------#
+	def __indentationTabs(self):
 		self.__indentation = '\n'
 		for i in range(0, self.__indentationTabsCount): self.__indentation += '\t'
+		
+	def increaseIndentationTabsCount(self):
+		self.__indentationTabsCount += 1
+		self.__indentationTabs()
+		
+	def decreaseIndentationTabsCount(self):
+		self.__indentationTabsCount -= 1
+		self.__indentationTabs()
+		
 	def print(self):
 		print(self.__context)
+		
 	def save(self, fileName):
 		with open(fileName, 'w') as f:
-			f.write(self.__context)
+			f.write(self.context)
 		f.close()
 	#--------------------------------------#
-	def defStart(self, name):
-		self.__context += debugTracer.defStartTemplate.substitute({'indentation': self.__indentation, 'name': name})
-		self.__indentationTabsCount += 1
-		self.indentationTabs()
-		return self
-	def defEnd(self, name):
-		self.__indentationTabsCount -= 1
-		self.indentationTabs()
-		self.__context += debugTracer.defEndTemplate.substitute({'indentation': self.__indentation, 'name': name})
-		return self
 	def attribute_(self, name, value):
-		self.__context += debugTracer.attributeTemplate.substitute({'indentation': self.__indentation, 'name': name, 'value': value})
+		self.context = debugTracer.attributeTemplate.substitute({'indentation': self.__indentation, 'name': name, 'value': value})
 		return self
 	def if_(self, name, value1, value2):
-		self.__context += debugTracer.ifTemplate.substitute({'indentation': self.__indentation, 'name': name, 'value1': value1, 'value2': value2})
+		self.context = debugTracer.ifTemplate.substitute({'indentation': self.__indentation, 'name': name, 'value1': value1, 'value2': value2})
 		return self
 	def statement_(self, statement):
-		self.__context += debugTracer.statementTemplate.substitute({'indentation': self.__indentation, 'statement': statement})
+		self.context = debugTracer.statementTemplate.substitute({'indentation': self.__indentation, 'statement': statement})
 		return self
 	def breakPoint(self, codeStatement):
-		self.__context += debugTracer.breakPointTemplate.substitute({'indentation': self.__indentation, 'codeStatement': codeStatement})
+		self.context = debugTracer.breakPointTemplate.substitute({'indentation': self.__indentation, 'codeStatement': codeStatement})
 		return self
 #================================================================================#
 debug_tracer = debugTracer()
-#debug_tracer.defStart('Ahmed').defEnd('Kamal')
-#debug_tracer.defStart('Ahmed')
-#debug_tracer.defEnd('Kamal')
+#debug_tracer.def_.start('Ahmed').def_.end('Kamal')
+#debug_tracer.def_.start('Ahmed')
+#debug_tracer.def_.end('Kamal')
 #================================================================================#
 class Database:
 	def __init__(self, database):
@@ -110,13 +129,13 @@ databaseInstance = Database(databaseFile)
 #================================================================================#
 class Field:
 	def __init__(self, value=None, name=None, index=None):
-		debug_tracer.defStart('Field._init')
+		debug_tracer.def_.start('Field._init')
 		debug_tracer.attribute_('self.__nname', name).attribute_('self.__value', value).attribute_('self.__oldValue', None).attribute_('self.__index', index)
 		self.__nname	= name
 		self.__value	= value
 		self.__oldValue	= None
 		self.__index	= index
-		debug_tracer.defEnd('Field._init')
+		debug_tracer.def_.end('Field._init')
 	#--------------------------------------#
 	@property
 	def name(self): return self.__nname
@@ -131,10 +150,10 @@ class Field:
 	#def name(self, name): self.__nname = name
 	@value.setter
 	def value(self, value):
-		debug_tracer.defStart('Field.value')
+		debug_tracer.def_.start('Field.value')
 		debug_tracer.attribute_('self.__value', value)
 		self.__value = value
-		debug_tracer.defEnd('Field.value')
+		debug_tracer.def_.end('Field.value')
 	#@index.setter
 	#def index(self, index): self.__index = index
 	#--------------------------------------#
@@ -183,7 +202,7 @@ class Record:
 	'''
 	
 	def __init__(self, pk=None, table=None, name=None, index=None, fields=[], verbose=0):
-		debug_tracer.defStart('Record.__init__')
+		debug_tracer.def_.start('Record.__init__')
 		debug_tracer.attribute_('self.__ttable', table).attribute_('self.__pk', pk).attribute_('self.__nname', name).attribute_('self.__index', index).attribute_('self.__new', 1).attribute_('self.__verbose', verbose)
 		#print("==================== ====================")
 		#print(self.__class__.__name__)
@@ -203,7 +222,7 @@ class Record:
 
 		self._pk				= pk # to call read()
 		#print(self.__dict__)
-		debug_tracer.defEnd('Record.__init__')
+		debug_tracer.def_.end('Record.__init__')
 	#--------------------------------------#
 	@property
 	def _pk(self): return self.__pk.value
@@ -226,24 +245,24 @@ class Record:
 	#--------------------------------------#
 	@_pk.setter
 	def _pk(self, _pk):
-		debug_tracer.defStart('Record._pk')
+		debug_tracer.def_.start('Record._pk')
 		#if(isinstance(_pk, int)):
 		if(_pk is not None):
 			debug_tracer.attribute_('self.__pk.value', _pk)
 			self.__pk.value = _pk
 			self.read()
-		debug_tracer.defEnd('Record._pk')
+		debug_tracer.def_.end('Record._pk')
 	@value.setter
 	def value(self, value):
-		debug_tracer.defStart('Record.value')
+		debug_tracer.def_.start('Record.value')
 		debug_tracer.attribute_('value', value)
 		self._pk = value
-		debug_tracer.defEnd('Record.value')
+		debug_tracer.def_.end('Record.value')
 	@verbose.setter
 	def verbose(self, verbose): self.__verbose = verbose
 	#--------------------------------------#
 	def read(self, verbose=0):
-		debug_tracer.defStart('Record.read')
+		debug_tracer.def_.start('Record.read')
 		debug_tracer.attribute_("self.__ttable", self.__ttable).attribute_("self._pk", self._pk)
 		statement = Record.selectStatementTemplate.substitute({'table': self.__ttable, 'pk': str(self._pk)})
 		#print(statement)
@@ -259,7 +278,7 @@ class Record:
 				field.value = record[field.index]
 		if(self.verbose):	self.print(readHeader)
 		if(verbose):		self.print(readHeader)
-		debug_tracer.defEnd('Record.read')
+		debug_tracer.def_.end('Record.read')
 	#--------------------------------------#
 	def save(self, verbose=0):
 		if(self.__new):
@@ -338,7 +357,7 @@ class Record:
 #================================================================================#
 class _values_lists(Record):
 	def __init__(self, pk=None, name=None, index=None, selfReference=1, verbose=0):
-		debug_tracer.defStart('_values_lists.__init__')
+		debug_tracer.def_.start('_values_lists.__init__')
 		self.__ttable	= '[_values_lists]'
 		self.__value	= Field(index=1, name='[_value]')
 		self.__list_pk	= Field(index=2, name='[_list_pk]')
@@ -349,7 +368,7 @@ class _values_lists(Record):
 		if(pk): 
 			debug_tracer.attribute_("pk", pk)
 			self.selfReference(pk)
-		debug_tracer.defEnd('_values_lists.__init__')
+		debug_tracer.def_.end('_values_lists.__init__')
 	#--------------------------------------#
 	#no setter without property(getter)
 	#property (getter) declaration must preceed setter declaration
@@ -372,23 +391,23 @@ class _values_lists(Record):
 	
 	@value.setter
 	def value(self, value):
-		debug_tracer.defStart('_value_lists.value')
+		debug_tracer.def_.start('_value_lists.value')
 		debug_tracer.attribute_("value", value)
 		self._pk = value
 		self.selfReference(value)
-		debug_tracer.defEnd('_value_lists.value')
+		debug_tracer.def_.end('_value_lists.value')
 		
 	@_value.setter
 	def _value(self, _value):
-		debug_tracer.defStart('_values_lists._value')
+		debug_tracer.def_.start('_values_lists._value')
 		self.__value.value = _value
-		debug_tracer.defEnd('_values_lists._value')
+		debug_tracer.def_.end('_values_lists._value')
 		
 	@_list_pk.setter
 	def _list_pk(self, _list_pk): self.__list_pk.value = _list_pk
 	#--------------------------------------#
 	def selfReference(self, value):
-		debug_tracer.defStart('_value_lists.selfReference')
+		debug_tracer.def_.start('_value_lists.selfReference')
 		if(isinstance(value, int)):
 			if(value>=0):
 				_values_lists_instance	= _values_lists(self._list_pk, index=2, name='[_list_pk]')
@@ -400,7 +419,7 @@ class _values_lists(Record):
 					pass
 				else:
 					self.__list_pk = _values_lists_instance
-		debug_tracer.defEnd('_value_lists.selfReference')
+		debug_tracer.def_.end('_value_lists.selfReference')
 #================================================================================#
 class _tables(Record):
 	def __init__(self, pk=None, name=None, index=None, verbose=0):

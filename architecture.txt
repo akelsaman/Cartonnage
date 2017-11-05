@@ -35,3 +35,6 @@ Field/Record
 				[value]/[_value_]property <- [__value]attribute
 	========================================
 ================================================================================
+[value]property -> [_pk]property -> [__pk]attribute + Read() -> [value]:property -> [__value]attribute
+38				->	38			 -> 38 + Read()				 -> 38				 -> 38
+Read()
