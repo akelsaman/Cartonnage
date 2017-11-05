@@ -111,11 +111,12 @@ databaseInstance = Database(databaseFile)
 class Field:
 	def __init__(self, value=None, name=None, index=None):
 		debug_tracer.defStart('Field._init')
+		debug_tracer.attribute_('self.__nname', name).attribute_('self.__value', value).attribute_('self.__oldValue', None).attribute_('self.__index', index)
 		self.__nname	= name
 		self.__value	= value
 		self.__oldValue	= None
 		self.__index	= index
-		debug_tracer.attribute_('self.__nname', self.__nname).attribute_('self.__value', self.__value).attribute_('self.__oldValue', self.__oldValue).attribute_('self.__index', self.__index).defEnd('Field._init')
+		debug_tracer.defEnd('Field._init')
 	#--------------------------------------#
 	@property
 	def name(self): return self.__nname
@@ -131,8 +132,9 @@ class Field:
 	@value.setter
 	def value(self, value):
 		debug_tracer.defStart('Field.value')
+		debug_tracer.attribute_('self.__value', value)
 		self.__value = value
-		debug_tracer.attribute_('self.__value', self.__value).defEnd('Field.value')
+		debug_tracer.defEnd('Field.value')
 	#@index.setter
 	#def index(self, index): self.__index = index
 	#--------------------------------------#
@@ -182,6 +184,7 @@ class Record:
 	
 	def __init__(self, pk=None, table=None, name=None, index=None, fields=[], verbose=0):
 		debug_tracer.defStart('Record.__init__')
+		debug_tracer.attribute_('self.__ttable', table).attribute_('self.__pk', pk).attribute_('self.__nname', name).attribute_('self.__index', index).attribute_('self.__new', 1).attribute_('self.__verbose', verbose)
 		#print("==================== ====================")
 		#print(self.__class__.__name__)
 		#arrange of attributes is important
@@ -192,6 +195,7 @@ class Record:
 		self.__ttable			= table
 		self.__pk				= Field(value=None, index=0, name='[_pk]')
 		self.__fields			= [self.__pk] + fields
+		debug_tracer.attribute_('self.__fields', self.__fields)
 		self.__nname			= name
 		self.__index			= index
 		self.__new				= 1
@@ -199,7 +203,7 @@ class Record:
 
 		self._pk				= pk # to call read()
 		#print(self.__dict__)
-		debug_tracer.attribute_('self.__ttable', self.__ttable).attribute_('self.__pk', self.__pk).attribute_('self.__fields', self.__fields).attribute_('self.__nname', self.__nname).attribute_('self.__index', self.__index).attribute_('self.__new', self.__new).attribute_('self.__verbose', self.__verbose).defEnd('Record.__init__')
+		debug_tracer.defEnd('Record.__init__')
 	#--------------------------------------#
 	@property
 	def _pk(self): return self.__pk.value
@@ -225,32 +229,34 @@ class Record:
 		debug_tracer.defStart('Record._pk')
 		#if(isinstance(_pk, int)):
 		if(_pk is not None):
+			debug_tracer.attribute_('self.__pk.value', _pk)
 			self.__pk.value = _pk
-			debug_tracer.attribute_('self.__pk.value', self.__pk.value)
 			self.read()
 		debug_tracer.defEnd('Record._pk')
 	@value.setter
 	def value(self, value):
-		debug_tracer.defStart('Record.value').attribute_('value', value)
+		debug_tracer.defStart('Record.value')
+		debug_tracer.attribute_('value', value)
 		self._pk = value
 		debug_tracer.defEnd('Record.value')
 	@verbose.setter
 	def verbose(self, verbose): self.__verbose = verbose
 	#--------------------------------------#
 	def read(self, verbose=0):
-		debug_tracer.defStart('Record.read').attribute_("self.__ttable", self.__ttable).attribute_("self._pk", self._pk)
+		debug_tracer.defStart('Record.read')
+		debug_tracer.attribute_("self.__ttable", self.__ttable).attribute_("self._pk", self._pk)
 		statement = Record.selectStatementTemplate.substitute({'table': self.__ttable, 'pk': str(self._pk)})
 		#print(statement)
 		debug_tracer.statement_(statement)
 		record = self.__database.select(statement)
 		
 		if(record):
-			self.__new = 0
 			debug_tracer.attribute_("record", record).attribute_("self.__new", self.__new)
+			self.__new = 0
 			
 			for field in self.__fields:
-				field.value = record[field.index]
 				debug_tracer.attribute_(field.name, field.value)
+				field.value = record[field.index]
 		if(self.verbose):	self.print(readHeader)
 		if(verbose):		self.print(readHeader)
 		debug_tracer.defEnd('Record.read')
@@ -332,6 +338,7 @@ class Record:
 #================================================================================#
 class _values_lists(Record):
 	def __init__(self, pk=None, name=None, index=None, selfReference=1, verbose=0):
+		debug_tracer.defStart('_values_lists.__init__')
 		self.__ttable	= '[_values_lists]'
 		self.__value	= Field(index=1, name='[_value]')
 		self.__list_pk	= Field(index=2, name='[_list_pk]')
@@ -340,8 +347,9 @@ class _values_lists(Record):
 		Record.__init__(self, pk, table = self.__ttable, name=name, index=index, fields=self.__fields, verbose=verbose)
 		
 		if(pk): 
-			debug_tracer.defStart('_values_lists.__init__').attribute_("pk", pk).defEnd('_values_lists.__init__')
+			debug_tracer.attribute_("pk", pk)
 			self.selfReference(pk)
+		debug_tracer.defEnd('_values_lists.__init__')
 	#--------------------------------------#
 	#no setter without property(getter)
 	#property (getter) declaration must preceed setter declaration
@@ -364,7 +372,8 @@ class _values_lists(Record):
 	
 	@value.setter
 	def value(self, value):
-		debug_tracer.defStart('_value_lists.value').attribute_("value", value)
+		debug_tracer.defStart('_value_lists.value')
+		debug_tracer.attribute_("value", value)
 		self._pk = value
 		self.selfReference(value)
 		debug_tracer.defEnd('_value_lists.value')
