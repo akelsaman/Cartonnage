@@ -117,14 +117,10 @@ databaseInstance = Database(databaseFile)
 #================================================================================#
 class Field:
 	def __init__(self, value=None, name=None, index=None):
-		debug_tracer.code('''class Field:''').code('''def __init__(self, value=None, name=None, index=None):''').def_.start()
-		debug_tracer.code('''self.__value	= value''', value).code('''self.__nname	= name''', name).\
-			code('''self.__oldValue	= None''', None).code('''self.__index	= index''', index)
 		self.__value	= value
 		self.__nname	= name
 		self.__oldValue	= None
 		self.__index	= index
-		debug_tracer.def_.end()
 	#--------------------------------------#
 	@property
 	def name(self): return self.__nname
@@ -138,11 +134,7 @@ class Field:
 	#@name.setter
 	#def name(self, name): self.__nname = name
 	@value.setter
-	def value(self, value):
-		debug_tracer.code('''class Field:''').code('''def value(self, value):''').def_.start()
-		debug_tracer.code('''self.__value = value''', value)
-		self.__value = value
-		debug_tracer.def_.end()
+	def value(self, value): self.__value = value
 	#@index.setter
 	#def index(self, index): self.__index = index
 	#--------------------------------------#
@@ -191,31 +183,23 @@ class Record:
 	'''
 	
 	def __init__(self, pk=None, table=None, name=None, index=None, fields=[], verbose=0):
-		debug_tracer.code('''class Record:''').code('''def __init__(self, pk=None, table=None, name=None, index=None, fields=[], verbose=0):''').def_.start()
 		#print("==================== ====================")
 		#print(self.__class__.__name__)
 		#arrange of attributes is important
 		#cannot declare self.__fields before self.__pk
 		#cannot use self._pk to call read() before self.__fields
 		self.__database			= databaseInstance
-		
-		debug_tracer.code('''self.__ttable = table''', table).code('''self.__pk	= Field(value=None, index=0, name='[_pk]')''').\
-			code('''self.__nname = name''', name).code('''self.__index = index''', index).\
-			code('''self.__new = 1''', 1).code('''self.__verbose = verbose''', verbose)
 			
 		self.__ttable			= table
 		self.__pk				= Field(value=None, index=0, name='[_pk]')
 		self.__fields			= [self.__pk] + fields
-		debug_tracer.code('''self.__fields = [self.__pk] + fields''', self.__fields)
 		self.__nname			= name
 		self.__index			= index
 		self.__new				= 1
 		self.__verbose			= verbose
 		
-		debug_tracer.code('''self._pk = pk''', pk)
 		self._pk				= pk # to call read()
 		#print(self.__dict__)
-		debug_tracer.def_.end()
 	#--------------------------------------#
 	@property
 	def _pk(self): return self.__pk.value
@@ -238,43 +222,27 @@ class Record:
 	#--------------------------------------#
 	@_pk.setter
 	def _pk(self, _pk):
-		debug_tracer.code('''class Record:''').code('''def _pk(self, _pk):''').def_.start()
 		#if(isinstance(_pk, int)):
-		debug_tracer.code('''if(_pk is not None):''')
 		if(_pk is not None):
-			debug_tracer.code('''self.__pk.value = _pk''', _pk)
 			self.__pk.value = _pk
-			debug_tracer.code('''self.read()''')
 			self.read()
-		debug_tracer.def_.end()
 	@value.setter
-	def value(self, value):
-		debug_tracer.code('''class Record:''').code('''def value(self, value):''').def_.start()
-		debug_tracer.code('''self._pk = value''', value)
-		self._pk = value
-		debug_tracer.def_.end()
+	def value(self, value): self._pk = value
 	@verbose.setter
 	def verbose(self, verbose): self.__verbose = verbose
 	#--------------------------------------#
 	def read(self, verbose=0):
-		debug_tracer.code('''class Record:''').code('''	def read(self, verbose=0):''').def_.start()
-		
 		statement = Record.selectStatementTemplate.substitute({'table': self.__ttable, 'pk': str(self._pk)})
 		#print(statement)
 		record = self.__database.select(statement)
 		
 		if(record):
-			debug_tracer.code('''if(record):''', record).code('''self.__new = 0''', 0)
 			self.__new = 0
-			
-			debug_tracer.code('''for field in self.__fields:''')
 			for field in self.__fields:
-				debug_tracer.code('''field.value = record[field.index]''', record[field.index])
 				field.value = record[field.index]
 				
 		if(self.verbose):	self.print(readHeader)
 		if(verbose):		self.print(readHeader)
-		debug_tracer.def_.end()
 	#--------------------------------------#
 	def save(self, verbose=0):
 		if(self.__new):
@@ -292,7 +260,6 @@ class Record:
 			if(field._value_ is not None):
 				fields += field.name + ', '
 				values	+= "'" + str(field._value_) + "', "
-				print(field._value_)
 		fields	= fields[:-2] # without comma and space
 		values	= values[:-2] # without comma and space
 		
@@ -306,8 +273,8 @@ class Record:
 		
 		if(lastrowid):
 			# if user doesn't define pk to be generated update the instance with it after insertion
-			self._pk = lastrowid
-			#self.__pk.value = lastrowid
+			#self._pk = lastrowid
+			self.__pk.value = lastrowid
 			if(self.verbose):	self.print(insertHeader)
 			if(verbose):		self.print(insertHeader)
 	#--------------------------------------#
@@ -354,7 +321,6 @@ class Record:
 #================================================================================#
 class _values_lists(Record):
 	def __init__(self, pk=None, name=None, index=None, selfReference=1, verbose=0):
-		debug_tracer.code('''class _values_lists:''').code('''def __init__(self, pk=None, name=None, index=None, selfReference=1, verbose=0):''').def_.start()
 		self.__ttable	= '[_values_lists]'
 		self.__value	= Field(index=1, name='[_value]')
 		self.__list_pk	= Field(index=2, name='[_list_pk]')
@@ -362,10 +328,7 @@ class _values_lists(Record):
 		self.__fields	= [self.__value, self.__list_pk]
 		Record.__init__(self, pk, table = self.__ttable, name=name, index=index, fields=self.__fields, verbose=verbose)
 		
-		if(pk): 
-			debug_tracer.code('''self.selfReference(pk)''', pk)
-			self.selfReference(pk)
-		debug_tracer.def_.end()
+		if(pk): self.selfReference(pk)
 	#--------------------------------------#
 	#no setter without property(getter)
 	#property (getter) declaration must preceed setter declaration
@@ -388,39 +351,27 @@ class _values_lists(Record):
 	
 	@value.setter
 	def value(self, value):
-		debug_tracer.code('''class _values_lists:''').code('''def value(self, value):''').def_.start()
-		debug_tracer.code('''self._pk = value''', value)
 		self._pk = value
-		debug_tracer.code('''self.selfReference(value)''', value)
 		self.selfReference(value)
-		debug_tracer.def_.end()
 		
 	@_value.setter
 	def _value(self, _value):
-		debug_tracer.code('''class _values_lists:''').code('''def value(self, _value):''').def_.start()
-		debug_tracer.code('''self.__value.value = _value''', _value)
 		self.__value.value = _value
-		debug_tracer.def_.end()
 		
 	@_list_pk.setter
 	def _list_pk(self, _list_pk): self.__list_pk.value = _list_pk
 	#--------------------------------------#
 	def selfReference(self, value):
-		debug_tracer.code('''class _values_lists:''').code('''def selfReference(self, value):''').def_.start()
 		if(isinstance(value, int)):
 			if(value>=0):
 				_values_lists_instance	= _values_lists(self._list_pk, index=2, name='[_list_pk]')
 				sameRecord = 0
-				debug_tracer.code('''for i in range(0, len(_values_lists_instance.fields)):''')
 				for i in range(0, len(_values_lists_instance.fields)):
-					debug_tracer.code('''if(_values_lists_instance.fields[i].value==self.fields[i].value): sameRecord = 1''').\
-						if_(_values_lists_instance.fields[i].value, self.fields[i].value)
 					if(_values_lists_instance.fields[i].value==self.fields[i].value): sameRecord = 1
 				if(sameRecord):
 					pass
 				else:
 					self.__list_pk = _values_lists_instance
-		debug_tracer.def_.end()
 #================================================================================#
 class _tables(Record):
 	def __init__(self, pk=None, name=None, index=None, verbose=0):
