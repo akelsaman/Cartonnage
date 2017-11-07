@@ -127,10 +127,12 @@ class Field:
 	#--------------------------------------#
 	@property
 	def value(self):
-		if(self.__reference):
-			self.__classObjectInstance = self.__reference()
-		if(self.__classObjectInstance):
-			self.__classObjectInstance._pk = self.__value
+		if(self.__classObjectInstance): # to prevent creating new object instance if one exists to save memory
+			self.__classObjectInstance._pk	= self.__value
+			return self.__classObjectInstance.value # self.__classObjectInstance = self.__classObjectInstance.value # as value returns self
+		elif(self.__reference):
+			self.__classObjectInstance		= self.__reference()
+			self.__classObjectInstance._pk	= self.__value
 			return self.__classObjectInstance.value # self.__classObjectInstance = self.__classObjectInstance.value # as value returns self
 		else:
 			return self.__value
@@ -268,7 +270,7 @@ class Record:
 		if(lastrowid):
 			# if user doesn't define pk to be generated update the instance with it after insertion
 			self._pk = lastrowid
-			#self.___pk.value = lastrowid
+			# self.___pk.value = lastrowid
 			if(self.verbose):	self.print(Record.insertHeader)
 			if(verbose):		self.print(Record.insertHeader)
 	#--------------------------------------#
