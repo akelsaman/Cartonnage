@@ -116,36 +116,34 @@ class Database:
 databaseInstance = Database(databaseFile)
 #================================================================================#
 class Field:
-	def __init__(self, value=None, name=None, index=None):
-		self.__value	= value
-		self.__nname	= name
-		self.__oldValue	= None
-		self.__index	= index
+	def __init__(self, value=None, name=None, index=None, reference=None, display=None):
+		self.__value				= value
+		self.__name					= name
+		self.__index				= index
+		self.__reference			= reference
+		self.__classObjectInstance	= None
+		self.__display				= display
+		self.__oldValue				= None
 	#--------------------------------------#
 	@property
-	def name(self): return self.__nname
-	@property
-	def value(self): return self.__value
+	def value(self):
+		if(self.__reference):
+			self.__classObjectInstance = self.__reference()
+		if(self.__classObjectInstance):
+			self.__classObjectInstance._pk = self.__value
+			return self.__classObjectInstance.value # self.__classObjectInstance = self.__classObjectInstance.value # as value returns self
+		else:
+			return self.__value
 	@property
 	def _value_(self): return self.__value
 	@property
+	def name(self): return self.__name
+	@property
 	def index(self): return self.__index
 	#--------------------------------------#
-	#@name.setter
-	#def name(self, name): self.__nname = name
 	@value.setter
 	def value(self, value): self.__value = value
-	#@index.setter
-	#def index(self, index): self.__index = index
-	#--------------------------------------#
-	#@name.deleter
-	#def name(self): del self.__nname
-	#@value.deleter
-	#def value(self): del self.__value
-	#@index.deleter
-	#def index(self): del self.__index
-	#--------------------------------------#
-	
+	#--------------------------------------#	
 #================================================================================#
 class Record:
 	selectStatementTemplate		= Template('''SELECT * FROM ${table} WHERE ${table}.[_pk]='${pk}';''')
@@ -190,10 +188,10 @@ class Record:
 		#cannot use self._pk to call read() before self.__fields
 		self.__database			= databaseInstance
 			
-		self.__ttable			= table
-		self.__pk				= Field(value=None, index=0, name='[_pk]')
-		self.__fields			= [self.__pk] + fields
-		self.__nname			= name
+		self.__table			= table
+		self.___pk				= Field(value=None, name='[_pk]', index=0)
+		self.__fields			= [self.___pk] + fields
+		self.__name				= name
 		self.__index			= index
 		self.__new				= 1
 		self.__verbose			= verbose
@@ -202,13 +200,11 @@ class Record:
 		#print(self.__dict__)
 	#--------------------------------------#
 	@property
-	def _pk(self): return self.__pk.value
-	@property
-	def name(self): return self.__nname
+	def _pk(self): return self.___pk.value
 	@property
 	def value(self): return self
 	@property
-	def _value_(self): return self._pk
+	def name(self): return self.__name
 	@property
 	def index(self): return self.__index
 	@property
@@ -224,15 +220,13 @@ class Record:
 	def _pk(self, _pk):
 		#if(isinstance(_pk, int)):
 		if(_pk is not None):
-			self.__pk.value = _pk
+			self.___pk.value = _pk
 			self.read()
-	@value.setter
-	def value(self, value): self._pk = value
 	@verbose.setter
 	def verbose(self, verbose): self.__verbose = verbose
 	#--------------------------------------#
 	def read(self, verbose=0):
-		statement = Record.selectStatementTemplate.substitute({'table': self.__ttable, 'pk': str(self._pk)})
+		statement = Record.selectStatementTemplate.substitute({'table': self.__table, 'pk': str(self._pk)})
 		#print(statement)
 		record = self.__database.select(statement)
 		
@@ -241,8 +235,8 @@ class Record:
 			for field in self.__fields:
 				field.value = record[field.index]
 				
-		if(self.verbose):	self.print(readHeader)
-		if(verbose):		self.print(readHeader)
+		if(self.verbose):	self.print(Record.readHeader)
+		if(verbose):		self.print(Record.readHeader)
 	#--------------------------------------#
 	def save(self, verbose=0):
 		if(self.__new):
@@ -264,7 +258,7 @@ class Record:
 		values	= values[:-2] # without comma and space
 		
 		lastrowid = None # prevent-> UnboundLocalError: local variable 'lastrowid' referenced before assignment
-		statement = Record.insertStatementTemplate.substitute({'table': self.__ttable, 'fields': fields, 'values': values})
+		statement = Record.insertStatementTemplate.substitute({'table': self.__table, 'fields': fields, 'values': values})
 		#print(statement)
 				
 		if(fields):
@@ -273,10 +267,10 @@ class Record:
 		
 		if(lastrowid):
 			# if user doesn't define pk to be generated update the instance with it after insertion
-			#self._pk = lastrowid
-			self.__pk.value = lastrowid
-			if(self.verbose):	self.print(insertHeader)
-			if(verbose):		self.print(insertHeader)
+			self._pk = lastrowid
+			#self.___pk.value = lastrowid
+			if(self.verbose):	self.print(Record.insertHeader)
+			if(verbose):		self.print(Record.insertHeader)
 	#--------------------------------------#
 	def __update(self, verbose=0):
 		fieldsValues = ''
@@ -289,31 +283,31 @@ class Record:
 		fieldsValues = fieldsValues[:-2]
 		
 		rowcount=None # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
-		statement	= Record.updateStatementTemplate.substitute({'table': self.__ttable, 'fieldsValues': fieldsValues, 'pk': self._pk})
+		statement	= Record.updateStatementTemplate.substitute({'table': self.__table, 'fieldsValues': fieldsValues, 'pk': self._pk})
 		#print(statement)
 		rowcount	= self.__database.update(statement)
 		
 		if(rowcount):
-			if(self.verbose):	self.print(updateHeader)
-			if(verbose):		self.print(updateHeader)
+			if(self.verbose):	self.print(Record.updateHeader)
+			if(verbose):		self.print(Record.updateHeader)
 	#--------------------------------------#
 	def delete(self, verbose=0):
 		if(self.__new):
 			print(Record.recordNotExistTemplate.substitute({'pk': self._pk}))
 		else:			
 			rowcount=None  # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
-			statement = Record.deleteStatementTemplate.substitute({'table': self.__ttable, 'pk': self._pk})
+			statement = Record.deleteStatementTemplate.substitute({'table': self.__table, 'pk': self._pk})
 			#print(statement)
 			rowcount = self.__database.delete(statement)
 			
 			if(rowcount):
-				if(self.verbose):	self.print(deleteHeader)
-				if(verbose):		self.print(deleteHeader)
+				if(self.verbose):	self.print(Record.deleteHeader)
+				if(verbose):		self.print(Record.deleteHeader)
 	#--------------------------------------#
 	def print(self, header=readHeader):
 		instanceStringLines = ''
 		for field in self.__fields:
-			instanceStringLines += Record.instanceStringLineTemplate.substitute({'table': self.__ttable, 'field': field.name, 'value': str(field.value)})
+			instanceStringLines += Record.instanceStringLineTemplate.substitute({'table': self.__table, 'field': field.name, 'value': str(field._value_)})
 		instanceString = Record.instanceStringTemplate.substitute({'status': self.new, 'instanceStringLines': instanceStringLines})
 		print(header)
 		print(instanceString)
@@ -321,88 +315,59 @@ class Record:
 #================================================================================#
 class _values_lists(Record):
 	def __init__(self, pk=None, name=None, index=None, selfReference=1, verbose=0):
-		self.__ttable	= '[_values_lists]'
-		self.__value	= Field(index=1, name='[_value]')
-		self.__list_pk	= Field(index=2, name='[_list_pk]')
+		self.__table	= '[_values_lists]'
+		self.___value	= Field(name='[_value]', index=1)
+		self.___list_pk	= Field(name='[_list_pk]', index=2, reference=_values_lists)
 		
-		self.__fields	= [self.__value, self.__list_pk]
-		Record.__init__(self, pk, table = self.__ttable, name=name, index=index, fields=self.__fields, verbose=verbose)
-		
-		if(pk): self.selfReference(pk)
+		self.__fields	= [self.___value, self.___list_pk]
+		Record.__init__(self, pk, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
 	#--------------------------------------#
 	#no setter without property(getter)
 	#property (getter) declaration must preceed setter declaration
 	#to override parent private attribute use the name of the property instead
-	#self._pk instead self.__pk
+	#self._pk instead self.___pk
+	#Record.value = value # to modify static attribute
 	
 	@property
-	def value(self): return self
-	
+	def _value(self): return self.___value.value
 	@property
-	def _value(self): return self.__value.value
-	@property
-	def _list_pk(self): return self.__list_pk.value
+	def _list_pk(self): return self.___list_pk.value
 	#--------------------------------------#
-	#no setter without property(getter)
-	#property (getter) declaration must preceed setter declaration
-	#to override parent private attribute use the name of the property instead
-	#self._pk instead self.__pk
-	#Record.value = value
-	
-	@value.setter
-	def value(self, value):
-		self._pk = value
-		self.selfReference(value)
-		
 	@_value.setter
-	def _value(self, _value):
-		self.__value.value = _value
-		
+	def _value(self, _value): self.___value.value = _value
 	@_list_pk.setter
-	def _list_pk(self, _list_pk): self.__list_pk.value = _list_pk
-	#--------------------------------------#
-	def selfReference(self, value):
-		if(isinstance(value, int)):
-			if(value>=0):
-				_values_lists_instance	= _values_lists(self._list_pk, index=2, name='[_list_pk]')
-				sameRecord = 0
-				for i in range(0, len(_values_lists_instance.fields)):
-					if(_values_lists_instance.fields[i].value==self.fields[i].value): sameRecord = 1
-				if(sameRecord):
-					pass
-				else:
-					self.__list_pk = _values_lists_instance
+	def _list_pk(self, _list_pk): self.___list_pk.value = _list_pk
 #================================================================================#
 class _tables(Record):
 	def __init__(self, pk=None, name=None, index=None, verbose=0):
-		self.__ttable = '[_tables]'
-		self.__table = Field(index=1, name='[_table]')
-		self.__fields = [self.__table]
-		Record.__init__(self, pk, table = self.__ttable, name=name, index=index, fields=self.__fields, verbose=verbose)
+		self.__table = '[_tables]'
+		self.___table = Field(name='[_table]', index=1)
+		self.__fields = [self.___table]
+		Record.__init__(self, pk, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
 	#--------------------------------------#
 	@property
-	def _table(self): return self.__table.value
+	def _table(self): return self.___table.value
 	#--------------------------------------#
 	@_table.setter
-	def _table(self, _table): self.__table.value = _table
+	def _table(self, _table): self.___table.value = _table
 #================================================================================#
 class _tables_columns(Record):
 	def __init__(self, pk=None, name=None, index=None, verbose=0):
-		self.__ttable = '[_tables_columns]'
-		self.__table_pk = _tables(index=1, name='[_table_pk]')
-		self.__column = Field(index=2, name='[_column]')
-		self.__fields = [self.__table_pk, self.__column]
-		Record.__init__(self, pk, table = self.__ttable, name=name, index=index, fields=self.__fields, verbose=verbose)
+		self.__table = '[_tables_columns]'
+		self.___table_pk = Field(name='[_table_pk]', index=1, reference=_tables)
+		self.___column = Field(name='[_column]', index=2)
+		self.__fields = [self.___table_pk, self.___column]
+		Record.__init__(self, pk, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
 	#--------------------------------------#
 	@property
-	def _table_pk(self): return self.__table_pk.value
+	def _table_pk(self): return self.___table_pk.value
 	@property
-	def _column(self): return self.__column.value
+	def _column(self): return self.___column.value
 	#--------------------------------------#
 	@_table_pk.setter
-	def _table_pk(self, _table_pk): self.__table_pk.value = _table_pk
+	def _table_pk(self, _table_pk): self.___table_pk.value = _table_pk
 	@_column.setter
-	def _column(self, _column): self.__column.value = _column
+	def _column(self, _column): self.___column.value = _column
 #================================================================================#
 
 #================================================================================#
