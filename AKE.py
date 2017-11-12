@@ -213,8 +213,8 @@ class Record:
 	def fields(self): return self.__fields
 	@property
 	def new(self): #return self.__new
-		if(self.__new): return 'New'
-		else: return 'Exist'
+		if(self.__new):	return 'New'
+		else:			return 'Exist'
 	@property
 	def verbose(self): return self.__verbose
 	#--------------------------------------#
@@ -234,17 +234,14 @@ class Record:
 		
 		if(record):
 			self.__new = 0
-			for field in self.__fields:
-				field.value = record[field.index]
+			for field in self.__fields: field.value = record[field.index]
 				
 		if(self.verbose):	self.print(Record.readHeader)
 		if(verbose):		self.print(Record.readHeader)
 	#--------------------------------------#
 	def save(self, verbose=0):
-		if(self.__new):
-			self.__insert(verbose)
-		else:
-			self.__update(verbose)
+		if(self.__new):	self.__insert(verbose)
+		else:			self.__update(verbose)
 	#--------------------------------------#
 	def __insert(self, verbose=0):
 		fields	= ''
@@ -264,8 +261,7 @@ class Record:
 		#print(statement)
 				
 		if(fields):
-			if(values):
-				lastrowid = self.__database.insert(statement)
+			if(values): lastrowid = self.__database.insert(statement)
 		
 		if(lastrowid):
 			# if user doesn't define pk to be generated update the instance with it after insertion
