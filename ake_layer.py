@@ -16,7 +16,7 @@
 import sqlite3
 from string import Template
 
-databaseFile = 'queueing_system.db'
+databaseFile = 'thehardlock.db'
 #================================================================================#
 class debugTracer:
 	attributeTemplate	= Template('''	@>>> ${value}''')
@@ -160,6 +160,11 @@ class PrimaryKey:
 		return self
 	#--------------------------------------#
 	def sql(self):
+		# to empty the self.__sql from previous text content.
+		# if it runs for read it will add [_Bookings].[_PK] = 11111
+		# and if it runs for save it will add [_Bookings].[_PK] = 11111
+		# to become [_Bookings].[_PK] = 11111 AND [_Bookings].[_PK] = 11111
+		# and so on.
 		self.__sql = ''
 		for field in self.__fields:
 			self.__sql += PrimaryKey.fieldValueTemplate.substitute({'table': self.__table, 'field': field.name, 'value': field._value_})
@@ -189,7 +194,7 @@ class ForeignKey:
 			return self.__referenceClassObjectInstance
 	#--------------------------------------#
 	def instance(self):
-			return self.referenceClassObjectInstance()
+		return self.referenceClassObjectInstance()
 	#--------------------------------------#
 #================================================================================#
 class Record:
