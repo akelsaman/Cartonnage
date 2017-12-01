@@ -1,3 +1,5 @@
+#!/usr/local/bin/python3
+
 #================================================================================#
 # if error appears while execute database statement, uncomment print(statement)
 # in the realted method (read/insert/update/delete)
@@ -116,24 +118,19 @@ class Database:
 databaseInstance = Database(databaseFile)
 #================================================================================#
 class Field:
-	def __init__(self, value=None, name=None, index=None, reference=None, display=None):
-		self.__value				= value
+	def __init__(self, index=None, name=None, foreignKey=None):
 		self.__name					= name
 		self.__index				= index
-		self.__reference			= reference
-		self.__classObjectInstance	= None
-		self.__display				= display
+		self.__foreignKey			= foreignKey
+		self.__value				= None
 		self.__oldValue				= None
+
+		if(self.__foreignKey): self.__foreignKey.field(self) # add the field to the foreign key
 	#--------------------------------------#
 	@property
 	def value(self):
-		if(self.__classObjectInstance): # to prevent creating new object instance if one exists to save memory
-			self.__classObjectInstance._pk	= self.__value
-			return self.__classObjectInstance.value # self.__classObjectInstance = self.__classObjectInstance.value # as value returns self
-		elif(self.__reference):
-			self.__classObjectInstance		= self.__reference()
-			self.__classObjectInstance._pk	= self.__value
-			return self.__classObjectInstance.value # self.__classObjectInstance = self.__classObjectInstance.value # as value returns self
+		if(self.__foreignKey):
+			return self.__foreignKey.referenceClassObjectInstance()
 		else:
 			return self.__value
 	@property
@@ -147,11 +144,55 @@ class Field:
 	def value(self, value): self.__value = value
 	#--------------------------------------#	
 #================================================================================#
+class PrimaryKey:
+	fieldValueTemplate	= Template('''${table}.${field}='${value}' AND ''')
+	#--------------------------------------#
+	def __init__(self, table):
+		self.__table	= table
+		self.__fields	= []
+		self.__sql		= ''
+	#--------------------------------------#
+	@property
+	def fields(self): return self.__fields
+	#--------------------------------------#
+	def field(self, field):
+		self.__fields.append(field)
+		return self
+	#--------------------------------------#
+	def sql(self):
+		for field in self.__fields:
+			self.__sql += PrimaryKey.fieldValueTemplate.substitute({'table': self.__table, 'field': field.name, 'value': field.value})
+		return self.__sql[:-5]  # without " AND "
+	#--------------------------------------#
+#================================================================================#
+class ForeignKey:
+	def __init__(self, reference):
+		self.__reference					= reference
+		self.__fields						= []
+		self.__referenceClassObjectInstance	= None
+	#--------------------------------------#
+	def field(self, field):
+		self.__fields.append(field)
+		return self
+	#--------------------------------------#
+	def referenceClassObjectInstance(self):
+		if(self.__referenceClassObjectInstance): return self.__referenceClassObjectInstance
+		else:
+			self.__referenceClassObjectInstance = self.__reference()
+			primaryKeyFieldsCount = len(self.__referenceClassObjectInstance.primaryKey.fields)
+			for i in range(0, primaryKeyFieldsCount):
+				primaryKeyField = self.__referenceClassObjectInstance.primaryKey.fields[i]
+				foreignKeyField = self.__fields[i]
+				primaryKeyField.value = foreignKeyField._value_
+			self.__referenceClassObjectInstance.read()
+			return self.__referenceClassObjectInstance
+	#--------------------------------------#
+#================================================================================#
 class Record:
-	selectStatementTemplate		= Template('''SELECT * FROM ${table} WHERE ${table}.[_pk]='${pk}';''')
+	selectStatementTemplate		= Template('''SELECT * FROM ${table} WHERE ${primaryKey};''')
 	insertStatementTemplate		= Template('''INSERT INTO ${table}(${fields}) VALUES (${values});''')
-	updateStatementTemplate		= Template('''UPDATE ${table} SET ${fieldsValues} WHERE ${table}.[_pk]='${pk}';''')
-	deleteStatementTemplate		= Template('''DELETE FROM ${table} WHERE ${table}.[_pk]='${pk}';''')
+	updateStatementTemplate		= Template('''UPDATE ${table} SET ${fieldsValues} WHERE ${primaryKey};''')
+	deleteStatementTemplate		= Template('''DELETE FROM ${table} WHERE ${primaryKey};''')
 
 	fieldValueTemplate			= Template('''${field}='${value}', ''')
 	instanceStringLineTemplate	= Template('''${table}.${field}: ${value}\n''')
@@ -182,7 +223,7 @@ class Record:
 	#--------------------------------------#
 	'''
 	
-	def __init__(self, pk=None, table=None, name=None, index=None, fields=[], verbose=0):
+	def __init__(self, table=None, name=None, index=None, fields=[], verbose=0):
 		#print("==================== ====================")
 		#print(self.__class__.__name__)
 		#arrange of attributes is important
@@ -191,18 +232,15 @@ class Record:
 		self.__database			= databaseInstance
 			
 		self.__table			= table
-		self.___pk				= Field(value=None, name='[_pk]', index=0)
-		self.__fields			= [self.___pk] + fields
+		self.__fields			= fields
 		self.__name				= name
 		self.__index			= index
 		self.__new				= 1
 		self.__verbose			= verbose
-		
-		self._pk				= pk # to call read()
+		self.primaryKey			= PrimaryKey(self.__table)
+
 		#print(self.__dict__)
 	#--------------------------------------#
-	@property
-	def _pk(self): return self.___pk.value
 	@property
 	def value(self): return self
 	@property
@@ -218,17 +256,11 @@ class Record:
 	@property
 	def verbose(self): return self.__verbose
 	#--------------------------------------#
-	@_pk.setter
-	def _pk(self, _pk):
-		#if(isinstance(_pk, int)):
-		if(_pk is not None):
-			self.___pk.value = _pk
-			self.read()
 	@verbose.setter
 	def verbose(self, verbose): self.__verbose = verbose
 	#--------------------------------------#
 	def read(self, verbose=0):
-		statement = Record.selectStatementTemplate.substitute({'table': self.__table, 'pk': str(self._pk)})
+		statement = Record.selectStatementTemplate.substitute({'table': self.__table, 'primaryKey': self.primaryKey.sql()})
 		#print(statement)
 		record = self.__database.select(statement)
 		
@@ -281,7 +313,7 @@ class Record:
 		fieldsValues = fieldsValues[:-2]
 		
 		rowcount=None # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
-		statement	= Record.updateStatementTemplate.substitute({'table': self.__table, 'fieldsValues': fieldsValues, 'pk': self._pk})
+		statement	= Record.updateStatementTemplate.substitute({'table': self.__table, 'fieldsValues': fieldsValues, 'primaryKey': self.primaryKey.sql()})
 		#print(statement)
 		rowcount	= self.__database.update(statement)
 		
@@ -294,7 +326,7 @@ class Record:
 			print(Record.recordNotExistTemplate.substitute({'pk': self._pk}))
 		else:			
 			rowcount=None  # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
-			statement = Record.deleteStatementTemplate.substitute({'table': self.__table, 'pk': self._pk})
+			statement = Record.deleteStatementTemplate.substitute({'table': self.__table, 'primaryKey': self.primaryKey.sql()})
 			#print(statement)
 			rowcount = self.__database.delete(statement)
 			
@@ -310,58 +342,103 @@ class Record:
 		print(header)
 		print(instanceString)
 		return instanceString
+	#--------------------------------------#
 #================================================================================#
 class _values_lists(Record):
+	__table = '[_values_lists]' #it's a good practice to make it read only but no oop way in python
 	def __init__(self, pk=None, name=None, index=None, selfReference=1, verbose=0):
-		self.__table	= '[_values_lists]'
-		self.___value	= Field(name='[_value]', index=1)
-		self.___list_pk	= Field(name='[_list_pk]', index=2, reference=_values_lists)
+
+		self.___list_pk_fk = ForeignKey(reference=_values_lists)
+
+		self.___pk		= Field(index=0, name='[_pk]')
+		self.___value	= Field(index=1, name='[_value]')
+		self.___list_pk	= Field(index=2, name='[_list_pk]', foreignKey=self.___list_pk_fk)
 		
-		self.__fields	= [self.___value, self.___list_pk]
-		Record.__init__(self, pk, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
+		self.__fields	= [self.___pk, self.___value, self.___list_pk]
+		Record.__init__(self, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
+
+		# assign values to attributes after calling supper/parent class
+		# constructor of the child class to be created to make sure all the
+		# super's/parent's class and child class's attributes and methods are
+		# comined to constitute/form the class.
+
+		self.primaryKey.field(self.___pk)
+		self._pk		= pk
 	#--------------------------------------#
 	#no setter without property(getter)
 	#property (getter) declaration must preceed setter declaration
 	#to override parent private attribute use the name of the property instead
 	#self._pk instead self.___pk
 	#Record.value = value # to modify static attribute
-	
+	@property
+	def table(self): return self.__table
+	@property
+	def _pk(self): return self.___pk.value
 	@property
 	def _value(self): return self.___value.value
 	@property
 	def _list_pk(self): return self.___list_pk.value
 	#--------------------------------------#
+	@_pk.setter
+	def _pk(self, _pk): self.___pk.value = _pk
 	@_value.setter
 	def _value(self, _value): self.___value.value = _value
 	@_list_pk.setter
 	def _list_pk(self, _list_pk): self.___list_pk.value = _list_pk
+	#--------------------------------------#
 #================================================================================#
 class _tables(Record):
+	__table = '[_tables]' #it's a good practice to make it read only but no oop way in python
 	def __init__(self, pk=None, name=None, index=None, verbose=0):
-		self.__table = '[_tables]'
-		self.___table = Field(name='[_table]', index=1)
-		self.__fields = [self.___table]
-		Record.__init__(self, pk, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
+		self.___pk		= Field(index=0, name='[_pk]')
+		self.___table	= Field(index=1, name='[_table]')
+
+		self.__fields	= [self.___pk, self.___table]
+		Record.__init__(self, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
+
+		self.primaryKey.field(self.___pk)
+		self._pk		= pk
 	#--------------------------------------#
+	@property
+	def table(self): return self.__table
+	@property
+	def _pk(self): return self.___pk.value
 	@property
 	def _table(self): return self.___table.value
 	#--------------------------------------#
+	@_pk.setter
+	def _pk(self, _pk): self.___pk.value = _pk
 	@_table.setter
 	def _table(self, _table): self.___table.value = _table
+	#--------------------------------------#
 #================================================================================#
 class _tables_columns(Record):
+	__table = '[_tables_columns]' #it's a good practice to make it read only but no oop way in python
 	def __init__(self, pk=None, name=None, index=None, verbose=0):
-		self.__table = '[_tables_columns]'
-		self.___table_pk = Field(name='[_table_pk]', index=1, reference=_tables)
-		self.___column = Field(name='[_column]', index=2)
-		self.__fields = [self.___table_pk, self.___column]
-		Record.__init__(self, pk, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
+		
+		self.___table_pk_fk = ForeignKey(reference=_tables)
+
+		self.___pk			= Field(index=0, name='[_pk]')
+		self.___table_pk	= Field(index=1, name='[_table_pk]', foreignKey=self.___table_pk_fk)
+		self.___column		= Field(index=2, name='[_column]')
+
+		self.__fields		= [self.___pk, self.___table_pk, self.___column]
+		Record.__init__(self, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
+
+		self.primaryKey.field(self.___pk)
+		self._pk			= pk
 	#--------------------------------------#
+	@property
+	def table(self): return self.__table
+	@property
+	def _pk(self): return self.___pk.value
 	@property
 	def _table_pk(self): return self.___table_pk.value
 	@property
 	def _column(self): return self.___column.value
 	#--------------------------------------#
+	@_pk.setter
+	def _pk(self, _pk): self.___pk.value = _pk
 	@_table_pk.setter
 	def _table_pk(self, _table_pk): self.___table_pk.value = _table_pk
 	@_column.setter
