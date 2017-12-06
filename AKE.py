@@ -118,9 +118,8 @@ class Database:
 databaseInstance = Database(databaseFile)
 #================================================================================#
 class Field:
-	def __init__(self, index=None, name=None, foreignKey=None):
+	def __init__(self, name=None, foreignKey=None):
 		self.__name					= name
-		self.__index				= index
 		self.__foreignKey			= foreignKey
 		self.__value				= None
 		self.__oldValue				= None
@@ -137,8 +136,6 @@ class Field:
 	def _value_(self): return self.__value
 	@property
 	def name(self): return self.__name
-	@property
-	def index(self): return self.__index
 	#--------------------------------------#
 	@value.setter
 	def value(self, value): self.__value = value
@@ -227,7 +224,7 @@ class Record:
 	#--------------------------------------#
 	'''
 	
-	def __init__(self, table=None, name=None, index=None, fields=[], verbose=0):
+	def __init__(self, table=None, fields=[], verbose=0):
 		#print("==================== ====================")
 		#print(self.__class__.__name__)
 		#arrange of attributes is important
@@ -237,8 +234,6 @@ class Record:
 			
 		self.__table			= table
 		self.__fields			= fields
-		self.__name				= name
-		self.__index			= index
 		self.__new				= 1
 		self.__verbose			= verbose
 		self.primaryKey			= PrimaryKey(self.__table)
@@ -247,10 +242,6 @@ class Record:
 	#--------------------------------------#
 	@property
 	def value(self): return self
-	@property
-	def name(self): return self.__name
-	@property
-	def index(self): return self.__index
 	@property
 	def fields(self): return self.__fields
 	@property
@@ -270,7 +261,10 @@ class Record:
 		
 		if(record):
 			self.__new = 0
-			for field in self.__fields: field.value = record[field.index]
+			columnIndex = 0
+			for field in self.__fields:
+				field.value = record[columnIndex]
+				columnIndex+=1
 				
 		if(self.verbose):	self.print(Record.readHeader)
 		if(verbose):		self.print(Record.readHeader)
@@ -350,16 +344,13 @@ class Record:
 #================================================================================#
 class _values_lists(Record):
 	__table = '[_values_lists]' #it's a good practice to make it read only but no oop way in python
-	def __init__(self, pk=None, name=None, index=None, selfReference=1, verbose=0):
-
-		self.___list_pk_fk = ForeignKey(reference=_values_lists)
-
-		self.___pk		= Field(index=0, name='[_pk]')
-		self.___value	= Field(index=1, name='[_value]')
-		self.___list_pk	= Field(index=2, name='[_list_pk]', foreignKey=self.___list_pk_fk)
+	def __init__(self, pk=None, selfReference=1, verbose=0):
+		self.___pk		= Field(name='[_pk]')
+		self.___value	= Field(name='[_value]')
+		self.___list_pk	= Field(name='[_list_pk]', foreignKey=ForeignKey(reference=_values_lists))
 		
 		self.__fields	= [self.___pk, self.___value, self.___list_pk]
-		Record.__init__(self, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
+		Record.__init__(self, table = self.__table, fields=self.__fields, verbose=verbose)
 
 		# assign values to attributes after calling supper/parent class
 		# constructor of the child class to be created to make sure all the
@@ -393,12 +384,12 @@ class _values_lists(Record):
 #================================================================================#
 class _tables(Record):
 	__table = '[_tables]' #it's a good practice to make it read only but no oop way in python
-	def __init__(self, pk=None, name=None, index=None, verbose=0):
-		self.___pk		= Field(index=0, name='[_pk]')
-		self.___table	= Field(index=1, name='[_table]')
+	def __init__(self, pk=None, verbose=0):
+		self.___pk		= Field(name='[_pk]')
+		self.___table	= Field(name='[_table]')
 
 		self.__fields	= [self.___pk, self.___table]
-		Record.__init__(self, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
+		Record.__init__(self, table = self.__table, fields=self.__fields, verbose=verbose)
 
 		self.primaryKey.field(self.___pk)
 		self._pk		= pk
@@ -418,16 +409,13 @@ class _tables(Record):
 #================================================================================#
 class _tables_columns(Record):
 	__table = '[_tables_columns]' #it's a good practice to make it read only but no oop way in python
-	def __init__(self, pk=None, name=None, index=None, verbose=0):
-		
-		self.___table_pk_fk = ForeignKey(reference=_tables)
-
-		self.___pk			= Field(index=0, name='[_pk]')
-		self.___table_pk	= Field(index=1, name='[_table_pk]', foreignKey=self.___table_pk_fk)
-		self.___column		= Field(index=2, name='[_column]')
+	def __init__(self, pk=None, verbose=0):
+		self.___pk			= Field(name='[_pk]')
+		self.___table_pk	= Field(name='[_table_pk]', foreignKey=ForeignKey(reference=_tables))
+		self.___column		= Field(name='[_column]')
 
 		self.__fields		= [self.___pk, self.___table_pk, self.___column]
-		Record.__init__(self, table = self.__table, name=name, index=index, fields=self.__fields, verbose=verbose)
+		Record.__init__(self, table = self.__table, fields=self.__fields, verbose=verbose)
 
 		self.primaryKey.field(self.___pk)
 		self._pk			= pk

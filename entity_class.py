@@ -3,7 +3,7 @@
 import sqlite3
 from string import Template
 
-attributeTemplate	= Template('''self.__${attributeName} = Field(index=0, name='[${attributeName}]')\n\t\t''')
+attributeTemplate	= Template('''self.__${attributeName} = Field(name='[${attributeName}]')\n\t\t''')
 fieldTemplate		= Template('''self.__${attributeName}, ''')
 
 getterTemplate		= Template('''
@@ -17,10 +17,10 @@ setterTemplate		= Template('''
 classTemplate = Template('''
 class ${tableName}(Record):
 	table='[${tableName}]'
-	def __init__(self, pk=None, name=None, index=None, verbose=0):
+	def __init__(self, pk=None, verbose=0):
 		${attributes}
 		self.__fields = [${fields}]
-		Record.__init__(self, table = self.table, name=name, index=index, fields=self.__fields, verbose=verbose)
+		Record.__init__(self, table = self.table, fields=self.__fields, verbose=verbose)
 	#--------------------------------------#
 	${getters}
 	#--------------------------------------#
