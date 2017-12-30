@@ -6,11 +6,13 @@ header("Content-Type:text/plain");
 $databaseFile = 'sqlite:database/thehardlock.db';
 #================================================================================#
 class Template{
+	private $__templateString;
 	private $__string;
 	public function __construct($string){
-		$this->__string = $string;
+		$this->__templateString = $string;
 	}
 	public function substitute($keywords){
+		$this->__string = $this->__templateString;
 		foreach($keywords as $key => $value){
 			$key = '${' . $key . '}';
 			$this->__string = str_replace($key, $value, $this->__string);
@@ -144,7 +146,7 @@ class Database{
 	}
 	public function beginTransaction(){$this->__connection->beginTransaction();}
 	public function commit(){$this->__connection->commit();}
-	public function close(){$this->__connection->close();}
+	public function close(){$this->__connection = Null;}
 	#--------------------------------------#
 	public function execute($statement){
 		$record = Null;
@@ -219,7 +221,7 @@ class Field{
 		if($this->__foreignKey){$this->__foreignKey->field($this);}
 	}
 	#--------------------------------------#
-	public function getValue(){
+	public function valueGet(){
 		if($this->__foreignKey){
 			return $this->__foreignKey->referenceClassObjectInstance();
 		} else {
@@ -227,9 +229,9 @@ class Field{
 		}
 	}
 	public function _value_(){return $this->__value;}
-	public function getName(){return $this->__name;}
+	public function nameGet(){return $this->__name;}
 	#--------------------------------------#
-	public function setValue($value){$this->__value=$value;return $this;}
+	public function valueSet($value){$this->__value=$value;return $this;}
 	#--------------------------------------#
 }
 #================================================================================#
@@ -241,7 +243,7 @@ class PrimaryKey{
 	private $__fields;
 	private $__sql;
 	#--------------------------------------#
-	function __construct($table){
+	public function __construct($table){
 		$this->fieldValueTemplate = new Template(PrimaryKey::$fieldValueTemplateString);
 
 		$this->__table	= $table;
@@ -249,18 +251,18 @@ class PrimaryKey{
 		$this->__sql	= Null;
 	}
 	#--------------------------------------#
-	function getFields(){ return $this->__fields; }
+	public function fieldsGet(){ return $this->__fields; }
 	#--------------------------------------#
-	function field($field){
+	public function field($field){
 		#$this->__fields->append($field);
 		array_push($this->__fields, $field);
 		return $this;
 	}
 	#--------------------------------------#
-	function getSql(){
+	public function sqlGet(){
 		$this->__sql = '';
 		foreach($this->__fields as $field){
-			$this->__sql .= $this->fieldValueTemplate->substitute(['table' => $this->__table, 'field' => $field->getName(), 'value' => $field->_value_()]);
+			$this->__sql .= $this->fieldValueTemplate->substitute(['table' => $this->__table, 'field' => $field->nameGet(), 'value' => $field->_value_()]);
 		}
 		return substr($this->__sql, 0, -5);  # without " AND "
 	}
@@ -272,49 +274,42 @@ class ForeignKey{
 	private $__fields;
 	private $__referenceClassObjectInstance;
 
-	function __construct($reference){
+	public function __construct($reference){
 		$this->__reference						= $reference;
 		$this->__fields							= [];
 		$this->__referenceClassObjectInstance	= Null;
 	}
 	#--------------------------------------#
-	function field($field){
-		$this->__fields.append($field);
+	public function field($field){
+		#$this->__fields.append($field);
+		array_push($this->__fields, $field);
 		return $this;
 	}
 	#--------------------------------------#
-	function referenceClassObjectInstance(){
+	public function referenceClassObjectInstance(){
 		if($this->__referenceClassObjectInstance){ return $this->__referenceClassObjectInstance; }
 		else{
-			$this->__referenceClassObjectInstance = $this->__reference();
-			$primaryKeyFieldsCount = len($this->__referenceClassObjectInstance->primaryKey->getFields());
+			$this->__referenceClassObjectInstance = new $this->__reference();
+			#var_dump($this->__referenceClassObjectInstance); #to dump the context of the class object instance for debugging.
+			#sizeof() is alias for count()
+			$primaryKeyFieldsCount = count($this->__referenceClassObjectInstance->primaryKey->fieldsGet());
 			for($i =0; $i < $primaryKeyFieldsCount; $i++){
-				$primaryKeyField = $this->__referenceClassObjectInstance->primaryKey->fields[$i];
+				$primaryKeyField = $this->__referenceClassObjectInstance->primaryKey->fieldsGet()[$i];
 				$foreignKeyField = $this->__fields[$i];
-				$primaryKeyField->value = $foreignKeyField->_value_;
+				$primaryKeyField->valueSet($foreignKeyField->_value_());
 			}
-			$this->__referenceClassObjectInstance.read();
+			$this->__referenceClassObjectInstance->read();
 			return $this->__referenceClassObjectInstance;
 		}
 	}
 	#--------------------------------------#
-	function instance(){
+	public function instance(){
 		return $this->referenceClassObjectInstance();
 	#--------------------------------------#
 	}
 }
 #================================================================================#
 class Record{
-	private static $selectStatementTemplateString	= 'SELECT * FROM ${table} WHERE ${primaryKey};';
-	private static $insertStatementTemplateString	= 'INSERT INTO ${table}(${fields}) VALUES (${values});';
-	private static $updateStatementTemplateString	= 'UPDATE ${table} SET ${fieldsValues} WHERE ${primaryKey};';
-	private static $deleteStatementTemplateString	= 'DELETE FROM ${table} WHERE ${primaryKey};';
-
-	private static $fieldValueTemplateString			= '${field}=\'${value}\', ';
-	private static $instanceStringLineTemplateString	= '${table}->${field}: ${value}\n';
-	private static $instanceStringTemplateString		= 'Record status: ${status}\n${instanceStringLines}';
-	private static $recordNotExistTemplateString		= 'Record ${pk} is not exist';
-
 	private static $selectStatementTemplate;
 	private static $insertStatementTemplate;
 	private static $updateStatementTemplate;
@@ -349,7 +344,7 @@ class Record{
 #--------------------------------------#
 ";
 
-	private $__database;
+	private static $__database;
 
 	private $__table;
 	private $__fields;
@@ -363,17 +358,22 @@ class Record{
 		#arrange of attributes is important
 		#cannot declare $this->__fields before $this->__pk
 		#cannot use $this->_pk to call read() before $this->
-		$this->__database		= $GLOBALS['databaseInstance'];
+		Record::$__database	= $GLOBALS['databaseInstance'];
 		
-		$this->selectStatementTemplate = new Template(Record::$selectStatementTemplateString);
-		$this->insertStatementTemplate = new Template(Record::$insertStatementTemplateString);
-		$this->updateStatementTemplate = new Template(Record::$updateStatementTemplateString);
-		$this->deleteStatementTemplate = new Template(Record::$deleteStatementTemplateString);
+		# when to use self::, static:: or Record:: ?
+		#https://stackoverflow.com/questions/151969/when-to-use-self-over-this
+		# $this is used for non-static members.
+		# self::, static:: or Record:: is used for static members.
+
+		Record::$selectStatementTemplate = new Template('SELECT * FROM ${table} WHERE ${primaryKey};');
+		Record::$insertStatementTemplate = new Template('INSERT INTO ${table}(${fields}) VALUES (${values});');
+		Record::$updateStatementTemplate = new Template('UPDATE ${table} SET ${fieldsValues} WHERE ${primaryKey};');
+		Record::$deleteStatementTemplate = new Template('DELETE FROM ${table} WHERE ${primaryKey};');
 		
-		$this->fieldValueTemplate			= new Template(Record::$fieldValueTemplateString);
-		$this->instanceStringLineTemplate	= new Template(Record::$instanceStringLineTemplateString);
-		$this->instanceStringTemplate		= new Template(Record::$instanceStringTemplateString);
-		$this->recordNotExistTemplate		= new Template(Record::$recordNotExistTemplateString);
+		Record::$fieldValueTemplate			= new Template('${field}=\'${value}\', ');
+		Record::$instanceStringLineTemplate	= new Template('${table}->${field}: ${value}' . "\n");
+		Record::$instanceStringTemplate		= new Template('Record status: ${status}' . "\n" . '${instanceStringLines}');
+		Record::$recordNotExistTemplate		= new Template('Record ${pk} is not exist');
 
 		$this->__table			= $table;
 		$this->__fields			= $fields;
@@ -384,34 +384,33 @@ class Record{
 		#print($this->__dict__) #python
 	}
 	#--------------------------------------#
-	public function getValue(){ return $this; }
-	public function getFields(){ return $this->__fields; }
-	public function getNew(){
+	public function valueGet(){ return $this; }
+	public function fieldsGet(){ return $this->__fields; }
+	public function newGet(){
 		#return $this->__new
 		if($this->__new){ return 'New'; }
 		else{ return 'Exist'; }
 	}
-	public function getVerbose(){ return $this->__verbose; }
+	public function verboseGet(){ return $this->__verbose; }
 	#--------------------------------------#
-	public function verbose($verbose){ $this->__verbose = $verbos; }
+	public function verboseSet($verbose){ $this->__verbose = $verbos; }
 	#--------------------------------------#
 	public function read($verbose=0){
-		$statement = $this->selectStatementTemplate->substitute(['table' => $this->__table, 'primaryKey' => $this->primaryKey->getSql()]);
-		#echo($statements);
-		$record = $this->__database->select($statement);
+		$statement = Record::$selectStatementTemplate->substitute(['table' => $this->__table, 'primaryKey' => $this->primaryKey->sqlGet()]);
+		#echo($statement);
+		$record = Record::$__database->select($statement);
 		
 		if($record){
 			$this->__new = 0;
 			$columnIndex = 0;
 			foreach($this->__fields as $field){
-				$field->setValue($record[$columnIndex]);
+				$field->valueSet($record[$columnIndex]);
 				$columnIndex+=1;
 			}
 		}
 		
 		if($this->verbose){	$this->print(Record::$readHeader); }
 		if($verbose){		$this->print(Record::$readHeader); }
-		
 	}
 	#--------------------------------------#
 	public function save($verbose=0){
@@ -427,7 +426,7 @@ class Record{
 			# $field->value may contains integer 0
 			# if(Null) = if(0) # field will be excluded in this way
 			if($field->_value_() != Null){
-				$fields .= $field->getName() . ', ';
+				$fields .= $field->nameGet() . ', ';
 				$values	.= "'" . (string)$field->_value_() . "', ";
 			}
 		}
@@ -435,16 +434,16 @@ class Record{
 		$values	= substr($values, 0 , -2); # without comma and space
 		
 		$lastrowid = Null; # prevent-> UnboundLocalError: local variable '$lastrowid' referenced before assignment
-		$statement = $this->insertStatementTemplate->substitute(['table' => $this->__table, 'fields' => $fields, 'values' => $values]);
+		$statement = Record::$insertStatementTemplate->substitute(['table' => $this->__table, 'fields' => $fields, 'values' => $values]);
 		#echo($statement);
 				
 		if($fields){
-			if($values){ $lastrowid = $this->__database->insert($statement); }
+			if($values){ $lastrowid = Record::$__database->insert($statement); echo($lastrowid);}
 		}
 		
 		if($lastrowid){
 			# if user doesn't define pk to be generated update the instance with it after insertion
-			$this->_pk = $lastrowid;
+			$this->_pkSet($lastrowid);
 			# $this->___pk->value = $lastrowid
 			if($this->verbose){	$this->print(Record::$insertHeader); }
 			if($verbose){		$this->print(Record::$insertHeader); }
@@ -458,15 +457,15 @@ class Record{
 			# $field->value may contains integer 0
 			# if(Null) = if(0) # field will be excluded in this way
 			if($field->_value_() != Null){
-				$fieldsValues .= $this->fieldValueTemplate->substitute(['field' => $field->getName(), 'value' => (string)$field->_value_()]);
+				$fieldsValues .= Record::$fieldValueTemplate->substitute(['field' => $field->nameGet(), 'value' => (string)$field->_value_()]);
 			}
 		}
 		$fieldsValues = substr($fieldsValues, 0 , -2);
 		
 		$rowcount=Null; # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
-		$statement	= $this->updateStatementTemplate->substitute(['table' => $this->__table, 'fieldsValues' => $fieldsValues, 'primaryKey' => $this->primaryKey->getSql()]);
+		$statement	= Record::$updateStatementTemplate->substitute(['table' => $this->__table, 'fieldsValues' => $fieldsValues, 'primaryKey' => $this->primaryKey->sqlGet()]);
 		#echo($statement);
-		$rowcount	= $this->__database->update($statement);
+		$rowcount	= Record::$__database->update($statement);
 		
 		if($rowcount){
 			if($this->verbose){	$this->print(Record::$updateHeader); }
@@ -480,9 +479,9 @@ class Record{
 		}
 		else{			
 			$rowcount=Null;  # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
-			$statement = $this->deleteStatementTemplate->substitute(['table' => $this->__table, 'primaryKey' => $this->primaryKey->sql()]);
+			$statement = Record::$deleteStatementTemplate->substitute(['table' => $this->__table, 'primaryKey' => $this->primaryKey->sql()]);
 			#echo($statement);
-			$rowcount = $this->__database->delete($statement);
+			$rowcount = Record::$__database->delete($statement);
 			
 			if($rowcount){
 				if($this->verbose){	$this->print(Record::$deleteHeader); }
@@ -497,9 +496,9 @@ class Record{
 		
 		$instanceStringLines = '';
 		foreach($this->__fields as $field){
-			$instanceStringLines .= $this->instanceStringLineTemplate->substitute(['table' => $this->__table, 'field' => $field->getName(), 'value' => (string)$field->_value_()]);
+			$instanceStringLines .= Record::$instanceStringLineTemplate->substitute(['table' => $this->__table, 'field' => $field->nameGet(), 'value' => (string)$field->_value_()]);
 		}
-		$instanceString = $this->instanceStringTemplate->substitute(['status' => $this->getNew(), 'instanceStringLines' => $instanceStringLines]);
+		$instanceString = Record::$instanceStringTemplate->substitute(['status' => $this->newGet(), 'instanceStringLines' => $instanceStringLines]);
 		echo($header);
 		echo($instanceString);
 		return $instanceString;
@@ -507,44 +506,14 @@ class Record{
 	#--------------------------------------#
 }
 #================================================================================#
-class _Schemas Extends Record{
-	private static $table='[_Schemas]';
-	private static $fields;
-	function __construct($pk=Null, $verbose=0){
-		$this->___Schema	= new Field($name='[_Schema]');
-		$this->__fields	= [$this->___Schema];
-		Parent::__construct($table = _Schemas::$table, $fields=$this->__fields, $verbose=$verbose);
-		
-		$this->primaryKey->field($this->___Schema);
-		$this->_SchemaSet($pk);
-	}
-	#--------------------------------------#
-	public function _SchemaGet(){ return $this->___Schema->getValue(); }
-	#--------------------------------------#
-	public function _SchemaSet($_Schema){ $this->___Schema->setValue($_Schema); }
-	#--------------------------------------#
-}
-#================================================================================#
-$s = new _Schemas('1987-06-18');
-$s->read();
-$s->print();
-#$s->_SchemaSet('1987-06-17');
-#$s->save();
-#$s->read();
-#$s->print();
-
-
-
-
-
 /*
 #$e = Field;
 #$f = new $e($name="AKE");
 $f = new Field($name="AKE");
-$f->setValue("Ahmed Kamal ELSaman")->setValue("Adel ELSayed");
-echo($f->getName());
+$f->valueSet("Ahmed Kamal ELSaman")->valueSet("Adel ELSayed");
+echo($f->nameGet());
 echo("\n");
-echo($f->getValue());
+echo($f->valueGet());
 
 
 $d = new Database($databaseFile);
