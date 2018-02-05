@@ -2,8 +2,6 @@
 header("Content-Type:text/plain");
 #header("Content-Type:text/html");
 
-#$databaseFile = 'database/thehardlock.db';
-$databaseFile = 'sqlite:database/thehardlock.db';
 #================================================================================#
 class Template{
 	private $__templateString;
@@ -206,8 +204,6 @@ class Database{
 	#--------------------------------------#
 }
 #================================================================================#
-$databaseInstance = new Database($databaseFile);
-#================================================================================#
 class Field{
 	private $__name;
 	private $__foreignKey;
@@ -259,7 +255,7 @@ class PrimaryKey{
 		return $this;
 	}
 	#--------------------------------------#
-	public function sqlGet(){
+	public function sql(){
 		$this->__sql = '';
 		foreach($this->__fields as $field){
 			$this->__sql .= $this->fieldValueTemplate->substitute(['table' => $this->__table, 'field' => $field->nameGet(), 'value' => $field->_value_()]);
@@ -344,7 +340,7 @@ class Record{
 #--------------------------------------#
 ";
 
-	private static $__database;
+	public static $__database = Null;
 
 	private $__table;
 	private $__fields;
@@ -352,13 +348,12 @@ class Record{
 	private $__verbose;
 	public $primaryKey;
 
-	public function __construct($table=None, $fields=[], $verbose=0){
+	public function __construct($table=Null, $fields=[], $verbose=0){
 		#print("==================== ====================")
 		#print($this->__class__->__name__)
 		#arrange of attributes is important
 		#cannot declare $this->__fields before $this->__pk
 		#cannot use $this->_pk to call read() before $this->
-		Record::$__database	= $GLOBALS['databaseInstance'];
 		
 		# when to use self::, static:: or Record:: ?
 		#https://stackoverflow.com/questions/151969/when-to-use-self-over-this
@@ -396,7 +391,7 @@ class Record{
 	public function verboseSet($verbose){ $this->__verbose = $verbos; }
 	#--------------------------------------#
 	public function read($verbose=0){
-		$statement = Record::$selectStatementTemplate->substitute(['table' => $this->__table, 'primaryKey' => $this->primaryKey->sqlGet()]);
+		$statement = Record::$selectStatementTemplate->substitute(['table' => $this->__table, 'primaryKey' => $this->primaryKey->sql()]);
 		#echo($statement);
 		$record = Record::$__database->select($statement);
 		
@@ -442,8 +437,10 @@ class Record{
 		}
 		
 		if($lastrowid){
-			# if user doesn't define pk to be generated update the instance with it after insertion
-			$this->_pkSet($lastrowid);
+			if($this->_pk){
+				# if user doesn't define pk to be generated update the instance with it after insertion
+				$this->_pkSet($lastrowid);
+			}
 			# $this->___pk->value = $lastrowid
 			if($this->verbose){	$this->print(Record::$insertHeader); }
 			if($verbose){		$this->print(Record::$insertHeader); }
@@ -463,7 +460,7 @@ class Record{
 		$fieldsValues = substr($fieldsValues, 0 , -2);
 		
 		$rowcount=Null; # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
-		$statement	= Record::$updateStatementTemplate->substitute(['table' => $this->__table, 'fieldsValues' => $fieldsValues, 'primaryKey' => $this->primaryKey->sqlGet()]);
+		$statement	= Record::$updateStatementTemplate->substitute(['table' => $this->__table, 'fieldsValues' => $fieldsValues, 'primaryKey' => $this->primaryKey->sql()]);
 		#echo($statement);
 		$rowcount	= Record::$__database->update($statement);
 		

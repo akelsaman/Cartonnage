@@ -16,7 +16,6 @@
 import sqlite3
 from string import Template
 
-databaseFile = 'thehardlock.db'
 #================================================================================#
 class debugTracer:
 	attributeTemplate	= Template('''	@>>> ${value}''')
@@ -115,8 +114,6 @@ class Database:
 		return self.__cursor.rowcount
 	#--------------------------------------#		
 #================================================================================#
-databaseInstance = Database(databaseFile)
-#================================================================================#
 class Field:
 	def __init__(self, name=None, foreignKey=None):
 		self.__name					= name
@@ -198,7 +195,7 @@ class Record:
 	fieldValueTemplate			= Template('''${field}='${value}', ''')
 	instanceStringLineTemplate	= Template('''${table}.${field}: ${value}\n''')
 	instanceStringTemplate		= Template('''Record status: ${status}\n${instanceStringLines}''')
-	recordNotExistTemplate		= Template('''Record ${pk} is not exist''')
+	recordNotExistTemplate		= Template('''Record ${primaryKey} is not exist''')
 
 	readHeader='''
 	#--------------------------------------#
@@ -224,14 +221,15 @@ class Record:
 	#--------------------------------------#
 	'''
 	
+	database = None
+
 	def __init__(self, table=None, fields=[], verbose=0):
 		#print("==================== ====================")
 		#print(self.__class__.__name__)
 		#arrange of attributes is important
 		#cannot declare self.__fields before self.__pk
 		#cannot use self._pk to call read() before self.__fields
-		self.__database			= databaseInstance
-			
+		
 		self.__table			= table
 		self.__fields			= fields
 		self.__new				= 1
@@ -257,7 +255,7 @@ class Record:
 	def read(self, verbose=0):
 		statement = Record.selectStatementTemplate.substitute({'table': self.__table, 'primaryKey': self.primaryKey.sql()})
 		#print(statement)
-		record = self.__database.select(statement)
+		record = Record.database.select(statement)
 		
 		if(record):
 			self.__new = 0
@@ -291,12 +289,12 @@ class Record:
 		#print(statement)
 				
 		if(fields):
-			if(values): lastrowid = self.__database.insert(statement)
+			if(values): lastrowid = Record.database.insert(statement)
 		
 		if(lastrowid):
-			# if user doesn't define pk to be generated update the instance with it after insertion
-			self._pk = lastrowid
-			# self.___pk.value = lastrowid
+			if(self._pk):
+				# if user doesn't define pk to be generated update the instance with it after insertion
+				self._pk = lastrowid # self.___pk.value = lastrowid
 			if(self.verbose):	self.print(Record.insertHeader)
 			if(verbose):		self.print(Record.insertHeader)
 	#--------------------------------------#
@@ -313,7 +311,7 @@ class Record:
 		rowcount=None # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
 		statement	= Record.updateStatementTemplate.substitute({'table': self.__table, 'fieldsValues': fieldsValues, 'primaryKey': self.primaryKey.sql()})
 		#print(statement)
-		rowcount	= self.__database.update(statement)
+		rowcount	= Record.database.update(statement)
 		
 		if(rowcount):
 			if(self.verbose):	self.print(Record.updateHeader)
@@ -321,12 +319,12 @@ class Record:
 	#--------------------------------------#
 	def delete(self, verbose=0):
 		if(self.__new):
-			print(Record.recordNotExistTemplate.substitute({'pk': self._pk}))
+			print(Record.recordNotExistTemplate.substitute({'primaryKey': self.primaryKey.sql()}))
 		else:			
 			rowcount=None  # prevent -> UnboundLocalError: local variable 'rowcount' referenced before assignment
 			statement = Record.deleteStatementTemplate.substitute({'table': self.__table, 'primaryKey': self.primaryKey.sql()})
 			#print(statement)
-			rowcount = self.__database.delete(statement)
+			rowcount = Record.database.delete(statement)
 			
 			if(rowcount):
 				if(self.verbose):	self.print(Record.deleteHeader)
