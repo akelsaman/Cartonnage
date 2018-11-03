@@ -111,7 +111,7 @@ class Record:
 	selectStatementTemplate			= Template('''SELECT * FROM ${table} WHERE ${fieldsValues}''')
 	deleteStatementTemplate			= Template('''DELETE FROM ${table} WHERE ${fieldsValues}''')
 	insertStatementTemplate			= Template('''INSERT INTO ${table}${fieldsValues}''')
-	updateStatementTemplate			= Template('''UPDATE ${table} SET ${fieldsValues} WHERE ${_fieldsValues_}''')
+	updateStatementTemplate			= Template('''UPDATE ${table} SET ${fieldsValues} WHERE ${_fieldsValues_}''')+
 	#--------------------------------------#
 	def __init__(self, statement=None, **kwargs):
 		self.mappedObjectsFromRecords = []
