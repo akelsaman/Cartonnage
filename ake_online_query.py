@@ -19,8 +19,10 @@ class Result:
 class Recordset:
 	def __init__(self): self.__records = []
 	def empty(self): self.__records = []
-	def add(self): self.__records.append(record)
+	def add(self, record): self.__records.append(record)
 	def iterate(self): return self.__records
+	def insert(self):
+		for record in self.__records: record.insert()
 #================================================================================#
 class Database:
 	def __init__(self, database=None, username=None, password=None, host=None):
@@ -79,6 +81,10 @@ class Database:
 			query.result = Result(columns, rows, count, rowcount)
 			return query
 	#--------------------------------------#
+        def executeScript(self, sqlScriptFileName):
+                sqlScriptFile = open(sqlScriptFileName,'r')
+                sql = sqlScriptFile.read()
+                return self.__cursor.executescript(sql)
 #================================================================================#
 class ObjectRelationalMapper:
 	def __init__(self): pass
@@ -93,7 +99,7 @@ class ObjectRelationalMapper:
 					setattr(object, query.result.columns[index], fieldValue)
 					index += 1
 				passedObject.mappedObjectsFromRecords.append(object)
-				object = Record()
+				object = passedObject.__class__() #object = Record() #bug
 #================================================================================#
 class State:
 	def __init__(self): self.current = None
@@ -122,7 +128,8 @@ class Record:
 		self.__query = Query() # must be declared before self.queryObject(statement)
 		if(statement is not None):
 			self.__query.statement = statement
-			Record.database.execute(self.__query)
+			#self. instead of Record. #change the static field self.__database for inherited children classes
+			self.database.execute(self.__query)
 			Record.orm.map(self.__query, self)
 	#--------------------------------------#
 	def __iter__(self): 
@@ -171,7 +178,7 @@ class Record:
 		if(fieldsValues is not None):
 			self.__query.statement = template.substitute({'table': self.table(), 'fieldsValues': fieldsValues, '_fieldsValues_': _fieldsValues_})
 			self.__state.current = None
-			Record.database.execute(self.__query)
+			self.database.execute(self.__query)
 			Record.orm.map(self.__query, self)
 	#--------------------------------------#
 	def startUpdate(self): self.__state.current = self.fieldsEqualValues()

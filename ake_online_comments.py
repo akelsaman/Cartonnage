@@ -48,3 +48,13 @@
 #select record(s) from table(s) using value(s) per attribute. (sql query mapping).
 #-----
 #================================================================================#
+#https://docs.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-2017
+#==> msodbcsql17
+"""
+If you installed this formula with the registration option (default), you'll
+need to manually remove [ODBC Driver 17 for SQL Server] section from
+odbcinst.ini after the formula is uninstalled. This can be done by executing
+the following command:
+    odbcinst -u -d -n "ODBC Driver 17 for SQL Server"
+"""
+#================================================================================#
