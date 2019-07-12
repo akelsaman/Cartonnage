@@ -58,3 +58,5 @@ the following command:
     odbcinst -u -d -n "ODBC Driver 17 for SQL Server"
 """
 #================================================================================#
+#how to be sure prepared statement's parameters is passed to the cursor.
+#================================================================================#
