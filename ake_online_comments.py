@@ -61,4 +61,5 @@ the following command:
 #how to be sure prepared statement's parameters is passed to the cursor.
 #most important database to keep compatibility:
 #   (sqlite, mysql, postgres, microsoft sql & oracle according need and usage)
+# reorganize code of recordset for firstObject - self.__record[0] -
 #================================================================================#
