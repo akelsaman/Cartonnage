@@ -62,4 +62,6 @@ the following command:
 #most important database to keep compatibility:
 #   (sqlite, mysql, postgres, microsoft sql & oracle according need and usage)
 # reorganize code of recordset for firstObject - self.__record[0] -
+# catch exception for missing fields in Record.parameters() from first record or
+#   even the rest of the records.
 #================================================================================#
