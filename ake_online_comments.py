@@ -64,4 +64,9 @@ the following command:
 # reorganize code of recordset for firstObject - self.__record[0] -
 # catch exception for missing fields in Record.parameters() from first record or
 #   even the rest of the records.
+#-----
+# self.__iterationIndex = 0 # self.__iterationBound = len(self.recordset.iterate()) # self.__iterationIndex += 1
+# save them in  class object instance to prevent contradiction with the attributes that represents database fields.
+#-----
+# make operation count an operation counter class to maintain more statistical information like number of insert/read/update/delete operations.
 #================================================================================#
