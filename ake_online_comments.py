@@ -5,6 +5,10 @@
 # Template double qoute " is not working only single qoute ' !
 # exceptions, testing and quality insurance
 # auto incremented fields
+#-----
+#  if read() don't select data correctly from the database although it's exist in
+# database, it's almost data type issue of class attributes ex: not str
+#-----
 #================================================================================#
 #direct and instant access without data definition. (implemented)
 #cach insert/update/delete translated sql to be run at once. (to be implemented)
