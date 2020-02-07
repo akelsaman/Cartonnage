@@ -527,7 +527,7 @@ class Record:
 	def commit(self): self.database.commit()
 	#--------------------------------------#
 	def getCopyInstance(self, base=(object, ), attributesDictionary={}):
-		return self.database.getCopyInstance(self, base=(object, ), attributesDictionary={})
+		return self.database.getCopyInstance(self, base, attributesDictionary={})
 #================================================================================#
 class Recordset:
 	def __init__(self):
