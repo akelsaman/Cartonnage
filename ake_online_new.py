@@ -218,7 +218,7 @@ class Database:
 			#lastrowid inserted by this connection
 			#if(self.__connection.insert_id()): lastrowid = self.__connection.insert_id()
 			#lastrowid inserted by this cursor
-			if hasattr(self.__cursor, '.lastrowid'): lastrowid = self.__cursor.lastrowid #MySQL has last row id
+			if hasattr(self.__cursor, 'lastrowid'): lastrowid = self.__cursor.lastrowid #MySQL has last row id
 			columns = []
 			#cursor.description returns a tuple of information describes each column in the table.
 			#(name, type_code, display_size, internal_size, precision, scale, null_ok)
