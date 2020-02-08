@@ -4,6 +4,7 @@
 #================================================================================#
 from string import Template
 from datetime import datetime
+import re
 #================================================================================#
 #Object attributes types and instance type affect the following classes function:
 #Database.prepare()	#ObjectRelationalMapper.map()
@@ -84,29 +85,6 @@ class NOT_NULL(SpecialValue):
 	def __repr__(self): return "NOT NULL"
 	def __eq__(self, other): return "NOT NULL"==other
 #================================================================================#
-class ObjectRelationalMapper:
-	def __init__(self): pass
-	#--------------------------------------#
-	def map(self, passedObject):
-		object = passedObject
-		query = object.query
-		passedObject.columns = [] #empty the columns of the passed object only since the new object created below for each row is empty
-		if(query.result.rows):
-			passedObject.recordset.empty()
-			for row in query.result.rows:
-				object.columns = query.result.columns
-				index = 0
-				for fieldValue in row:
-					if(fieldValue is None):
-						fieldValue=NULL()
-					elif(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
-						fieldValue = str(fieldValue)
-					# str() don't use # to map Null value to None field correctly.
-					setattr(object, query.result.columns[index], fieldValue)
-					index += 1
-				passedObject.recordset.add(object)
-				object = passedObject.__class__() #object = Record() #bug
-#================================================================================#
 class Result:
 	def __init__(self, columns=None, rows=None, count=0, rowcount=0, lastrowid=0):
 		self.columns	= columns
@@ -146,6 +124,66 @@ class Statement:
 	def deleteStatement(self): return self.fieldsEqualPlaceholdersAnd[:-5]
 	def startUpdateStatement(self): return self.fieldsEqualPlaceholdersAnd[:-5]
 #================================================================================#
+class Representer:
+	def __init__(self):
+		pass
+
+	def xml(self, record):
+		xmlRecords = "<" + record.name() + ">"
+		for r in record.recordset.iterate():
+			xmlRecord = "<Record "
+			attributes = ""
+			for column in r.columns:
+				attributes += str(column) + "='" + str(r.getField(column)) + "' "
+			xmlRecord += attributes + "></Record>"
+			xmlRecords += xmlRecord
+		xmlRecords += "</" + record.name() + ">"
+
+		return xmlRecords
+
+	def html(self, record):
+		htmlTable = "<table>\n\t<tr><th>" + record.name() + "</th></tr>"
+		
+		th = "\n\t<tr>"
+		for column in record.columns:
+			th += "<th>" + str(column) + "</th>"
+		th += "</tr>"
+		htmlTable += th
+
+		for r in record.recordset.iterate():
+			tr = "\n\t<tr>"
+			for column in r.columns:
+				tr += "\n\t\t<td>" + str(r.getField(column)) + "</td>"
+			tr += "\n\t</tr>"
+			htmlTable += tr
+
+		htmlTable += "\n</table>"
+
+		return htmlTable
+#================================================================================#
+class ObjectRelationalMapper:
+	def __init__(self): pass
+	#--------------------------------------#
+	def map(self, passedObject):
+		object = passedObject
+		query = object.query
+		passedObject.columns = [] #empty the columns of the passed object only since the new object created below for each row is empty
+		if(query.result.rows):
+			passedObject.recordset.empty()
+			for row in query.result.rows:
+				object.columns = query.result.columns
+				index = 0
+				for fieldValue in row:
+					if(fieldValue is None):
+						fieldValue=NULL()
+					elif(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
+						fieldValue = str(fieldValue)
+					# str() don't use # to map Null value to None field correctly.
+					setattr(object, query.result.columns[index], fieldValue)
+					index += 1
+				passedObject.recordset.add(object)
+				object = passedObject.__class__() #object = Record() #bug
+#================================================================================#
 class Database:
 
 	# ------
@@ -157,6 +195,7 @@ class Database:
 	update		= 3
 	delete		= 4
 	startUpdate	= 5
+	all	= 6
 	# ------
 	selectPreparedStatementTemplate	= Template('''SELECT * FROM ${table} WHERE ${parameterizedStatement}''')
 	deletePreparedStatementTemplate	= Template('''DELETE FROM ${table} WHERE ${parameterizedStatement}''')
@@ -174,6 +213,7 @@ class Database:
 		self.__cursor		= None
 		self.__placeholder	= '?'
 		self.operationsCount = 0
+		self.user_pk		= 0
 		self.connect()
 	#--------------------------------------#
 	def placeholder(self): return self.__placeholder
@@ -198,8 +238,8 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			#print(query.statement)
-			#print(query.parameters)
+			print(query.statement)
+			print(query.parameters)
 			#result is a cursor object instance contains the returned records of select statement
 			#None is the returned value in case of insert/update/delete.
 			self.__cursor.execute(query.statement, tuple(query.parameters))
@@ -285,6 +325,56 @@ class Database:
 				else:
 					record.query.parameters.append(fieldValue) #not used for parameterized statement #if(value): value = "'" + str(value) + "'"
 	#--------------------------------------#
+	def secure(self, record):
+
+		queryStatement = record.query.statement
+
+		#aa = re.search('{([a-zA-Z0-9_]+)}', query, re.IGNORECASE)
+		#if (aa): print(a.groups(1))
+		tablesNames = re.findall(r"\${([a-zA-Z0-9_]+)}", queryStatement)
+
+		tables_names_placeholders = ', '.join('?'*len(tablesNames))
+		
+		loadViews = """SELECT V.view, V.table_name, V.crud_statement
+		FROM Policys_Views_Authoritys PVA
+		INNER JOIN Users_Policys UP ON PVA.policy_fk = UP.policy_fk
+		INNER JOIN Views V ON PVA.view_fk = V.pk
+		WHERE UP.user_fk = ?
+			AND V.table_name IN (""" + tables_names_placeholders + ")"
+
+		#https://forums.mysql.com/read.php?100,630131,630158#msg-630158
+		secureViewsStatement = {}
+		if(tables_names_placeholders):
+			
+			class Views(Record): pass
+			views = Views()
+			views.query.statement = loadViews
+
+			# mysql.connector.errors.InterfaceError
+			# InterfaceError: No result set to fetch from.
+			# No parameters were provided with the prepared statement
+			# "views.query.parameters" was written by mistake "views.parameters"
+
+			views.query.parameters = [self.user_pk] + tablesNames
+			self.executeStatement(views.query)
+			Database.orm.map(views)
+
+			#print(views.recordset.count())
+			for view in views:
+				#print(view.columns)
+				secureViewsStatement[str(view.table_name)] = '(' + str(view.crud_statement) + '\n)'
+			for tableName in tablesNames:
+				if(tableName not in secureViewsStatement):
+					secureViewsStatement[tableName] = tableName
+
+			#print(secureViewsStatement)
+
+			queryStatementTemplate = Template(queryStatement)
+			secureQuerySatement = queryStatementTemplate.safe_substitute(secureViewsStatement)
+			secureQuerySatement = secureQuerySatement.replace("$|user.pk|", str(self.user_pk))
+			record.query.statement = secureQuerySatement
+			#return secureQuery
+	#--------------------------------------#
 	def __crud(self, operation, record):
 		
 		table = record.table()
@@ -304,6 +394,9 @@ class Database:
 		elif(operation==Database.delete):
 			template = Database.deletePreparedStatementTemplate
 			statement = record.statement.deleteStatement()
+		elif(operation==Database.all):
+			template = Database.selectAllPreparedStatementTemplate
+			statement = "NA" #useless just for the next condition: no statement keyword in "selectAllPreparedStatementTemplate"
 
 		if(statement): #if not empty string
 			record.query.statement = self.statement(template, table, statement, _statement_)
@@ -311,6 +404,7 @@ class Database:
 			record.query.parameters += record.state.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
 			record.statement.delete()
 			record.state.delete()
+			if(record.secure): self.secure(record)
 			self.executeStatement(record.query)
 			Database.orm.map(record)
 	#--------------------------------------#
@@ -356,6 +450,7 @@ class Database:
 			self.__crud(Database.update, record)
 		else:
 			raise RuntimeError("The update doesn't start, no current state !")
+	def all(self, record): self.__crud(Database.all, record)
 	#--------------------------------------#
 	def insertMany(self, record): self.__crudMany(Database.insert, record)
 	def deleteMany(self,record): self.__crudMany(Database.delete, record)
@@ -404,10 +499,6 @@ class Database:
 		copy.columns = list(record.columns)
 		return copy
 	#--------------------------------------#
-	def selectAll(self, record):
-		record.query.statement = Database.selectAllPreparedStatementTemplate.substitute({'table': record.table()})
-		self.executeStatement(record.query)
-		Database.orm.map(record)
 #================================================================================#
 class SQLite(Database):
 	def __init__(self, database=None, checkSameThread=True):
@@ -463,14 +554,21 @@ class MicrosoftSQL(Database):
 #================================================================================#
 class Record:
 	database	= None
+	representer = Representer()
 	tableName	= TableName()
 	#--------------------------------------#
-	def __init__(self, statement=None, parameters=None, **kwargs):
+	def __init__(self, statement=None, parameters=None, secure=False, **kwargs):
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.recordset = Recordset()
 		self.statement = Statement()
 		self.state = State()
 		self.primarykey = []
+		self.secure = secure
+
+		if(self.secure):
+			self.table = self.__tableSecure
+		else:
+			self.table = self.__table
 
 		if(kwargs):
 			for key, value in kwargs.items():
@@ -481,10 +579,32 @@ class Record:
 			self.query.statement = statement
 			if(parameters): self.query.parameters = parameters #if prepared statement's parameters are passed
 			#self. instead of Record. #change the static field self.__database for inherited children classes
+			if(self.secure): self.database.secure(self)
 			self.database.executeStatement(self.query)
 			Database.orm.map(self)
 	#--------------------------------------#
+	def name(self): return self.__table()
+	#--------------------------------------#
+	def __table(self):
+		if(self.tableName.value()): return self.tableName.value()
+		else: return self.__class__.__name__
+	#--------------------------------------#
+	def __tableSecure(self):
+		if(self.tableName.value()): return "${" + self.tableName.value() + "}\t" + self.tableName.value()
+		else: return "${" + self.__class__.__name__ + "}\t" + self.__class__.__name__
+	#--------------------------------------#
+	def id(self): return self.query.result.lastrowid
+	#--------------------------------------#
+	def readCount(self): return self.query.result.count
+	#--------------------------------------#
+	def getField(self, fieldName): return self.__dict__[fieldName]
+	def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue
+	#--------------------------------------#
 	def __str__(self): pass
+	#--------------------------------------#
+	def hash(self):
+		hashedValue = ''
+		for column in self.primarykey: pass
 	#--------------------------------------#
 	def __iter__(self): 
 		self.__iterationIndex = 0
@@ -503,31 +623,19 @@ class Record:
 	#--------------------------------------#
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
-	def table(self):
-		if(self.tableName.value()): return self.tableName.value()
-		else: return self.__class__.__name__
-	#--------------------------------------#
-	def getField(self, fieldName): return self.__dict__[fieldName]
-	def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue
-	#--------------------------------------#
-	def readCount(self): return self.query.result.count
-	#--------------------------------------#
-	def id(self): return self.query.result.lastrowid
-	#--------------------------------------#
-	def hash(self):
-		hashedValue = ''
-		for column in self.primarykey: pass
-	#--------------------------------------#
 	def insert(self): self.database.insert(self)
 	def read(self): self.database.read(self)
 	def update(self): self.database.update(self)
 	def delete(self): self.database.delete(self)
 	def startUpdate(self): self.database.startUpdate(self)
-	def selectAll(self): self.database.selectAll(self)
+	def all(self): self.database.all(self)
 	def commit(self): self.database.commit()
 	#--------------------------------------#
 	def getCopyInstance(self, base=(object, ), attributesDictionary={}):
 		return self.database.getCopyInstance(self, base, attributesDictionary={})
+	#--------------------------------------#
+	def xml(self): return self.representer.xml(self)
+	def html(self): return self.representer.html(self)
 #================================================================================#
 class Recordset:
 	def __init__(self):
