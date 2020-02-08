@@ -238,8 +238,8 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			print(query.statement)
-			print(query.parameters)
+			#print(query.statement)
+			#print(query.parameters)
 			#result is a cursor object instance contains the returned records of select statement
 			#None is the returned value in case of insert/update/delete.
 			self.__cursor.execute(query.statement, tuple(query.parameters))
