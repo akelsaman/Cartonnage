@@ -34,6 +34,9 @@ class SpecialValue:
 	def placeholder(self, placeholder): return placeholder
 #--------------------------------------#
 class TableName(SpecialValue): pass
+class UserID(SpecialValue):
+	def __init__(self, value=None):
+		self.user_id = value
 #--------------------------------------#
 class LIKE(SpecialValue):
 	def operator(self): return " LIKE "
@@ -131,13 +134,13 @@ class Representer:
 	def xml(self, record):
 		xmlRecords = "<" + record.name() + ">"
 		for r in record.recordset.iterate():
-			xmlRecord = "<Record "
+			xmlRecord = "\n\t<Record "
 			attributes = ""
 			for column in r.columns:
 				attributes += str(column) + "='" + str(r.getField(column)) + "' "
 			xmlRecord += attributes + "></Record>"
 			xmlRecords += xmlRecord
-		xmlRecords += "</" + record.name() + ">"
+		xmlRecords += "\n</" + record.name() + ">"
 
 		return xmlRecords
 
@@ -160,6 +163,21 @@ class Representer:
 		htmlTable += "\n</table>"
 
 		return htmlTable
+
+	def json(self, record):
+		jsonString = '{'
+		for r in record.recordset.iterate():
+			jsonString += '\n\t{'
+			for column in r.columns:
+				jsonString += '"' + column + '":"' + str(r.getField(column)) + '", '
+			jsonString = jsonString[:-2] + '}, '
+		jsonString = jsonString[:-2] + '\n}'
+		return jsonString
+
+	def loadJSON(self, record, jsonDictionary):
+		for key, value in jsonDictionary.items():
+			key = key.split('.')[-1]
+			record.setField(key, value)
 #================================================================================#
 class ObjectRelationalMapper:
 	def __init__(self): pass
@@ -355,7 +373,7 @@ class Database:
 			# No parameters were provided with the prepared statement
 			# "views.query.parameters" was written by mistake "views.parameters"
 
-			views.query.parameters = [self.user_pk] + tablesNames
+			views.query.parameters = [record.secure.user_id] + tablesNames
 			self.executeStatement(views.query)
 			Database.orm.map(views)
 
@@ -371,7 +389,7 @@ class Database:
 
 			queryStatementTemplate = Template(queryStatement)
 			secureQuerySatement = queryStatementTemplate.safe_substitute(secureViewsStatement)
-			secureQuerySatement = secureQuerySatement.replace("$|user.pk|", str(self.user_pk))
+			secureQuerySatement = secureQuerySatement.replace("$|user.pk|", str(record.secure.user_id))
 			record.query.statement = secureQuerySatement
 			#return secureQuery
 	#--------------------------------------#
@@ -404,7 +422,7 @@ class Database:
 			record.query.parameters += record.state.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
 			record.statement.delete()
 			record.state.delete()
-			if(record.secure): self.secure(record)
+			if(record.secure.user_id): self.secure(record)
 			self.executeStatement(record.query)
 			Database.orm.map(record)
 	#--------------------------------------#
@@ -557,15 +575,15 @@ class Record:
 	representer = Representer()
 	tableName	= TableName()
 	#--------------------------------------#
-	def __init__(self, statement=None, parameters=None, secure=False, **kwargs):
+	def __init__(self, statement=None, parameters=None, secure_by_user_id=None, **kwargs):
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.recordset = Recordset()
 		self.statement = Statement()
 		self.state = State()
 		self.primarykey = []
-		self.secure = secure
+		self.secure = UserID(secure_by_user_id)
 
-		if(self.secure):
+		if(self.secure.user_id):
 			self.table = self.__tableSecure
 		else:
 			self.table = self.__table
@@ -579,7 +597,7 @@ class Record:
 			self.query.statement = statement
 			if(parameters): self.query.parameters = parameters #if prepared statement's parameters are passed
 			#self. instead of Record. #change the static field self.__database for inherited children classes
-			if(self.secure): self.database.secure(self)
+			if(self.secure.user_id): self.database.secure(self)
 			self.database.executeStatement(self.query)
 			Database.orm.map(self)
 	#--------------------------------------#
@@ -634,8 +652,11 @@ class Record:
 	def getCopyInstance(self, base=(object, ), attributesDictionary={}):
 		return self.database.getCopyInstance(self, base, attributesDictionary={})
 	#--------------------------------------#
+	def json(self): return self.representer.json(self)
 	def xml(self): return self.representer.xml(self)
 	def html(self): return self.representer.html(self)
+	def loadJSON(self, jsonDictionary): return self.representer.loadJSON(self, jsonDictionary)
+	#--------------------------------------#
 #================================================================================#
 class Recordset:
 	def __init__(self):
