@@ -171,12 +171,23 @@ class Representer:
 			for column in r.columns:
 				jsonString += '"' + column + '":"' + str(r.getField(column)) + '", '
 			jsonString = jsonString[:-2] + '}, '
-		jsonString = jsonString[:-2] + '\n}'
+		if(jsonString=='{'):
+			jsonString +=  '}'
+		else:
+			jsonString = jsonString[:-2] + '\n}'
 		return jsonString
 
-	def loadJSON(self, record, jsonDictionary):
-		for key, value in jsonDictionary.items():
+	def loadDictionary(self, record, dictionary):
+		for key, value in dictionary.items():
 			key = key.split('.')[-1]
+			record.setField(key, value)
+
+	def searchDictionary(self, record, dictionary):
+		for key, value in dictionary.items():
+			key = key.split('.')[-1]
+			if(type(value) in [str, unicode]):
+				if("*" in value):
+					value = LIKE(str(value).replace("*", "%"))
 			record.setField(key, value)
 #================================================================================#
 class ObjectRelationalMapper:
@@ -655,7 +666,8 @@ class Record:
 	def json(self): return self.representer.json(self)
 	def xml(self): return self.representer.xml(self)
 	def html(self): return self.representer.html(self)
-	def loadJSON(self, jsonDictionary): return self.representer.loadJSON(self, jsonDictionary)
+	def loadDictionary(self, dictionary): return self.representer.loadDictionary(self, dictionary)
+	def searchDictionary(self, dictionary): return self.representer.searchDictionary(self, dictionary)
 	#--------------------------------------#
 #================================================================================#
 class Recordset:
