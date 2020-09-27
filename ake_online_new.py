@@ -77,13 +77,15 @@ class NULL(SpecialValue):
 			return "="
 		else:
 			return " IS "
+	def placeholder(self, placeholder): return "NULL"
 	def __str__(self): return "NULL"
 	def __repr__(self): return "NULL"
 	def __eq__(self, other): return "NULL"==other
 #--------------------
 class NOT_NULL(SpecialValue):
 	def __init__(self): self.__value = "NOT NULL"
-	def operator(self): return " IS NOT "
+	def operator(self): return " IS "
+	def placeholder(self, placeholder): return "NOT NULL"
 	def __str__(self): return "NOT NULL"
 	def __repr__(self): return "NOT NULL"
 	def __eq__(self, other): return "NOT NULL"==other
@@ -182,10 +184,32 @@ class Representer:
 			key = key.split('.')[-1]
 			record.setField(key, value)
 
-	def searchDictionary(self, record, dictionary):
+	def search(self, record, url):
+
+		#http://localhost:5000/personsSearch?name_last=eq*Fe*h*&persons.name_first=eqMostafa&created_by_fk=ge1
+		#http://localhost:5000/personsSearch?name_last=eq*Fe*h*&persons.name_first=eqMostafa&created_by_fk=ge1&start_date=null
+		#http://localhost:5000/personsSearch?start_date=null
+		dictionary = {}
+
+		url = url.split("?")
+		searchCriteria = url[1]
+		criteria = searchCriteria.split("&")
+		#print(criteria)
+		for c in criteria:
+			c = c.split("=")
+			dictionary[c[0]] = c[1]
+
 		for key, value in dictionary.items():
-			key = key.split('.')[-1]
-			if(type(value) in [str, unicode]):
+			key = key.split('.')[-1] #persons.name_last => name_last
+			operator = value[:2]
+			value = value[2:]
+			if(operator=="ge"):	value = ge(value)
+			if(operator=="gt"): value = gt(value)
+			if(operator=="lt"): value = lt(value)
+			if(operator=="le"): value = le(value)
+			if(operator=="nu"): value = NULL()
+			if(operator=="no"): value = NOT_NULL()
+			if(operator=="eq"):
 				if("*" in value):
 					value = LIKE(str(value).replace("*", "%"))
 			record.setField(key, value)
@@ -267,8 +291,8 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			#print(query.statement)
-			#print(query.parameters)
+			print(query.statement)
+			print(query.parameters)
 			#result is a cursor object instance contains the returned records of select statement
 			#None is the returned value in case of insert/update/delete.
 			self.__cursor.execute(query.statement, tuple(query.parameters))
@@ -333,7 +357,7 @@ class Database:
 			if(type(attributeValue) in [str, unicode, int, float, datetime]):
 				self.__prepare(record, attributeName, placeholder)
 			elif(isinstance(attributeValue, NULL)):
-				self.__prepare(record, attributeName, placeholder, attributeValue.operator(operation))
+				self.__prepare(record, attributeName, "NULL", attributeValue.operator(operation))
 			elif(isinstance(attributeValue, (IN, gt, ge, lt, le, LIKE, NOT_NULL, BETWEEN, NOT_IN))):
 				self.__prepare(record, attributeName, attributeValue.placeholder(placeholder), attributeValue.operator())
 	#--------------------------------------#
@@ -346,7 +370,8 @@ class Database:
 			for field in fieldsNames:
 				fieldValue = record.__dict__[field]
 				if(isinstance(fieldValue, (NULL, NOT_NULL))):
-					record.query.parameters.append(None)
+					pass
+					#record.query.parameters.append(None)
 				elif(isinstance(fieldValue, (IN, BETWEEN, NOT_IN))):
 					for value in fieldValue.value(): record.query.parameters.append(value) # list values
 				elif(isinstance(fieldValue, (gt, ge, lt, le, LIKE))):
@@ -667,7 +692,7 @@ class Record:
 	def xml(self): return self.representer.xml(self)
 	def html(self): return self.representer.html(self)
 	def loadDictionary(self, dictionary): return self.representer.loadDictionary(self, dictionary)
-	def searchDictionary(self, dictionary): return self.representer.searchDictionary(self, dictionary)
+	def search(self, url): return self.representer.search(self, url)
 	#--------------------------------------#
 #================================================================================#
 class Recordset:
