@@ -39,6 +39,9 @@ class UserID(SpecialValue):
 		self.user_id = value
 #--------------------------------------#
 class LIKE(SpecialValue):
+	def __init__(self, value):
+		self.__value = value.replace("*","%")
+		SpecialValue.__init__(self, self.__value)
 	def operator(self): return " LIKE "
 #--------------------
 class IN(SpecialValue):
@@ -230,7 +233,7 @@ class ObjectRelationalMapper:
 					if(fieldValue is None):
 						fieldValue=NULL()
 					elif(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
-						fieldValue = str(fieldValue)
+						fieldValue = fieldValue.decode()
 					# str() don't use # to map Null value to None field correctly.
 					setattr(object, query.result.columns[index], fieldValue)
 					index += 1
@@ -441,6 +444,9 @@ class Database:
 		elif(operation==Database.read):
 			template = Database.selectPreparedStatementTemplate
 			statement = record.statement.readStatement()
+			if not (statement): #to simulate read all if no criteria exists
+				template = Database.selectAllPreparedStatementTemplate
+				statement = "NA" #useless just for the next condition: no statement keyword in "selectAllPreparedStatementTemplate"
 		elif(operation==Database.update):
 			template = Database.updatePreparedStatementTemplate
 			statement = record.statement.updateStatement()
