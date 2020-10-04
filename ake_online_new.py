@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-#version: 201909091800
+#version: 202010042323
 #================================================================================#
 from string import Template
 from datetime import datetime
@@ -34,6 +34,7 @@ class SpecialValue:
 	def placeholder(self, placeholder): return placeholder
 #--------------------------------------#
 class TableName(SpecialValue): pass
+class Alias(SpecialValue): pass
 class UserID(SpecialValue):
 	def __init__(self, value=None):
 		self.user_id = value
@@ -92,6 +93,21 @@ class NOT_NULL(SpecialValue):
 	def __str__(self): return "NOT NULL"
 	def __repr__(self): return "NOT NULL"
 	def __eq__(self, other): return "NOT NULL"==other
+#--------------------
+class Join(SpecialValue):
+	def __init__(self, object, fields, value=None):
+		self.object = object
+		self.fields = fields
+		self.__value = value
+		SpecialValue.__init__(self, value)
+#--------------------
+class Joiners(SpecialValue):
+	def __init__(self, value=None):
+		self.joinClause = ''
+		self.preparedStatement = ''
+		self.parameters = []
+		self.__value = value
+		SpecialValue.__init__(self, value)
 #================================================================================#
 class Result:
 	def __init__(self, columns=None, rows=None, count=0, rowcount=0, lastrowid=0):
@@ -137,7 +153,7 @@ class Representer:
 		pass
 
 	def xml(self, record):
-		xmlRecords = "<" + record.name() + ">"
+		xmlRecords = "<" + record.table() + ">"
 		for r in record.recordset.iterate():
 			xmlRecord = "\n\t<Record "
 			attributes = ""
@@ -145,12 +161,12 @@ class Representer:
 				attributes += str(column) + "='" + str(r.getField(column)) + "' "
 			xmlRecord += attributes + "></Record>"
 			xmlRecords += xmlRecord
-		xmlRecords += "\n</" + record.name() + ">"
+		xmlRecords += "\n</" + record.table() + ">"
 
 		return xmlRecords
 
 	def html(self, record):
-		htmlTable = "<table>\n\t<tr><th>" + record.name() + "</th></tr>"
+		htmlTable = "<table>\n\t<tr><th>" + record.table() + "</th></tr>"
 		
 		th = "\n\t<tr>"
 		for column in record.columns:
@@ -253,12 +269,12 @@ class Database:
 	startUpdate	= 5
 	all	= 6
 	# ------
-	selectPreparedStatementTemplate	= Template('''SELECT * FROM ${table} WHERE ${parameterizedStatement}''')
-	deletePreparedStatementTemplate	= Template('''DELETE FROM ${table} WHERE ${parameterizedStatement}''')
+	selectPreparedStatementTemplate	= Template('''SELECT ${selected} FROM ${table} ${alias} ${joiners} \nWHERE ${parameterizedStatement}''')
+	deletePreparedStatementTemplate	= Template('''DELETE FROM ${table} \nWHERE ${parameterizedStatement}''')
 	insertPreparedStatementTemplate	= Template('''INSERT INTO ${table}${parameterizedStatement}''')
-	updatePreparedStatementTemplate	= Template('''UPDATE ${table} SET ${parameterizedStatement} WHERE ${_parameterizedStatement_}''')
+	updatePreparedStatementTemplate	= Template('''UPDATE ${table} SET ${parameterizedStatement} \nWHERE ${_parameterizedStatement_}''')
 	# ------
-	selectAllPreparedStatementTemplate	= Template('''SELECT * FROM ${table}''')
+	selectAllPreparedStatementTemplate	= Template('''SELECT * FROM ${table} ${alias} ${joiners} \nWHERE 1''')
 	#--------------------------------------#
 	def __init__(self, database=None, username=None, password=None, host=None):
 		self.__database		= database
@@ -321,6 +337,7 @@ class Database:
 			#for index, column in enumerate(self.__cursor.description): columns.append(column[0])
 			
 			if(self.__cursor.description): columns = [column[0] for column in self.__cursor.description]
+			print(columns)
 			query.result = Result(columns, rows, count, rowcount, lastrowid)
 			#query.result = Result(columns, rows, count, rowcount)
 			#for r in query.result.rows:
@@ -341,13 +358,13 @@ class Database:
 		sql = sqlScriptFile.read()
 		return self.__cursor.executescript(sql)
 	#--------------------------------------#
-	def statement(self, template, table, statement, _statement_=None):
-		return template.substitute({'table': table, 'parameterizedStatement': statement, '_parameterizedStatement_': _statement_})
+	def statement(self, template, selected, table, statement, alias='', joiners='', _statement_=None):
+		return template.substitute({'selected': selected,'table': table, 'alias': alias, 'joiners': joiners,'parameterizedStatement': statement, '_parameterizedStatement_': _statement_})
 	#--------------------------------------#
 	def __prepare(self, record, field, placeholder, operator='='):
 		record.statement.fieldsNames.append(field)
 		record.statement.fieldsEqualPlaceholdersComma += field + operator + placeholder + ', '
-		record.statement.fieldsEqualPlaceholdersAnd += field + operator + placeholder + ' AND '
+		record.statement.fieldsEqualPlaceholdersAnd += '`' + record.alias.value() + '`' + '.' + '`' + field + '`' + operator + placeholder + ' AND '
 		record.statement.fields += field + ', '
 		record.statement.parametersPlaceholders += placeholder + ', '
 	#--------------------------------------#
@@ -381,6 +398,27 @@ class Database:
 					record.query.parameters.append(fieldValue.value()) # the value of LIKE
 				else:
 					record.query.parameters.append(fieldValue) #not used for parameterized statement #if(value): value = "'" + str(value) + "'"
+	#--------------------------------------#
+	def joiners(self, record):
+		__joiners = Joiners()
+		for key, join in record.joins.items():
+			#" INNER JOIN Persons pp ON "
+			inner_join = ' INNER JOIN ' + join.object.table() + " " + join.object.alias.value() + ' ON '			
+			for foreign_key, primary_key in join.fields.items():
+				#"	uu.person.fk=pp.pk AND "
+				inner_join += "\n\t" + record.alias.value() + "." + foreign_key + "=" + join.object.alias.value() + "." + primary_key + " AND "
+			inner_join = "\n" + inner_join[:-5]
+			__joiners.joinClause += inner_join
+			#--------------------
+			self.prepare(Database.read, join.object)
+			statement = join.object.statement.readStatement()
+			if(statement): __joiners.preparedStatement += " AND " + statement
+			self.parameterize(join.object)
+			__joiners.parameters += join.object.query.parameters
+			join.object.statement.delete()
+			join.object.state.delete()
+
+		return __joiners
 	#--------------------------------------#
 	def secure(self, record):
 
@@ -432,21 +470,22 @@ class Database:
 			record.query.statement = secureQuerySatement
 			#return secureQuery
 	#--------------------------------------#
-	def __crud(self, operation, record):
+	def __crud(self, operation, record, selected="*"):
 		
 		table = record.table()
 		self.prepare(operation, record)
+		alias = record.alias.value()
 
 		_statement_ = None
+		joiners = self.joiners(record)
+
 		if(operation==Database.insert):
 			template = Database.insertPreparedStatementTemplate
 			statement = record.statement.insertStatement()
 		elif(operation==Database.read):
 			template = Database.selectPreparedStatementTemplate
 			statement = record.statement.readStatement()
-			if not (statement): #to simulate read all if no criteria exists
-				template = Database.selectAllPreparedStatementTemplate
-				statement = "NA" #useless just for the next condition: no statement keyword in "selectAllPreparedStatementTemplate"
+			if not (statement): statement="1" #to simulate read all if no criteria exists
 		elif(operation==Database.update):
 			template = Database.updatePreparedStatementTemplate
 			statement = record.statement.updateStatement()
@@ -459,17 +498,20 @@ class Database:
 			statement = "NA" #useless just for the next condition: no statement keyword in "selectAllPreparedStatementTemplate"
 
 		if(statement): #if not empty string
-			record.query.statement = self.statement(template, table, statement, _statement_)
+			record.query.statement = self.statement(template=template, selected=selected, table=table, alias=alias, joiners=joiners.joinClause, statement=statement, _statement_=_statement_)
 			self.parameterize(record)
 			record.query.parameters += record.state.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
 			record.statement.delete()
 			record.state.delete()
+			if(joiners.joinClause):
+				record.query.statement += joiners.preparedStatement
+				record.query.parameters += joiners.parameters
 			if(record.secure.user_id): self.secure(record)
 			self.executeStatement(record.query)
 			Database.orm.map(record)
 	#--------------------------------------#
-	def __crudMany(self, operation, record):
-		
+	def __crudMany(self, operation, record, selected="*"):
+
 		table = record.table()
 		self.prepare(operation, record)
 
@@ -492,7 +534,7 @@ class Database:
 		query=Query() # as 
 
 		if(statement): #if not empty string
-			query.statement = self.statement(template, table, statement, _statement_)
+			query.statement = self.statement(template=template, selected=selected, table=table, statement=statement, _statement_=_statement_)
 			for r in record.recordset.iterate():
 				#r.insert()
 				self.parameterize(r, fieldsNames)
@@ -503,7 +545,7 @@ class Database:
 			record.recordset.rowsCount = self.executeMany(query)
 	#--------------------------------------#
 	def insert(self, record): self.__crud(Database.insert, record)
-	def read(self, record): self.__crud(Database.read, record)
+	def read(self, record, selected="*"): self.__crud(Database.read, record, selected)
 	def delete(self, record): self.__crud(Database.delete, record)
 	def update(self, record): 
 		if(record.state.statement):
@@ -617,14 +659,16 @@ class Record:
 	representer = Representer()
 	tableName	= TableName()
 	#--------------------------------------#
-	def __init__(self, statement=None, parameters=None, secure_by_user_id=None, **kwargs):
-		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
+	def __init__(self, statement=None, parameters=None, alias=None, secure_by_user_id=None, **kwargs):
 		self.recordset = Recordset()
 		self.statement = Statement()
 		self.state = State()
+		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
+		self.joins = {}
 		self.primarykey = []
 		self.secure = UserID(secure_by_user_id)
 
+		self.alias = Alias(self.__class__.__name__)
 		if(self.secure.user_id):
 			self.table = self.__tableSecure
 		else:
@@ -643,15 +687,13 @@ class Record:
 			self.database.executeStatement(self.query)
 			Database.orm.map(self)
 	#--------------------------------------#
-	def name(self): return self.__table()
-	#--------------------------------------#
 	def __table(self):
 		if(self.tableName.value()): return self.tableName.value()
 		else: return self.__class__.__name__
 	#--------------------------------------#
 	def __tableSecure(self):
-		if(self.tableName.value()): return "${" + self.tableName.value() + "}\t" + self.tableName.value()
-		else: return "${" + self.__class__.__name__ + "}\t" + self.__class__.__name__
+		if(self.tableName.value()): return "${" + self.tableName.value() + "}"
+		else: return "${" + self.__class__.__name__ + "}"
 	#--------------------------------------#
 	def id(self): return self.query.result.lastrowid
 	#--------------------------------------#
@@ -660,7 +702,7 @@ class Record:
 	def getField(self, fieldName): return self.__dict__[fieldName]
 	def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue
 	#--------------------------------------#
-	def __str__(self): pass
+	#def __str__(self): pass
 	#--------------------------------------#
 	def hash(self):
 		hashedValue = ''
@@ -684,12 +726,16 @@ class Record:
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
 	def insert(self): self.database.insert(self)
-	def read(self): self.database.read(self)
+	def read(self, selected="*"): self.database.read(self, selected)
 	def update(self): self.database.update(self)
 	def delete(self): self.database.delete(self)
 	def startUpdate(self): self.database.startUpdate(self)
 	def all(self): self.database.all(self)
 	def commit(self): self.database.commit()
+	#--------------------------------------#
+	def join(self, table, fields):
+		if not (table.alias): raise AttributeError("No alias for table")
+		self.joins[table.alias.value()] = Join(table, fields)
 	#--------------------------------------#
 	def getCopyInstance(self, base=(object, ), attributesDictionary={}):
 		return self.database.getCopyInstance(self, base, attributesDictionary={})
@@ -723,7 +769,7 @@ class Recordset:
 	#--------------------------------------#
 	def insert(self):
 		if(self.firstRecord()): self.firstRecord().database.insertMany(self.firstRecord())
-	def read(self):
+	def read(self, selected="*"):
 		if(self.firstRecord()):  self.firstRecord().database.readMany(self.firstRecord())
 	def update(self):
 		if(self.firstRecord()):  self.firstRecord().database.updateMany(self.firstRecord())
