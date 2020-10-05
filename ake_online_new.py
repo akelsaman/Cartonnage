@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-#version: 202010042323
+#version: 202010060113
 #================================================================================#
 from string import Template
 from datetime import datetime
@@ -399,8 +399,8 @@ class Database:
 				else:
 					record.query.parameters.append(fieldValue) #not used for parameterized statement #if(value): value = "'" + str(value) + "'"
 	#--------------------------------------#
-	def joiners(self, record):
-		__joiners = Joiners()
+	def joining(self, record):
+		joiners = Joiners()
 		for key, join in record.joins.items():
 			#" INNER JOIN Persons pp ON "
 			inner_join = ' INNER JOIN ' + join.object.table() + " " + join.object.alias.value() + ' ON '			
@@ -408,17 +408,23 @@ class Database:
 				#"	uu.person.fk=pp.pk AND "
 				inner_join += "\n\t" + record.alias.value() + "." + foreign_key + "=" + join.object.alias.value() + "." + primary_key + " AND "
 			inner_join = "\n" + inner_join[:-5]
-			__joiners.joinClause += inner_join
+			joiners.joinClause += inner_join
 			#--------------------
 			self.prepare(Database.read, join.object)
 			statement = join.object.statement.readStatement()
-			if(statement): __joiners.preparedStatement += " AND " + statement
+			if(statement): joiners.preparedStatement += " AND " + statement
 			self.parameterize(join.object)
-			__joiners.parameters += join.object.query.parameters
+			joiners.parameters += join.object.query.parameters
 			join.object.statement.delete()
 			join.object.state.delete()
+			#--------------------
+			child_joiners = self.joining(join.object)
+			joiners.joinClause += child_joiners.joinClause
+			#if(child_joiners.preparedStatement): joiners.preparedStatement += child_joiners.preparedStatement
+			joiners.preparedStatement += child_joiners.preparedStatement
+			joiners.parameters += child_joiners.parameters
 
-		return __joiners
+		return joiners
 	#--------------------------------------#
 	def secure(self, record):
 
@@ -477,7 +483,7 @@ class Database:
 		alias = record.alias.value()
 
 		_statement_ = None
-		joiners = self.joiners(record)
+		joiners = self.joining(record)
 
 		if(operation==Database.insert):
 			template = Database.insertPreparedStatementTemplate
