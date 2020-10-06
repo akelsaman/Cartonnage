@@ -269,7 +269,7 @@ class Database:
 	startUpdate	= 5
 	all	= 6
 	# ------
-	selectPreparedStatementTemplate	= Template('''SELECT ${selected} FROM ${table} ${alias} ${joiners} \nWHERE ${parameterizedStatement}''')
+	selectPreparedStatementTemplate	= Template('''SELECT ${selected} FROM ${table} ${alias} ${joiners} \nWHERE ${parameterizedStatement} ${joinsCriteria} \n${group_by}''')
 	deletePreparedStatementTemplate	= Template('''DELETE FROM ${table} \nWHERE ${parameterizedStatement}''')
 	insertPreparedStatementTemplate	= Template('''INSERT INTO ${table}${parameterizedStatement}''')
 	updatePreparedStatementTemplate	= Template('''UPDATE ${table} SET ${parameterizedStatement} \nWHERE ${_parameterizedStatement_}''')
@@ -358,8 +358,8 @@ class Database:
 		sql = sqlScriptFile.read()
 		return self.__cursor.executescript(sql)
 	#--------------------------------------#
-	def statement(self, template, selected, table, statement, alias='', joiners='', _statement_=None):
-		return template.substitute({'selected': selected,'table': table, 'alias': alias, 'joiners': joiners,'parameterizedStatement': statement, '_parameterizedStatement_': _statement_})
+	def statement(self, template, selected, table, statement, alias='', joiners='', joinsCriteria='', group_by='', _statement_=None):
+		return template.substitute({'selected': selected,'table': table, 'alias': alias, 'joiners': joiners,'parameterizedStatement': statement, 'joinsCriteria': joinsCriteria, 'group_by': group_by, '_parameterizedStatement_': _statement_})
 	#--------------------------------------#
 	def __prepare(self, record, field, placeholder, operator='='):
 		record.statement.fieldsNames.append(field)
@@ -476,7 +476,7 @@ class Database:
 			record.query.statement = secureQuerySatement
 			#return secureQuery
 	#--------------------------------------#
-	def __crud(self, operation, record, selected="*"):
+	def __crud(self, operation, record, selected="*", group_by=''):
 		
 		table = record.table()
 		self.prepare(operation, record)
@@ -504,19 +504,18 @@ class Database:
 			statement = "NA" #useless just for the next condition: no statement keyword in "selectAllPreparedStatementTemplate"
 
 		if(statement): #if not empty string
-			record.query.statement = self.statement(template=template, selected=selected, table=table, alias=alias, joiners=joiners.joinClause, statement=statement, _statement_=_statement_)
+			joinsCriteria = joiners.preparedStatement
+			record.query.statement = self.statement(template=template, selected=selected, table=table, alias=alias, joiners=joiners.joinClause, statement=statement, joinsCriteria=joinsCriteria, group_by=group_by, _statement_=_statement_)
 			self.parameterize(record)
 			record.query.parameters += record.state.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
+			record.query.parameters += joiners.parameters
 			record.statement.delete()
 			record.state.delete()
-			if(joiners.joinClause):
-				record.query.statement += joiners.preparedStatement
-				record.query.parameters += joiners.parameters
 			if(record.secure.user_id): self.secure(record)
 			self.executeStatement(record.query)
 			Database.orm.map(record)
 	#--------------------------------------#
-	def __crudMany(self, operation, record, selected="*"):
+	def __crudMany(self, operation, record, selected="*", group_by=''):
 
 		table = record.table()
 		self.prepare(operation, record)
@@ -540,7 +539,7 @@ class Database:
 		query=Query() # as 
 
 		if(statement): #if not empty string
-			query.statement = self.statement(template=template, selected=selected, table=table, statement=statement, _statement_=_statement_)
+			query.statement = self.statement(template=template, selected=selected, table=table, statement=statement, group_by=group_by, _statement_=_statement_)
 			for r in record.recordset.iterate():
 				#r.insert()
 				self.parameterize(r, fieldsNames)
@@ -551,7 +550,7 @@ class Database:
 			record.recordset.rowsCount = self.executeMany(query)
 	#--------------------------------------#
 	def insert(self, record): self.__crud(Database.insert, record)
-	def read(self, record, selected="*"): self.__crud(Database.read, record, selected)
+	def read(self, record, selected="*", group_by=''): self.__crud(Database.read, record, selected, group_by)
 	def delete(self, record): self.__crud(Database.delete, record)
 	def update(self, record): 
 		if(record.state.statement):
@@ -732,7 +731,7 @@ class Record:
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
 	def insert(self): self.database.insert(self)
-	def read(self, selected="*"): self.database.read(self, selected)
+	def read(self, selected="*", group_by=''): self.database.read(self, selected, group_by)
 	def update(self): self.database.update(self)
 	def delete(self): self.database.delete(self)
 	def startUpdate(self): self.database.startUpdate(self)
@@ -775,7 +774,7 @@ class Recordset:
 	#--------------------------------------#
 	def insert(self):
 		if(self.firstRecord()): self.firstRecord().database.insertMany(self.firstRecord())
-	def read(self, selected="*"):
+	def read(self, selected="*", group_by=''):
 		if(self.firstRecord()):  self.firstRecord().database.readMany(self.firstRecord())
 	def update(self):
 		if(self.firstRecord()):  self.firstRecord().database.updateMany(self.firstRecord())
