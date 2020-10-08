@@ -95,7 +95,8 @@ class NOT_NULL(SpecialValue):
 	def __eq__(self, other): return "NOT NULL"==other
 #--------------------
 class Join(SpecialValue):
-	def __init__(self, object, fields, value=None):
+	def __init__(self, object, fields, type=' INNER JOIN ', value=None):
+		self.type = type
 		self.object = object
 		self.fields = fields
 		self.__value = value
@@ -403,7 +404,7 @@ class Database:
 		joiners = Joiners()
 		for key, join in record.joins.items():
 			#" INNER JOIN Persons pp ON "
-			inner_join = ' INNER JOIN ' + join.object.table() + " " + join.object.alias.value() + ' ON '			
+			inner_join = join.type + join.object.table() + " " + join.object.alias.value() + ' ON '		
 			for foreign_key, primary_key in join.fields.items():
 				#"	uu.person.fk=pp.pk AND "
 				inner_join += "\n\t" + record.alias.value() + "." + foreign_key + "=" + join.object.alias.value() + "." + primary_key + " AND "
@@ -738,9 +739,11 @@ class Record:
 	def all(self): self.database.all(self)
 	def commit(self): self.database.commit()
 	#--------------------------------------#
-	def join(self, table, fields):
-		if not (table.alias): raise AttributeError("No alias for table")
-		self.joins[table.alias.value()] = Join(table, fields)
+	def join(self, table, fields): self.joins[table.alias.value()] = Join(table, fields)
+	#--------------------------------------#
+	def rightJoin(self, table, fields): self.joins[table.alias.value()] = Join(table, fields, ' RIGHT JOIN ')
+	#--------------------------------------#
+	def leftJoin(self, table, fields): self.joins[table.alias.value()] = Join(table, fields, ' LEFT JOIN ')
 	#--------------------------------------#
 	def getCopyInstance(self, base=(object, ), attributesDictionary={}):
 		return self.database.getCopyInstance(self, base, attributesDictionary={})
