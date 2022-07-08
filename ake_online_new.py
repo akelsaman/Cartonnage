@@ -131,22 +131,14 @@ class State:
 		self.statement = None
 		self.parameters = []
 #================================================================================#
-class Statement:
+class Prepared():
 	def __init__(self):
 		self.delete()
 
 	def delete(self):
+		self.statement = ""
+		self.parameters = []
 		self.fieldsNames = []
-		self.fieldsEqualPlaceholdersComma = ""
-		self.fieldsEqualPlaceholdersAnd	= ""
-		self.fields = ""
-		self.parametersPlaceholders = ""
-
-	def insertStatement(self): return '(' + self.fields[:-2] + ') VALUES (' + self.parametersPlaceholders[:-2] + ')'
-	def readStatement(self): return self.fieldsEqualPlaceholdersAnd[:-5]
-	def updateStatement(self): return self.fieldsEqualPlaceholdersComma[:-2]
-	def deleteStatement(self): return self.fieldsEqualPlaceholdersAnd[:-5]
-	def startUpdateStatement(self): return self.fieldsEqualPlaceholdersAnd[:-5]
 #================================================================================#
 class Representer:
 
@@ -438,13 +430,6 @@ class Database:
 	delete		= 4
 	startUpdate	= 5
 	all	= 6
-	# ------
-	selectPreparedStatementTemplate	= Template('''SELECT ${selected} FROM ${table} ${alias} ${joiners} \nWHERE ${parameterizedStatement} ${joinsCriteria} \n${group_by} ${limit}''')
-	deletePreparedStatementTemplate	= Template('''DELETE ${selected} FROM ${table} ${joiners} \nWHERE ${parameterizedStatement} ${joinsCriteria} \n${group_by}''')
-	insertPreparedStatementTemplate	= Template('''INSERT INTO ${table}${parameterizedStatement}''')
-	updatePreparedStatementTemplate	= Template('''UPDATE ${table} SET ${parameterizedStatement} \nWHERE ${_parameterizedStatement_}''')
-	# ------
-	selectAllPreparedStatementTemplate	= Template('''SELECT * FROM ${table} ${alias} ${joiners} \nWHERE 1''')
 	#--------------------------------------#
 	def __init__(self, database=None, username=None, password=None, host=None):
 		self.__database		= database
@@ -478,95 +463,6 @@ class Database:
 		self.operationsCount = 0
 		return operationsCount
 	#--------------------------------------#
-	def executeStatement(self, query):
-		if(query.statement):
-			#print(query.statement)
-			#print(query.parameters)
-			#result is a cursor object instance contains the returned records of select statement
-			#None is the returned value in case of insert/update/delete.
-			self.__cursor.execute(query.statement, tuple(query.parameters))
-			self.operationsCount +=1
-			rows=None
-			count=None
-			if(str((query.statement.strip())[:6]).lower()=="select"):
-				rows = self.__cursor.fetchall()
-				count = len(rows)
-			#rowcount is readonly attribute
-			#rowcount contains the count/number of the inserted/updated/deleted records/rows.
-			#rowcount is -1 in case of rows/records select.
-			rowcount = self.__cursor.rowcount
-
-			if hasattr(self.__cursor, 'lastrowid'): lastrowid = self.__cursor.lastrowid #MySQL has last row id
-			columns = []
-			#cursor.description returns a tuple of information describes each column in the table.
-			#(name, type_code, display_size, internal_size, precision, scale, null_ok)
-			#for index, column in enumerate(self.__cursor.description): columns.append(column[0])
-			
-			if(self.__cursor.description): columns = [column[0] for column in self.__cursor.description]
-			query.result = Result(columns, rows, count, rowcount)
-			#for r in query.result.rows:
-			#	print(r)
-			return query
-	#--------------------------------------#
-	def executeMany(self, query):
-		#print(query.statement)
-		#print(query.parameters)
-		rowcount = 0
-		if(query.statement):
-			self.__cursor.executemany(query.statement, query.parameters)
-			self.operationsCount +=1
-			rowcount = self.__cursor.rowcount
-		return rowcount
-	#--------------------------------------#
-	def executeScript(self, sqlScriptFileName):
-		sqlScriptFile = open(sqlScriptFileName,'r')
-		sql = sqlScriptFile.read()
-		return self.__cursor.executescript(sql)
-	#--------------------------------------#
-	def statement(self, template, selected, table, statement, alias='', joiners='', joinsCriteria='', group_by='', limit='', _statement_0=None):
-		return template.substitute({'selected': selected,'table': table, 'alias': alias, 'joiners': joiners,'parameterizedStatement': statement, 'joinsCriteria': joinsCriteria, 'group_by': group_by, 'limit': limit, '_parameterizedStatement_': _statement_0})
-	#--------------------------------------#
-	def __prepare(self, record, field, placeholder, operator='='):
-		record.statement__.fieldsNames.append(field)
-		record.statement__.fieldsEqualPlaceholdersComma += '`' + field + '`' + operator + placeholder + ', '
-		record.statement__.fieldsEqualPlaceholdersAnd += record.alias.value() + '.' + '`' + field + '`' + operator + placeholder + ' AND '
-		record.statement__.fields += '`' + field + '`' + ', '
-		record.statement__.parametersPlaceholders += placeholder + ', '
-	#--------------------------------------#
-	def prepare(self, operation, record):
-		placeholder = self.placeholder()
-		record.statement__.delete()
-		#placeholderVariableNumber = 0
-		for attributeName, attributeValue in record.__dict__.items(): #for a in dir(r): println(a)
-			# any other type will be execluded Class type, None type and others ...
-			if(type(attributeValue) in [str, unicode, int, float, datetime]):
-				self.__prepare(record, attributeName, placeholder)
-			elif(isinstance(attributeValue, NULL)):
-				self.__prepare(record, attributeName, "NULL", attributeValue.operator(operation))
-			elif(isinstance(attributeValue, (gt, ge, lt, le, LIKE, NOT_NULL))):
-				self.__prepare(record, attributeName, attributeValue.placeholder(placeholder), attributeValue.operator())
-			elif(isinstance(attributeValue, (IN, BETWEEN, NOT_IN))):
-				if(type(attributeValue.value()) is list and len(attributeValue.value())): #to make sure it's a list and contains elements
-					self.__prepare(record, attributeName, attributeValue.placeholder(placeholder), attributeValue.operator())
-	#--------------------------------------#
-	def parameterize(self, record, fieldsNames=None):
-		if(not fieldsNames):
-			fieldsNames = record.statement__.fieldsNames
-
-		record.query__.parameters = []
-		if(fieldsNames):
-			for field in fieldsNames:
-				fieldValue = record.__dict__[field]
-				if(isinstance(fieldValue, (NULL, NOT_NULL))):
-					pass
-					#record.query__.parameters.append(None)
-				elif(isinstance(fieldValue, (IN, BETWEEN, NOT_IN))):
-					for value in fieldValue.value(): record.query__.parameters.append(value) # list values
-				elif(isinstance(fieldValue, (gt, ge, lt, le, LIKE))):
-					record.query__.parameters.append(fieldValue.value()) # the value of LIKE
-				else:
-					record.query__.parameters.append(fieldValue) #not used for parameterized statement #if(value): value = "'" + str(value) + "'"
-	#--------------------------------------#
 	def joining(self, record):
 		joiners = Joiners()
 		for key, join in record.joins__.items():
@@ -578,13 +474,12 @@ class Database:
 			inner_join = "\n" + inner_join[:-5]
 			joiners.joinClause += inner_join
 			#--------------------
-			self.prepare(Database.read, join.object)
-			statement = join.object.statement__.readStatement()
+			self.__prepare(Database.read , join.object)
+			statement = join.object.prepared__.statement
 			if(statement): joiners.preparedStatement += " AND " + statement
-			self.parameterize(join.object)
-			joiners.parameters += join.object.query__.parameters
-			join.object.statement__.delete()
-			join.object.state__.delete()
+			joiners.parameters += join.object.prepared__.parameters
+			join.object.prepared__.delete() #to be deleted after investigate dependencies
+			join.object.state__.delete() #to be deleted after investigate dependencies
 			#--------------------
 			child_joiners = self.joining(join.object)
 			joiners.joinClause += child_joiners.joinClause
@@ -644,86 +539,176 @@ class Database:
 			record.query__.statement = secureQuerySatement
 			#return secureQuery
 	#--------------------------------------#
-	def __crud(self, operation, record, selected="*", group_by='', limit=''):
-		
-		table = record.table__()
-		self.prepare(operation, record)
-		alias = record.alias.value()
+	def executeStatement(self, query):
+		if(query.statement):
+			#print(query.statement)
+			#print(query.parameters)
+			#result is a cursor object instance contains the returned records of select statement
+			#None is the returned value in case of insert/update/delete.
+			self.__cursor.execute(query.statement, tuple(query.parameters))
+			self.operationsCount +=1
+			rows=None
+			count=None
+			if(str((query.statement.strip())[:6]).lower()=="select"):
+				rows = self.__cursor.fetchall()
+				count = len(rows)
+			#rowcount is readonly attribute
+			#rowcount contains the count/number of the inserted/updated/deleted records/rows.
+			#rowcount is -1 in case of rows/records select.
+			rowcount = self.__cursor.rowcount
 
-		_statement_0 = None
-		joiners = self.joining(record)
-
-		if(operation==Database.insert):
-			template = Database.insertPreparedStatementTemplate
-			statement = record.statement__.insertStatement()
-		elif(operation==Database.read):
-			template = Database.selectPreparedStatementTemplate
-			statement = record.statement__.readStatement()
-			if not (statement): statement="1" #to simulate read all if no criteria exists
-		elif(operation==Database.update):
-			template = Database.updatePreparedStatementTemplate
-			statement = record.statement__.updateStatement()
-			_statement_0 = record.state__.statement
-		elif(operation==Database.delete):
-			template = Database.deletePreparedStatementTemplate
-			statement = record.statement__.deleteStatement()
+			if hasattr(self.__cursor, 'lastrowid'): lastrowid = self.__cursor.lastrowid #MySQL has last row id
+			columns = []
+			#cursor.description returns a tuple of information describes each column in the table.
+			#(name, type_code, display_size, internal_size, precision, scale, null_ok)
+			#for index, column in enumerate(self.__cursor.description): columns.append(column[0])
+			
+			if(self.__cursor.description): columns = [column[0] for column in self.__cursor.description]
+			query.result = Result(columns, rows, count, rowcount)
+			#for r in query.result.rows:
+			#	print(r)
+			return query
+	#--------------------------------------#
+	def executeMany(self, query):
+		#print(query.statement)
+		#print(query.parameters)
+		rowcount = 0
+		if(query.statement):
+			self.__cursor.executemany(query.statement, query.parameters)
+			self.operationsCount +=1
+			rowcount = self.__cursor.rowcount
+		return rowcount
+	#--------------------------------------#
+	def executeScript(self, sqlScriptFileName):
+		sqlScriptFile = open(sqlScriptFileName,'r')
+		sql = sqlScriptFile.read()
+		return self.__cursor.executescript(sql)
+	#--------------------------------------#
+	def __prepare(self, operation, record, fields_names=None):
+		placeholder = self.placeholder()
+		record.prepared__.delete()
+		fieldsEqualPlaceholdersAnd = fieldsEqualPlaceholdersComma = fields = parametersPlaceholders = ""
+		parameters = []
+		fieldsNames = []
+		flds=record.__dict__
+		if(fields_names): flds=fields_names
+		for field in flds: #for a in dir(r): println(a)
+			fieldValue = record.__dict__[field]
+			# any other type will be execluded Class type, None type and others ...
+			if(type(fieldValue) in [str, unicode, int, float, datetime]):
+				fieldsNames.append(field)
+				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` = {placeholder} AND "
+				fieldsEqualPlaceholdersComma += f"`{field}` = {placeholder}, "
+				fields += f"`{field}`, "
+				parametersPlaceholders += f"{placeholder}, "
+				parameters.append(fieldValue) #not used for parameterized statement #if(value): value = "'" + str(value) + "'"
+			elif(isinstance(fieldValue, NULL)):
+				fieldsNames.append(field)
+				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` {fieldValue.operator(operation)} {placeholder} AND "
+				fieldsEqualPlaceholdersComma += f"`{field}` {fieldValue.operator(operation)} {placeholder}, "
+				fields += f"`{field}`, "
+				parametersPlaceholders += f"{placeholder}, "
+				parameters.append(None)
+			elif(isinstance(fieldValue, NOT_NULL)):
+				fieldsNames.append(field)
+				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
+				fieldsEqualPlaceholdersComma += f"`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
+				fields += f"`{field}`, "
+				parametersPlaceholders += f"{placeholder}, "
+			elif(isinstance(fieldValue, (gt, ge, lt, le, LIKE))):
+				fieldsNames.append(field)
+				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
+				fieldsEqualPlaceholdersComma += f"`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
+				fields += f"`{field}`, "
+				parametersPlaceholders += f"{placeholder}, "
+				parameters.append(fieldValue.value()) # the value of LIKE
+			elif(isinstance(fieldValue, (IN, BETWEEN, NOT_IN))):
+				if(type(fieldValue.value()) is list and len(fieldValue.value())): #to make sure it's a list and contains elements
+					fieldsNames.append(field)
+					fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
+					fieldsEqualPlaceholdersComma += f"`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
+					fields += f"`{field}`, "
+					parametersPlaceholders += f"{placeholder}, "
+					for value in fieldValue.value(): parameters.append(value) # list values
+		#
+		if(operation==Database.insert): record.prepared__.statement = f"({fields[:-2]}) VALUES ({parametersPlaceholders[:-2]})"
+		elif(operation==Database.read): record.prepared__.statement = fieldsEqualPlaceholdersAnd[:-5]
+		elif(operation==Database.startUpdate): record.prepared__.statement = fieldsEqualPlaceholdersAnd[:-5]
+		elif(operation==Database.update): record.prepared__.statement = fieldsEqualPlaceholdersComma[:-2]
+		elif(operation==Database.delete): record.prepared__.statement = fieldsEqualPlaceholdersAnd[:-5]
 		elif(operation==Database.all):
-			template = Database.selectAllPreparedStatementTemplate
-			statement = "NA" #useless just for the next condition: no statement keyword in "selectAllPreparedStatementTemplate"
-
-		if(statement): #if not empty string
-			joinsCriteria = joiners.preparedStatement
-			record.query__.statement = self.statement(template=template, selected=selected, table=table, alias=alias, joiners=joiners.joinClause, statement=statement, joinsCriteria=joinsCriteria, group_by=group_by, limit=limit, _statement_0=_statement_0)
-			self.parameterize(record)
-			record.query__.parameters += record.state__.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
-			record.query__.parameters += joiners.parameters
-			record.statement__.delete()
-			record.state__.delete()
-			if(record.secure__.user_id): self.secure(record)
-			self.executeStatement(record.query__)
-			self.orm.map(record) #use self. instead Database. to be  able to override
+			record.prepared__.statement = "1"
+			parameters = [] #iterating over Record has attributes will fill emptied parameters above with the same attributes again
+		record.prepared__.fieldsNames = fieldsNames
+		record.prepared__.parameters = parameters
+		#
+		#print(record.prepared__.statement)
+		#print(parameters)
+	#--------------------------------------#
+	def __crud(self, operation, record, selected="*", group_by='', limit=''):
+		self.__prepare(operation, record)
+		joiners = self.joining(record)
+		joinsCriteria = joiners.preparedStatement
+		where = "1"
+		if(record.prepared__.statement): where=record.prepared__.statement
+		_where_ = record.state__.statement
+		#----- #ordered by occurance propability for single record
+		if(operation==Database.read):
+			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where} {joinsCriteria} \n{group_by} {limit}"
+		elif(operation==Database.insert):
+			statement = f"INSERT INTO {record.table__()} {record.prepared__.statement}"
+		elif(operation==Database.delete):
+			statement = f"DELETE {selected} FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}"
+		elif(operation==Database.update):
+			statement = f"UPDATE {record.table__()} SET {record.prepared__.statement} \nWHERE {_where_}"
+		elif(operation==Database.all):
+			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE 1"
+		#print(statement)
+		#-----
+		record.query__ = Query()
+		record.query__.statement = statement
+		record.query__.parameters = record.prepared__.parameters
+		record.query__.parameters += record.state__.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
+		record.query__.parameters += joiners.parameters
+		record.state__.delete()
+		if(record.secure__.user_id): self.secure(record)
+		self.executeStatement(record.query__)
+		self.orm.map(record) #use self. instead Database. to be  able to override
 	#--------------------------------------#
 	def __crudMany(self, operation, record, selected="*", group_by='', limit=''):
-
-		table = record.table__()
-		self.prepare(operation, record)
-		alias = record.alias.value()
-
-		_statement_0 = None
+		self.__prepare(operation, record)
 		joiners = self.joining(record)
-
+		joinsCriteria = joiners.preparedStatement
+		where = "1"
+		if(record.prepared__.statement): where=record.prepared__.statement
+		_where_ = record.state__.statement
+		#----- #ordered by occurance propability for many records
 		if(operation==Database.insert):
-			template = Database.insertPreparedStatementTemplate
-			statement = record.statement__.insertStatement()
-		elif(operation==Database.read):
-			template = Database.selectPreparedStatementTemplate
-			statement = record.statement__.readStatement()
+			statement = f"INSERT INTO {record.table__()} {record.prepared__.statement}"
 		elif(operation==Database.update):
-			template = Database.updatePreparedStatementTemplate
-			statement = record.statement__.updateStatement()
-			_statement_0 = record.state__.statement
+			statement = f"UPDATE {record.table__()} SET {record.prepared__.statement} \nWHERE {_where_}"
+		elif(operation==Database.read):
+			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where} {joinsCriteria} \n{group_by} {limit}"
 		elif(operation==Database.delete):
-			template = Database.deletePreparedStatementTemplate
-			statement = record.statement__.deleteStatement()
-
-		fieldsNames = record.statement__.fieldsNames # as record.statement__.delete() below in iteration over recordset will delete record.statement__.fieldsnames
+			statement = f"DELETE {selected} FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}"
+		elif(operation==Database.all):
+			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE 1"
+		#-----
+		fieldsNames = record.prepared__.fieldsNames # as record.statement__.delete() below in iteration over recordset will delete record.statement__.fieldsnames
 		query=Query() # as 
-
-		if(statement): #if not empty string
-			joinsCriteria = joiners.preparedStatement
-			query.statement = self.statement(template=template, selected=selected, table=table, alias=alias, joiners=joiners.joinClause, statement=statement, joinsCriteria=joinsCriteria, group_by=group_by, limit=limit, _statement_0=_statement_0)
-			#query.statement = self.statement(template=template, selected=selected, table=table, statement=statement, group_by=group_by, limit=limit, _statement_0=_statement_0)
-			for r in record.recordset.iterate():
-				#r.insert()
-				self.parameterize(r, fieldsNames)
-				r.query__.parameters = r.query__.parameters + r.state__.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
-				#r_joiners = self.joining(r)
-				#r.query__.parameters += r_joiners.parameters # parameters need to be implemented to be retrieved in the same order from all records
-				query.parameters.append(tuple(r.query__.parameters))
-				r.statement__.delete()
-				r.state__.delete()
-			record.recordset.rowsCount = self.executeMany(query)
+		for r in record.recordset.iterate():
+			#r.insert()
+			self.__prepare(operation, r, fieldsNames)
+			r.prepared__.parameters = r.prepared__.parameters + r.state__.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
+			#r_joiners = self.joining(r)
+			#r.query__.parameters += r_joiners.parameters # parameters need to be implemented to be retrieved in the same order from all records
+			query.parameters.append(tuple(r.prepared__.parameters))
+			r.state__.delete()
+		#if(record.secure__.user_id): self.secure(record) #not implemented for many (insert and update)
+		record.recordset.rowsCount = self.executeMany(query)
+		#self.orm.map(record)  #not implemented for many (insert and update)
 	#--------------------------------------#
+	def all(self, record): self.__crud(Database.all, record)
 	def insert(self, record): self.__crud(Database.insert, record)
 	def read(self, record, selected="*", group_by='', limit=''): self.__crud(Database.read, record, selected, group_by, limit)
 	def delete(self, record, selected): self.__crud(Database.delete, record, selected)
@@ -732,10 +717,9 @@ class Database:
 			self.__crud(Database.update, record)
 		else:
 			raise RuntimeError("The update doesn't start, no current state !")
-	def all(self, record): self.__crud(Database.all, record)
 	#--------------------------------------#
 	def insertMany(self, record): self.__crudMany(Database.insert, record)
-	def deleteMany(self,record, selected): self.__crudMany(Database.delete, record, selected)
+	def deleteMany(self, record, selected): self.__crudMany(Database.delete, record, selected)
 	def updateMany(self, record):
 		if(record.state__.statement):
 			self.__crudMany(Database.update, record)
@@ -745,19 +729,17 @@ class Database:
 	#--------------------------------------#
 	def startUpdate(self, record, fieldsNames=None):
 		if(fieldsNames): #Recordset.startUpdate()
-			self.parameterize(record, fieldsNames)
-			#record.state__.statement = None
-			record.state__.parameters = record.query__.parameters
+			self.__prepare(Database.startUpdate, record, fieldsNames)
+			record.state__.parameters = record.prepared__.parameters
 		else: #Record.startUpdate()
-			self.prepare(Database.startUpdate, record)
-			self.parameterize(record)
-			record.state__.statement = record.statement__.startUpdateStatement()
-			record.state__.parameters = record.query__.parameters
+			self.__prepare(Database.startUpdate, record, fieldsNames)
+			record.state__.statement = record.prepared__.statement
+			record.state__.parameters = record.prepared__.parameters
 	#--------------------------------------#
 	def startUpdateMany(self, record):
 		self.startUpdate(record)
 		#self.startUpdate(record) will happen again in next line recordset iteration startUpdate process
-		for r in record.recordset.iterate(): self.startUpdate(r, record.statement__.fieldsNames)
+		for r in record.recordset.iterate(): self.startUpdate(r, record.prepared__.fieldsNames)
 	#--------------------------------------#
 	def getCopyInstance(self, record, base=(object, ), attributesDictionary={}):
 		if(base):
@@ -859,7 +841,7 @@ class Record:
 	#--------------------------------------#
 	def __init__(self, statement=None, parameters=None, alias=None, secure_by_user_id=None, **kwargs):
 		self.recordset = Recordset()
-		self.statement__ = Statement()
+		self.prepared__ = Prepared()
 		self.state__ = State()
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.joins__ = {}
