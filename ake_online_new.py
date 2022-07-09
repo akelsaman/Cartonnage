@@ -663,7 +663,6 @@ class Database:
 			statement = f"UPDATE {record.table__()} SET {record.prepared__.statement} \nWHERE {_where_}"
 		elif(operation==Database.all):
 			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE 1"
-		#print(statement)
 		#-----
 		record.query__ = Query()
 		record.query__.statement = statement
@@ -696,6 +695,7 @@ class Database:
 		#-----
 		fieldsNames = record.prepared__.fieldsNames # as record.statement__.delete() below in iteration over recordset will delete record.statement__.fieldsnames
 		query=Query() # as 
+		query.statement = statement
 		for r in record.recordset.iterate():
 			#r.insert()
 			self.__prepare(operation, r, fieldsNames)
@@ -775,12 +775,16 @@ class SQLite(Database):
 			self.cursor()
 #================================================================================#
 class Oracle(Database):
-	def __init__(self, database=None, username=None, password=None):
-		Database.__init__(self, database=database, username=username, password=password)
+	def __init__(self, database=None, username=None, password=None, host=None):
+		Database.__init__(self, database=database, username=username, password=password, host=host)
 	def connect(self):
-		if(self.connectionParameters() == 3):
+		if(self.connectionParameters() >= 3):
 			import cx_Oracle
-			self._Database__connection = cx_Oracle.connect(self._Database__username, self._Database__password, self._Database__database)
+			if(self._Database__host):
+				dsn_tns = cx_Oracle.makedsn(self._Database__host, '1521', service_name=self._Database__database)
+				self._Database__connection = cx_Oracle.connect(self._Database__username, self._Database__password, dsn=dsn_tns)
+			else:
+				self._Database__connection = cx_Oracle.connect(self._Database__username, self._Database__password, self._Database__database)
 			self.cursor()
 			self._Database__placeholder = ':1' #1 #start of numeric
 #================================================================================#
