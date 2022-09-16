@@ -74,7 +74,7 @@ class lt(SpecialValue):
 class le(SpecialValue):
 	def operator(self): return " <= "
 #--------------------
-class NULL(SpecialValue, dict): #to make it json serializable using jsonifiy
+class NUL(SpecialValue, dict): #to make it json serializable using jsonifiy
 	def __init__(self): self.__value = None
 	def operator(self, operation):
 		if(operation==Database.update):
@@ -409,7 +409,7 @@ class ObjectRelationalMapper:
 				index = 0
 				for fieldValue in row:
 					if(fieldValue is None):
-						fieldValue=NULL()
+						fieldValue=NUL()
 					elif(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
 						fieldValue = fieldValue.decode('utf-8')
 					# str() don't use # to map Null value to None field correctly.
@@ -417,6 +417,12 @@ class ObjectRelationalMapper:
 					index += 1
 				passedObject.recordset.add(object)
 				object = passedObject.__class__() #object = Record() #bug
+#================================================================================#
+class DummyObjectRelationalMapper:
+	def __init__(self): pass
+	#--------------------------------------#
+	def map(self, passedObject):
+		pass
 #================================================================================#
 class Database:
 
@@ -439,11 +445,13 @@ class Database:
 		self.__connection	= None
 		self.__cursor		= None
 		self.__placeholder	= '?'
+		self.__escapeChar	= '`'
 		self.operationsCount = 0
 		self.user_pk		= 0
 		self.connect()
 	#--------------------------------------#
 	def placeholder(self): return self.__placeholder
+	def escapeChar(self): return self.__escapeChar
 	#--------------------------------------#
 	def connectionParameters(self):
 		if(self.__database):
@@ -470,7 +478,7 @@ class Database:
 			inner_join = join.type + join.object.table__() + ' ' + join.object.alias.value() + ' ON '		
 			for foreign_key, primary_key in join.fields.items():
 				#"	uu.person.fk=pp.pk AND "
-				inner_join += "\n\t" + record.alias.value() + "." + '`' + foreign_key + '`' + "=" + join.object.alias.value() + "." + '`' + primary_key + '`' + " AND "
+				inner_join += "\n\t" + record.alias.value() + "." + self.escapeChar() + foreign_key + self.escapeChar() + "=" + join.object.alias.value() + "." + self.escapeChar() + primary_key + self.escapeChar() + " AND "
 			inner_join = "\n" + inner_join[:-5]
 			joiners.joinClause += inner_join
 			#--------------------
@@ -529,7 +537,7 @@ class Database:
 				secureViewsStatement[str(view.table_name)] = '(' + str(view.crud_statement) + '\n)'
 			for tableName in tablesNames:
 				if(tableName not in secureViewsStatement):
-					secureViewsStatement[tableName] = '`' + tableName + '`'
+					secureViewsStatement[tableName] = f"{self.escapeChar()}{tableName}{self.escapeChar()}"
 
 			#print(secureViewsStatement)
 
@@ -541,8 +549,8 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			#print(query.statement)
-			#print(query.parameters)
+			print(query.statement)
+			print(query.parameters)
 			#result is a cursor object instance contains the returned records of select statement
 			#None is the returned value in case of insert/update/delete.
 			self.__cursor.execute(query.statement, tuple(query.parameters))
@@ -597,37 +605,37 @@ class Database:
 			# any other type will be execluded Class type, None type and others ...
 			if(type(fieldValue) in [str, unicode, int, float, datetime]):
 				fieldsNames.append(field)
-				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` = {placeholder} AND "
-				fieldsEqualPlaceholdersComma += f"`{field}` = {placeholder}, "
-				fields += f"`{field}`, "
+				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} = {placeholder} AND "
+				fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} = {placeholder}, "
+				fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
 				parametersPlaceholders += f"{placeholder}, "
 				parameters.append(fieldValue) #not used for parameterized statement #if(value): value = "'" + str(value) + "'"
-			elif(isinstance(fieldValue, NULL)):
+			elif(isinstance(fieldValue, NUL)):
 				fieldsNames.append(field)
-				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` {fieldValue.operator(operation)} {placeholder} AND "
-				fieldsEqualPlaceholdersComma += f"`{field}` {fieldValue.operator(operation)} {placeholder}, "
-				fields += f"`{field}`, "
+				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator(operation)} {placeholder} AND "
+				fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator(operation)} {placeholder}, "
+				fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
 				parametersPlaceholders += f"{placeholder}, "
 				parameters.append(None)
 			elif(isinstance(fieldValue, NOT_NULL)):
 				fieldsNames.append(field)
-				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
-				fieldsEqualPlaceholdersComma += f"`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
-				fields += f"`{field}`, "
+				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
+				fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
+				fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
 				parametersPlaceholders += f"{placeholder}, "
 			elif(isinstance(fieldValue, (gt, ge, lt, le, LIKE))):
 				fieldsNames.append(field)
-				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
-				fieldsEqualPlaceholdersComma += f"`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
-				fields += f"`{field}`, "
+				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
+				fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
+				fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
 				parametersPlaceholders += f"{placeholder}, "
 				parameters.append(fieldValue.value()) # the value of LIKE
 			elif(isinstance(fieldValue, (IN, BETWEEN, NOT_IN))):
 				if(type(fieldValue.value()) is list and len(fieldValue.value())): #to make sure it's a list and contains elements
 					fieldsNames.append(field)
-					fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
-					fieldsEqualPlaceholdersComma += f"`{field}` {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
-					fields += f"`{field}`, "
+					fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
+					fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
+					fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
 					parametersPlaceholders += f"{placeholder}, "
 					for value in fieldValue.value(): parameters.append(value) # list values
 		#
@@ -649,7 +657,7 @@ class Database:
 		self.__prepare(operation, record)
 		joiners = self.joining(record)
 		joinsCriteria = joiners.preparedStatement
-		where = "1"
+		where = "1=1"
 		if(record.prepared__.statement): where=record.prepared__.statement
 		_where_ = record.state__.statement
 		#----- #ordered by occurance propability for single record
@@ -662,7 +670,7 @@ class Database:
 		elif(operation==Database.update):
 			statement = f"UPDATE {record.table__()} SET {record.prepared__.statement} \nWHERE {_where_}"
 		elif(operation==Database.all):
-			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE 1"
+			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
 		#-----
 		record.query__ = Query()
 		record.query__.statement = statement
@@ -678,7 +686,7 @@ class Database:
 		self.__prepare(operation, record)
 		joiners = self.joining(record)
 		joinsCriteria = joiners.preparedStatement
-		where = "1"
+		where = "1=1"
 		if(record.prepared__.statement): where=record.prepared__.statement
 		_where_ = record.state__.statement
 		#----- #ordered by occurance propability for many records
@@ -691,7 +699,7 @@ class Database:
 		elif(operation==Database.delete):
 			statement = f"DELETE {selected} FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}"
 		elif(operation==Database.all):
-			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE 1"
+			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
 		#-----
 		fieldsNames = record.prepared__.fieldsNames # as record.statement__.delete() below in iteration over recordset will delete record.statement__.fieldsnames
 		query=Query() # as 
@@ -741,6 +749,19 @@ class Database:
 		#self.startUpdate(record) will happen again in next line recordset iteration startUpdate process
 		for r in record.recordset.iterate(): self.startUpdate(r, record.prepared__.fieldsNames)
 	#--------------------------------------#
+	def limit(self, pageNumber=1, recordsCount=1):
+		try:
+			pageNumber = int(pageNumber)
+			recordsCount = int(recordsCount)
+			if(pageNumber and recordsCount):
+				offset = (pageNumber - 1) * recordsCount
+				return self.paginationClause(offset, recordsCount)
+			else:
+				return ''
+		except Exception as e:
+			print(e)
+			return ''
+	#--------------------------------------#
 	def getCopyInstance(self, record, base=(object, ), attributesDictionary={}):
 		if(base):
 			Copy = createTableClass(record.__class__.__name__, base, attributesDictionary)
@@ -754,8 +775,8 @@ class Database:
 				setattr(copy, attributeName, attributeValue)
 			elif(isinstance(attributeValue, IN)):
 				setattr(copy, attributeName, IN(list(attributeValue.value())))
-			elif(isinstance(attributeValue, NULL)):
-				setattr(copy, attributeName, NULL())
+			elif(isinstance(attributeValue, NUL)):
+				setattr(copy, attributeName, NUL())
 			elif(isinstance(attributeValue, NOT_NULL)):
 				setattr(copy, attributeName, NOT_NULL())
 			elif(isinstance(attributeValue, LIKE)):
@@ -787,6 +808,10 @@ class Oracle(Database):
 				self._Database__connection = cx_Oracle.connect(self._Database__username, self._Database__password, self._Database__database)
 			self.cursor()
 			self._Database__placeholder = ':1' #1 #start of numeric
+			self._Database__escapeChar = '"'
+	@staticmethod
+	def paginationClause(offset=0, recordsCount=1):
+		return f"OFFSET {offset} ROWS FETCH NEXT {recordsCount} ROWS ONLY"
 #================================================================================#
 class MySQL(Database):
 	def __init__(self, database=None, username=None, password=None, host=None):
@@ -803,6 +828,9 @@ class MySQL(Database):
 		self._Database__cursor.execute("SELECT FOUND_ROWS() AS last_total_rows")
 		(last_total_rows,) = self._Database__cursor.fetchone()
 		return last_total_rows
+	@staticmethod
+	def paginationClause(offset=0, recordsCount=1):
+		return f"LIMIT {offset}, {recordsCount}"
 #================================================================================#
 class MySQLClient(Database):
 	def __init__(self, database=None, username=None, password=None, host=None):
@@ -817,6 +845,9 @@ class MySQLClient(Database):
 		self._Database__cursor.execute("SELECT FOUND_ROWS() AS last_total_rows")
 		(last_total_rows,) = self._Database__cursor.fetchone()
 		return last_total_rows
+	@staticmethod
+	def paginationClause(offset=0, recordsCount=1):
+		return f"LIMIT {offset}, {recordsCount}"
 #================================================================================#
 class Postgres(Database):
 	def __init__(self, database=None, username=None, password=None, host=None):
@@ -852,7 +883,7 @@ class Record:
 		self.primarykey__ = []
 		self.secure__ = UserID(secure_by_user_id)
 
-		self.alias = Alias('`' + self.__class__.__name__ + '`')
+		self.alias = Alias(f"{self.database__.escapeChar()}{self.__class__.__name__}{self.database__.escapeChar()}")
 		if(self.secure__.user_id):
 			self.table__ = self.__tableSecure
 		else:
@@ -868,12 +899,15 @@ class Record:
 			if(parameters): self.query__.parameters = parameters #if prepared statement's parameters are passed
 			#self. instead of Record. #change the static field self.__database for inherited children classes
 			if(self.secure__.user_id): self.database__.secure(self)
-			self.database__.executeStatement(self.query__)
+			if(len(self.query__.parameters) and type(self.query__.parameters[0]) in (list, tuple)):
+				self.database__.executeMany(self.query__)
+			else:
+				self.database__.executeStatement(self.query__)
 			Database.orm.map(self)
 	#--------------------------------------#
 	def __table(self):
-		if(self.tableName__.value()): return '`' + self.tableName__.value() + '`'
-		else: return '`' + self.__class__.__name__ + '`'
+		if(self.tableName__.value()): return f"{self.database__.escapeChar()}{self.tableName__.value()}{self.database__.escapeChar()}"
+		else: return f"{self.database__.escapeChar()}{self.__class__.__name__}{self.database__.escapeChar()}"
 	#--------------------------------------#
 	def __tableSecure(self):
 		if(self.tableName__.value()): return "${" + self.tableName__.value() + "}"
@@ -935,23 +969,11 @@ class Record:
 	def search(self, searchCriteria, selected="*", group_by='', limit=''):
 		self.importSearchCriteria(searchCriteria)
 		self.read(selected, group_by, limit)
+	def limit(self, pageNumber=1, recordsCount=1): return self.database__.limit(pageNumber, recordsCount)
 	@staticmethod
 	def getURLData(url): return Record.representer__.getURLData(url)
 	@staticmethod
 	def lastTotalRecords(): return Record.database__.lastTotalRows()
-	@staticmethod
-	def limit(pageNumber, recordsCount):
-		try:
-			pageNumber = int(pageNumber)
-			recordsCount = int(recordsCount)
-			if(pageNumber and recordsCount):
-				offset = (pageNumber - 1) * recordsCount
-				return "LIMIT " + str(offset) +  ", " + str(recordsCount)
-			else:
-				return ''
-		except Exception as e:
-			print(e)
-			return ''
 	#--------------------------------------#
 #================================================================================#
 class Recordset:
@@ -1032,6 +1054,6 @@ class manipolatore:
 		value = self.__getValue(path)
 		if(value): return value
 		elif(value == ""): return ""
-		else: return NULL()
+		else: return NUL()
 	#--------------------
 #================================================================================#
