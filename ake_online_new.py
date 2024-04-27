@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
-#version: 202010060113
+#version: 202404221245
+
 #================================================================================#
 from string import Template
 from datetime import datetime
@@ -32,6 +33,7 @@ class SpecialValue:
 	def value(self): return self.__value
 	def operator(self): return "="
 	def placeholder(self, placeholder): return placeholder
+	def condition(self): return self.__condition
 #--------------------------------------#
 class TableName(SpecialValue): pass
 class Alias(SpecialValue): pass
@@ -74,9 +76,8 @@ class lt(SpecialValue):
 class le(SpecialValue):
 	def operator(self): return " <= "
 #--------------------
-class NUL(SpecialValue, dict): #to make it json serializable using jsonifiy
-	def __init__(self): self.__value = None
-	def operator(self, operation):
+class NULL(SpecialValue, dict): #to make it json serializable using jsonifiy
+	def operator(self, operation=2):
 		if(operation==Database.update):
 			return "="
 		else:
@@ -87,7 +88,9 @@ class NUL(SpecialValue, dict): #to make it json serializable using jsonifiy
 	def __eq__(self, other): return "NULL"==other
 #--------------------
 class NOT_NULL(SpecialValue):
-	def __init__(self): self.__value = "NOT NULL"
+	def __init__(self):
+		self.__value = "NOT NULL"
+		SpecialValue.__init__(self, self.__value)
 	def operator(self): return " IS "
 	def placeholder(self, placeholder): return "NOT NULL"
 	def __str__(self): return "NOT NULL"
@@ -111,34 +114,150 @@ class Joiners(SpecialValue):
 		SpecialValue.__init__(self, value)
 #================================================================================#
 class Result:
-	def __init__(self, columns=None, rows=None, count=0, rowcount=0):
+	def __init__(self, columns=None, rows=None, count=0):
 		self.columns	= columns
 		self.rows		= rows
 		self.count		= count
-		self.rowcount	= rowcount
 #================================================================================#
 class Query:
 	def __init__(self):
 		self.statement	= None
 		self.result		= Result()
 		self.parameters	= [] #to prevent #ValueError: parameters are of unsupported type in line #self.__cursor.execute(query.statement, tuple(query.parameters))
+		self.operation	= None
 #================================================================================#
-class State:
+class Prepared:
 	def __init__(self):
-		self.delete()
+		self.empty()
 
-	def delete(self):
-		self.statement = None
-		self.parameters = []
-#================================================================================#
-class Prepared():
-	def __init__(self):
-		self.delete()
-
-	def delete(self):
+	def empty(self):
 		self.statement = ""
 		self.parameters = []
 		self.fieldsNames = []
+#================================================================================#
+class Set:
+	def __init__(self, parent):
+		self.__dict__['parent'] = parent
+		self.empty()
+
+	def empty(self):
+		self.__dict__['new'] = {}
+
+	def setFields(self):
+		statement = ''
+		for field in self.new.keys():
+			# some databases reject tablename. or alias. before field in set clause as they are don't implement join update
+			# statement += f"{self.parent.alias.value()}.{field}={self.parent.database__.placeholder()}, "
+			statement += f"{field}={self.parent.database__.placeholder()}, "
+		return statement[:-2]
+	
+	def parameters(self, fieldsNames=None):
+		fields = fieldsNames if(fieldsNames) else list(self.new.keys())
+		parameters = []
+		for field in fields:
+			value = self.new[field]
+			parameters.append(value)
+		return parameters
+
+	def __setattr__(self, field, value):
+		# print(field, value)
+		placeholder = self.parent.database__.placeholder()
+		if(type(value) in [str, unicode, int, float, datetime]): self.__dict__['new'][field] = value
+		elif(isinstance(value, (NULL))): self.__dict__['new'][field] = None
+#================================================================================#
+class Values:
+	#--------------------------------------#
+	@staticmethod
+	def where(record):
+		#getStatement always used to collect values not filters so no "NOT NULL" but only "NULL" alongside with [str, unicode, int, float, and datetime] values.
+		#getStatement always used in 'WHERE' so "NULL" always be evaluated to "IS".
+		statement = ''
+		for field in record.fields:
+			value = record.fields[field]
+			if(type(value) is NULL):
+				statement += f"{field} IS NULL AND "
+			else: statement += f"{record.alias.value()}.{field} = {record.database__.placeholder()} AND "
+		return statement[:-5]
+	#--------------------------------------#
+	@staticmethod
+	def parameters(record, fieldsNames=None):
+		#getParameters always used to collect values not filters so no "NOT NULL" but only "NULL" alongside with [str, unicode, int, float, and datetime] values.
+		#getParameters used in 'SET' or 'WHERE' so "NULL" may be evaluated to "= ?" or "IS NULL".
+		fields = fieldsNames if (fieldsNames) else list(record.fields.keys())
+		parameters = []
+		for field in fields:
+			try:
+				value = record.fields[field]
+			except KeyError as e:
+				key = e.args[0]
+				print(f"\n{'?'*80}Missing '{key}' in Record {record.fields}!\n{'?'*80}")
+				# raise
+				exit()
+			
+			if(type(value) is NULL):
+					pass #parameters.append(None)
+			else: parameters.append(value)
+		return parameters
+	#--------------------------------------#
+#================================================================================#
+class Filter:
+	def __init__(self, parent):
+		self.__dict__['parent'] = parent
+		self.empty()
+
+	def empty(self):
+		self.__dict__['__conditions'] = {}
+		self.__dict__['__where'] = ''
+		self.__dict__['__parameters'] = []
+	
+	def read(self, selected="*", group_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, mode='filter', selected=selected, group_by=group_by, limit=limit)
+	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent, mode='filter')
+	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent, mode='filter')
+
+	def addCondition(self, field, value):
+		self.__dict__['__conditions'][field] = value
+
+	def __setattr__(self, field, value):
+		# print(field, value)
+		placeholder = self.parent.database__.placeholder()
+		if(type(value) in [str, unicode, int, float, datetime]):
+			self.addCondition(f"{field} = {value} AND ", (f"{field} = {placeholder} AND ", value))
+		elif(isinstance(value, (NULL, NOT_NULL, gt, ge, lt, le, LIKE))):
+			value.field = field #to be used in Filter.where
+			self.addCondition(f"{field}{value.operator()}{value.value()} AND ", value)
+		elif(isinstance(value, (IN, NOT_IN, BETWEEN))):
+			value.field = field #to be used in Filter.where
+			self.addCondition(f"{field}{value.operator()}{value.value()} AND ", value)
+
+	#'record' parameter to follow the same signature/interface of 'Values.where' function design pattern
+	#Both are used interchangeably in 'Database.__crud' function
+	def where(self, record=None):
+		#because this is where so any NULL | NOT_NULL values will be evaluated to "IS NULL" | "IS NOT NULL"
+		where = ''
+		parameters = []
+		for key, value in self.__dict__['__conditions'].items():
+			if(type(value) is tuple): #tuple contains string, numeric and datetime values
+				where += f"{self.parent.alias.value()}.{value[0]}"
+				parameters.append(value[1])
+			else:
+				where += f"{self.parent.alias.value()}.{value.field}{value.operator()}{value.placeholder(self.parent.database__.placeholder())} AND "
+				conditionValue = value.value()
+				if(isinstance(value, (NULL, NOT_NULL))):
+					pass
+				elif(type(conditionValue) == list): #elif(isinstance(value, (IN, NOT_IN, BETWEEN))):
+					parameters += conditionValue
+				else:
+					parameters.append(conditionValue)
+		self.__dict__['__where'] = where[:-5]
+		self.__dict__['__parameters'] = parameters
+		# print(">>>>>>>>>>>>>>>>>>>>", self.__dict__['__conditions'])
+		# print(">>>>>>>>>>>>>>>>>>>>", self.__dict__['__where'])
+		# print(">>>>>>>>>>>>>>>>>>>>", self.__dict__['__parameters'])
+		return where[:-5]
+	
+	#This 'Filter.parameters' function follow the same signature/interface of 'Values.parameters' function design pattern
+	#Both are used interchangeably in 'Database.__crud' function
+	def parameters(self, record=None): return self.__dict__['__parameters']
 #================================================================================#
 class Representer:
 
@@ -409,11 +528,12 @@ class ObjectRelationalMapper:
 				index = 0
 				for fieldValue in row:
 					if(fieldValue is None):
-						fieldValue=NUL()
+						fieldValue=NULL()
 					elif(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
 						fieldValue = fieldValue.decode('utf-8')
 					# str() don't use # to map Null value to None field correctly.
-					setattr(object, query.result.columns[index], fieldValue)
+					# setattr(object, query.result.columns[index], fieldValue)
+					object.setField(query.result.columns[index], fieldValue) #to prevent invoke __setattr__
 					index += 1
 				passedObject.recordset.add(object)
 				object = passedObject.__class__() #object = Record() #bug
@@ -424,18 +544,20 @@ class DummyObjectRelationalMapper:
 	def map(self, passedObject):
 		pass
 #================================================================================#
+class Field:
+	def  __init__(self): self.value = None
+#================================================================================#
 class Database:
-
 	# ------
 	orm	= ObjectRelationalMapper()
 	# ------
-	NA			= 0
-	insert		= 1
-	read		= 2
-	update		= 3
-	delete		= 4
-	startUpdate	= 5
-	all	= 6
+	values = Values
+	# ------
+	all				= 0
+	insert			= 1
+	read			= 2
+	update			= 4
+	delete			= 5
 	#--------------------------------------#
 	def __init__(self, database=None, username=None, password=None, host=None):
 		self.__database		= database
@@ -448,7 +570,7 @@ class Database:
 		self.__escapeChar	= '`'
 		self.operationsCount = 0
 		self.user_pk		= 0
-		self.connect()
+		# self.connect()
 	#--------------------------------------#
 	def placeholder(self): return self.__placeholder
 	def escapeChar(self): return self.__escapeChar
@@ -471,25 +593,23 @@ class Database:
 		self.operationsCount = 0
 		return operationsCount
 	#--------------------------------------#
-	def joining(self, record):
+	def joining(self, record, mode):
 		joiners = Joiners()
+		qouteChar = '' #self.escapeChar()
 		for key, join in record.joins__.items():
 			#" INNER JOIN Persons pp ON "
 			inner_join = join.type + join.object.table__() + ' ' + join.object.alias.value() + ' ON '		
 			for foreign_key, primary_key in join.fields.items():
 				#"	uu.person.fk=pp.pk AND "
-				inner_join += "\n\t" + record.alias.value() + "." + self.escapeChar() + foreign_key + self.escapeChar() + "=" + join.object.alias.value() + "." + self.escapeChar() + primary_key + self.escapeChar() + " AND "
+				inner_join += "\n\t" + record.alias.value() + "." + qouteChar + foreign_key + qouteChar + "=" + join.object.alias.value() + "." + qouteChar + primary_key + qouteChar + " AND "
 			inner_join = "\n" + inner_join[:-5]
 			joiners.joinClause += inner_join
 			#--------------------
-			self.__prepare(Database.read , join.object)
-			statement = join.object.prepared__.statement
+			statement = join.object.getMode(mode).where(join.object)
 			if(statement): joiners.preparedStatement += " AND " + statement
-			joiners.parameters += join.object.prepared__.parameters
-			join.object.prepared__.delete() #to be deleted after investigate dependencies
-			join.object.state__.delete() #to be deleted after investigate dependencies
+			joiners.parameters += join.object.getMode(mode).parameters(join.object)
 			#--------------------
-			child_joiners = self.joining(join.object)
+			child_joiners = self.joining(join.object, mode)
 			joiners.joinClause += child_joiners.joinClause
 			#if(child_joiners.preparedStatement): joiners.preparedStatement += child_joiners.preparedStatement
 			joiners.preparedStatement += child_joiners.preparedStatement
@@ -549,21 +669,25 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			print(query.statement)
-			print(query.parameters)
+			print(f"<s|{'-'*20}|>")
+			print(" > Execute statement: ", query.statement)
+			print(" > Execute parameters: ", query.parameters)
+			print(f"<|{'-'*20}|e>")
 			#result is a cursor object instance contains the returned records of select statement
 			#None is the returned value in case of insert/update/delete.
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
 			rows=None
-			count=None
-			if(str((query.statement.strip())[:6]).lower()=="select"):
+			count=0
+			if(query.operation in [Database.all, Database.read]):
 				rows = self.__cursor.fetchall()
 				count = len(rows)
+			else:
+				count = self.__cursor.rowcount	
 			#rowcount is readonly attribute
 			#rowcount contains the count/number of the inserted/updated/deleted records/rows.
 			#rowcount is -1 in case of rows/records select.
-			rowcount = self.__cursor.rowcount
+			# rowcount = self.__cursor.rowcount
 
 			if hasattr(self.__cursor, 'lastrowid'): lastrowid = self.__cursor.lastrowid #MySQL has last row id
 			columns = []
@@ -571,15 +695,15 @@ class Database:
 			#(name, type_code, display_size, internal_size, precision, scale, null_ok)
 			#for index, column in enumerate(self.__cursor.description): columns.append(column[0])
 			
-			if(self.__cursor.description): columns = [column[0] for column in self.__cursor.description]
-			query.result = Result(columns, rows, count, rowcount)
+			if(self.__cursor.description): columns = [column[0].lower() for column in self.__cursor.description] #lower() to low column names
+			query.result = Result(columns, rows, count)
 			#for r in query.result.rows:
 			#	print(r)
 			return query
 	#--------------------------------------#
 	def executeMany(self, query):
-		#print(query.statement)
-		#print(query.parameters)
+		print(query.statement)
+		print(query.parameters)
 		rowcount = 0
 		if(query.statement):
 			self.__cursor.executemany(query.statement, query.parameters)
@@ -592,170 +716,100 @@ class Database:
 		sql = sqlScriptFile.read()
 		return self.__cursor.executescript(sql)
 	#--------------------------------------#
-	def __prepare(self, operation, record, fields_names=None):
-		placeholder = self.placeholder()
-		record.prepared__.delete()
-		fieldsEqualPlaceholdersAnd = fieldsEqualPlaceholdersComma = fields = parametersPlaceholders = ""
-		parameters = []
-		fieldsNames = []
-		flds=record.__dict__
-		if(fields_names): flds=fields_names
-		for field in flds: #for a in dir(r): println(a)
-			fieldValue = record.__dict__[field]
-			# any other type will be execluded Class type, None type and others ...
-			if(type(fieldValue) in [str, unicode, int, float, datetime]):
-				fieldsNames.append(field)
-				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} = {placeholder} AND "
-				fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} = {placeholder}, "
-				fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
-				parametersPlaceholders += f"{placeholder}, "
-				parameters.append(fieldValue) #not used for parameterized statement #if(value): value = "'" + str(value) + "'"
-			elif(isinstance(fieldValue, NUL)):
-				fieldsNames.append(field)
-				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator(operation)} {placeholder} AND "
-				fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator(operation)} {placeholder}, "
-				fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
-				parametersPlaceholders += f"{placeholder}, "
-				parameters.append(None)
-			elif(isinstance(fieldValue, NOT_NULL)):
-				fieldsNames.append(field)
-				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
-				fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
-				fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
-				parametersPlaceholders += f"{placeholder}, "
-			elif(isinstance(fieldValue, (gt, ge, lt, le, LIKE))):
-				fieldsNames.append(field)
-				fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
-				fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
-				fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
-				parametersPlaceholders += f"{placeholder}, "
-				parameters.append(fieldValue.value()) # the value of LIKE
-			elif(isinstance(fieldValue, (IN, BETWEEN, NOT_IN))):
-				if(type(fieldValue.value()) is list and len(fieldValue.value())): #to make sure it's a list and contains elements
-					fieldsNames.append(field)
-					fieldsEqualPlaceholdersAnd += f"{record.alias.value()}.{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)} AND "
-					fieldsEqualPlaceholdersComma += f"{self.escapeChar()}{field}{self.escapeChar()} {fieldValue.operator()} {fieldValue.placeholder(placeholder)}, "
-					fields += f"{self.escapeChar()}{field}{self.escapeChar()}, "
-					parametersPlaceholders += f"{placeholder}, "
-					for value in fieldValue.value(): parameters.append(value) # list values
-		#
-		if(operation==Database.insert): record.prepared__.statement = f"({fields[:-2]}) VALUES ({parametersPlaceholders[:-2]})"
-		elif(operation==Database.read): record.prepared__.statement = fieldsEqualPlaceholdersAnd[:-5]
-		elif(operation==Database.startUpdate): record.prepared__.statement = fieldsEqualPlaceholdersAnd[:-5]
-		elif(operation==Database.update): record.prepared__.statement = fieldsEqualPlaceholdersComma[:-2]
-		elif(operation==Database.delete): record.prepared__.statement = fieldsEqualPlaceholdersAnd[:-5]
-		elif(operation==Database.all):
-			record.prepared__.statement = "1"
-			parameters = [] #iterating over Record has attributes will fill emptied parameters above with the same attributes again
-		record.prepared__.fieldsNames = fieldsNames
-		record.prepared__.parameters = parameters
-		#
-		#print(record.prepared__.statement)
-		#print(parameters)
-	#--------------------------------------#
-	def __crud(self, operation, record, selected="*", group_by='', limit=''):
-		self.__prepare(operation, record)
-		joiners = self.joining(record)
+	def __crud(self, operation, record, mode, selected="*", group_by='', limit=''):
+		current = []
+		where = record.getMode(mode).where(record)
+		parameters = record.getMode(mode).parameters(record)
+		joiners = self.joining(record, mode)
 		joinsCriteria = joiners.preparedStatement
-		where = "1=1"
-		if(record.prepared__.statement): where=record.prepared__.statement
-		_where_ = record.state__.statement
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.read):
-			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where} {joinsCriteria} \n{group_by} {limit}"
+			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_by} {limit}"
+		#-----
 		elif(operation==Database.insert):
-			statement = f"INSERT INTO {record.table__()} {record.prepared__.statement}"
-		elif(operation==Database.delete):
-			statement = f"DELETE {selected} FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}"
+			fieldsValuesClause = f"({', '.join(record.fields)}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.fields))])})"
+			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
+		#-----
 		elif(operation==Database.update):
-			statement = f"UPDATE {record.table__()} SET {record.prepared__.statement} \nWHERE {_where_}"
+			current = parameters
+			setFields = record.set.setFields()
+			parameters = record.set.parameters()
+			statement = f"UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+		#-----
+		elif(operation==Database.delete):
+			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+		#-----
 		elif(operation==Database.all):
 			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
 		#-----
 		record.query__ = Query()
 		record.query__.statement = statement
-		record.query__.parameters = record.prepared__.parameters
-		record.query__.parameters += record.state__.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
+		record.query__.parameters = parameters
+		record.query__.parameters += current #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.parameters += joiners.parameters
-		record.state__.delete()
 		if(record.secure__.user_id): self.secure(record)
+		record.query__.operation = operation
 		self.executeStatement(record.query__)
 		self.orm.map(record) #use self. instead Database. to be  able to override
 	#--------------------------------------#
 	def __crudMany(self, operation, record, selected="*", group_by='', limit=''):
-		self.__prepare(operation, record)
-		joiners = self.joining(record)
+		joiners = self.joining(record, 'values')
 		joinsCriteria = joiners.preparedStatement
-		where = "1=1"
-		if(record.prepared__.statement): where=record.prepared__.statement
-		_where_ = record.state__.statement
-		#----- #ordered by occurance propability for many records
+		#
+		where = record.values.where(record)
+		# parameters = record.values.parameters(record)
+		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
-			statement = f"INSERT INTO {record.table__()} {record.prepared__.statement}"
-		elif(operation==Database.update):
-			statement = f"UPDATE {record.table__()} SET {record.prepared__.statement} \nWHERE {_where_}"
-		elif(operation==Database.read):
-			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where} {joinsCriteria} \n{group_by} {limit}"
-		elif(operation==Database.delete):
-			statement = f"DELETE {selected} FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}"
-		elif(operation==Database.all):
-			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
+			fieldsValuesClause = f"({', '.join(record.fields)}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.fields))])})"
+			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
-		fieldsNames = record.prepared__.fieldsNames # as record.statement__.delete() below in iteration over recordset will delete record.statement__.fieldsnames
-		query=Query() # as 
+		elif(operation==Database.update):
+			setFields = record.set.setFields()
+			statement = f"UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+		#-----
+		elif(operation==Database.delete):
+			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+		#-----
+		fieldsNames = list(record.fields.keys()) #
+		query = Query() # as 
 		query.statement = statement
 		for r in record.recordset.iterate():
-			#r.insert()
-			self.__prepare(operation, r, fieldsNames)
-			r.prepared__.parameters = r.prepared__.parameters + r.state__.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
-			#r_joiners = self.joining(r)
-			#r.query__.parameters += r_joiners.parameters # parameters need to be implemented to be retrieved in the same order from all records
-			query.parameters.append(tuple(r.prepared__.parameters))
-			r.state__.delete()
+			params = r.set.parameters() + r.values.parameters(r, fieldsNames=fieldsNames) #no problem withr.set.parameters() as it's emptied after sucessful update
+		 	# r.prepared__.parameters = r.prepared__.parameters + r.state__.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
+		 	# #r_joiners = self.joining(r)
+			# #r.query__.parameters += r_joiners.parameters # parameters need to be implemented to be retrieved in the same order from all records
+			query.parameters.append(tuple(params))
 		#if(record.secure__.user_id): self.secure(record) #not implemented for many (insert and update)
+		query.opeartion = operation
 		record.recordset.rowsCount = self.executeMany(query)
 		#self.orm.map(record)  #not implemented for many (insert and update)
 	#--------------------------------------#
-	def all(self, record): self.__crud(Database.all, record)
-	def insert(self, record): self.__crud(Database.insert, record)
-	def read(self, record, selected="*", group_by='', limit=''): self.__crud(Database.read, record, selected, group_by, limit)
-	def delete(self, record, selected): self.__crud(Database.delete, record, selected)
-	def update(self, record): 
-		if(record.state__.statement):
-			self.__crud(Database.update, record)
-		else:
-			raise RuntimeError("The update doesn't start, no current state !")
+	def all(self, record, mode): self.__crud(operation=Database.all, record=record, mode=mode)
+	def insert(self, record, mode): self.__crud(operation=Database.insert, record=record, mode=mode)
+	def read(self, operation, record, mode, selected="*", group_by='', limit=''): self.__crud(operation=operation, record=record, mode=mode, selected=selected, group_by=group_by, limit=limit)
+	def delete(self, operation, record, mode): self.__crud(operation=operation, record=record, mode=mode)
+	def update(self, operation, record, mode):
+		self.__crud(operation=operation, record=record, mode=mode)
+		for field, value in record.set.new.items():
+			record.setField(field, value)
+			record.set.empty()
 	#--------------------------------------#
-	def insertMany(self, record): self.__crudMany(Database.insert, record)
-	def deleteMany(self, record, selected): self.__crudMany(Database.delete, record, selected)
-	def updateMany(self, record):
-		if(record.state__.statement):
-			self.__crudMany(Database.update, record)
-		else:
-			#print("The update doesn't start, no current state !")
-			raise RuntimeError("The update doesn't start, no current state !")
+	def insertMany(self, record): self.__crudMany(operation=Database.insert, record=record)
+	def deleteMany(self, record): self.__crudMany(operation=Database.delete, record=record)
+	def updateMany(self, record): 
+		self.__crudMany(operation=Database.update, record=record)
+		for r in record.recordset.iterate():
+			for field, value in r.set.new.items():
+				r.setField(field, value)
+				r.set.empty()
 	#--------------------------------------#
-	def startUpdate(self, record, fieldsNames=None):
-		if(fieldsNames): #Recordset.startUpdate()
-			self.__prepare(Database.startUpdate, record, fieldsNames)
-			record.state__.parameters = record.prepared__.parameters
-		else: #Record.startUpdate()
-			self.__prepare(Database.startUpdate, record, fieldsNames)
-			record.state__.statement = record.prepared__.statement
-			record.state__.parameters = record.prepared__.parameters
-	#--------------------------------------#
-	def startUpdateMany(self, record):
-		self.startUpdate(record)
-		#self.startUpdate(record) will happen again in next line recordset iteration startUpdate process
-		for r in record.recordset.iterate(): self.startUpdate(r, record.prepared__.fieldsNames)
-	#--------------------------------------#
-	def limit(self, pageNumber=1, recordsCount=1):
+	def paginate(self, pageNumber=1, recordsCount=1):
 		try:
 			pageNumber = int(pageNumber)
 			recordsCount = int(recordsCount)
 			if(pageNumber and recordsCount):
 				offset = (pageNumber - 1) * recordsCount
-				return self.paginationClause(offset, recordsCount)
+				return self.limit(offset, recordsCount)
 			else:
 				return ''
 		except Exception as e:
@@ -775,8 +829,8 @@ class Database:
 				setattr(copy, attributeName, attributeValue)
 			elif(isinstance(attributeValue, IN)):
 				setattr(copy, attributeName, IN(list(attributeValue.value())))
-			elif(isinstance(attributeValue, NUL)):
-				setattr(copy, attributeName, NUL())
+			elif(isinstance(attributeValue, NULL)):
+				setattr(copy, attributeName, NULL())
 			elif(isinstance(attributeValue, NOT_NULL)):
 				setattr(copy, attributeName, NOT_NULL())
 			elif(isinstance(attributeValue, LIKE)):
@@ -786,31 +840,25 @@ class Database:
 	#--------------------------------------#
 #================================================================================#
 class SQLite(Database):
-	def __init__(self, database=None, checkSameThread=True):
-		self.__checkSameThread = checkSameThread
-		Database.__init__(self, database=database)
-	def connect(self):
-		if(self.connectionParameters() == 1):
-			import sqlite3
-			self._Database__connection = sqlite3.connect(self._Database__database, check_same_thread=self.__checkSameThread)
-			self.cursor()
+	def __init__(self, connection):
+		Database.__init__(self)
+		self._Database__connection = connection
+		self.cursor()
+		
+	@staticmethod
+	def limit(offset=0, recordsCount=1):
+		return f"LIMIT {offset}, {recordsCount}"
 #================================================================================#
 class Oracle(Database):
-	def __init__(self, database=None, username=None, password=None, host=None):
-		Database.__init__(self, database=database, username=username, password=password, host=host)
-	def connect(self):
-		if(self.connectionParameters() >= 3):
-			import cx_Oracle
-			if(self._Database__host):
-				dsn_tns = cx_Oracle.makedsn(self._Database__host, '1521', service_name=self._Database__database)
-				self._Database__connection = cx_Oracle.connect(self._Database__username, self._Database__password, dsn=dsn_tns)
-			else:
-				self._Database__connection = cx_Oracle.connect(self._Database__username, self._Database__password, self._Database__database)
-			self.cursor()
-			self._Database__placeholder = ':1' #1 #start of numeric
-			self._Database__escapeChar = '"'
+	def __init__(self, connection):
+		Database.__init__(self)
+		self._Database__connection = connection
+		self.cursor()
+		self._Database__placeholder = ':1' #1 #start of numeric
+		self._Database__escapeChar = "'"
+
 	@staticmethod
-	def paginationClause(offset=0, recordsCount=1):
+	def limit(offset=0, recordsCount=1):
 		return f"OFFSET {offset} ROWS FETCH NEXT {recordsCount} ROWS ONLY"
 #================================================================================#
 class MySQL(Database):
@@ -829,7 +877,7 @@ class MySQL(Database):
 		(last_total_rows,) = self._Database__cursor.fetchone()
 		return last_total_rows
 	@staticmethod
-	def paginationClause(offset=0, recordsCount=1):
+	def limit(offset=0, recordsCount=1):
 		return f"LIMIT {offset}, {recordsCount}"
 #================================================================================#
 class MySQLClient(Database):
@@ -846,7 +894,7 @@ class MySQLClient(Database):
 		(last_total_rows,) = self._Database__cursor.fetchone()
 		return last_total_rows
 	@staticmethod
-	def paginationClause(offset=0, recordsCount=1):
+	def limit(offset=0, recordsCount=1):
 		return f"LIMIT {offset}, {recordsCount}"
 #================================================================================#
 class Postgres(Database):
@@ -865,7 +913,7 @@ class MicrosoftSQL(Database):
 	def connect(self):
 		if(self.connectionParameters() == 4):
 			import pyodbc
-			self._Database__connection = pyodbc.connect(Driver='{ODBC Driver 17 for SQL Server}',database=self._Database__database, user=self._Database__username, password=self._Database__password, host=self._Database__host)
+			self._Database__connection = pyodbc.connect(Driver='{ODBC Driver 17 for SQL Server}', database=self._Database__database, user=self._Database__username, password=self._Database__password, host=self._Database__host)
 			#self._Database__connection = pyodbc.connect('Driver={ODBC Driver 17 for SQL Server};Server=tcp:example.database.windows.net,1433;Database=example_db;;;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;')
 			self.cursor()
 #================================================================================#
@@ -875,15 +923,17 @@ class Record:
 	tableName__ = TableName()
 	#--------------------------------------#
 	def __init__(self, statement=None, parameters=None, alias=None, secure_by_user_id=None, **kwargs):
+		self.__dict__['filter'] = Filter(self) #should be the first attr to be added and in this format to prevent __setattr__ issue
+		self.values = Database.values
+		self.set = Set(self)
 		self.recordset = Recordset()
 		self.prepared__ = Prepared()
-		self.state__ = State()
+		self.fields = {}
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.joins__ = {}
-		self.primarykey__ = []
 		self.secure__ = UserID(secure_by_user_id)
-
-		self.alias = Alias(f"{self.database__.escapeChar()}{self.__class__.__name__}{self.database__.escapeChar()}")
+		quoteChar = '' #self.database__.escapeChar()
+		self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
 		if(self.secure__.user_id):
 			self.table__ = self.__tableSecure
 		else:
@@ -899,6 +949,8 @@ class Record:
 			if(parameters): self.query__.parameters = parameters #if prepared statement's parameters are passed
 			#self. instead of Record. #change the static field self.__database for inherited children classes
 			if(self.secure__.user_id): self.database__.secure(self)
+			if(str((statement.strip())[:6]).lower()=="select"):
+				self.query__.operation = Database.read
 			if(len(self.query__.parameters) and type(self.query__.parameters[0]) in (list, tuple)):
 				self.database__.executeMany(self.query__)
 			else:
@@ -906,8 +958,9 @@ class Record:
 			Database.orm.map(self)
 	#--------------------------------------#
 	def __table(self):
-		if(self.tableName__.value()): return f"{self.database__.escapeChar()}{self.tableName__.value()}{self.database__.escapeChar()}"
-		else: return f"{self.database__.escapeChar()}{self.__class__.__name__}{self.database__.escapeChar()}"
+		quoteChar = '' #self.database__.escapeChar()
+		if(self.tableName__.value()): return f"{quoteChar}{self.tableName__.value()}{quoteChar}"
+		else: return f"{quoteChar}{self.__class__.__name__}{quoteChar}"
 	#--------------------------------------#
 	def __tableSecure(self):
 		if(self.tableName__.value()): return "${" + self.tableName__.value() + "}"
@@ -915,16 +968,48 @@ class Record:
 	#--------------------------------------#
 	def id(self): return self.query__.result.lastrowid
 	#--------------------------------------#
-	def readCount(self): return self.query__.result.count
+	def rowsCount(self): return self.query__.result.count
 	#--------------------------------------#
-	def getField(self, fieldName): return self.__dict__[fieldName]
-	def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue
+	def getMode(self, mode): return self.__dict__[mode]
+	#--------------------------------------#
+	def getField(self, fieldName): return self.__dict__[fieldName] #get field without invoke __getattr__
+	def setField(self, fieldName, fieldValue):
+		 #set field without invoke __setattr__
+		self.__dict__[fieldName]=fieldValue
+		self.fields[fieldName]=fieldValue
+	#--------------------------------------#
+	def __delattr__(self, attr):
+		del self.__dict__[attr]
+		del self.fields[attr]
+	#--------------------------------------#
+	def __setattr__(self, field, value):
+		# print(field, value)
+		placeholder = self.database__.placeholder()
+		if(type(value) in [str, unicode, int, float, datetime]):
+			self.__dict__[field] = value
+			self.__dict__['fields'][field] = value
+			self.filter.addCondition(field, (f"{field} = {placeholder} AND ", value))
+		elif(isinstance(value, (NULL))):
+			self.__dict__[field] = value
+			self.__dict__['fields'][field] = value
+			value.field = field #to be used in Filter.where
+			self.filter.addCondition(field, value)
+		elif(isinstance(value, (NULL, NOT_NULL, gt, ge, lt, le, LIKE, IN, NOT_IN, BETWEEN))):
+			value.field = field #to be used in Filter.where
+			self.filter.addCondition(field, value)
+		self.__dict__[field] = value
+	#--------------------------------------#
+	def filter_(self, **kwargs):
+		for field, value in kwargs.items():
+			setattr(self, field, value) # self.__setattr__(field, value)
+		return self
+	#--------------------------------------#
+	def set_(self, **kwargs):
+		for field, value in kwargs.items():
+			setattr(self.set, field, value) # self.__setattr__(field, value)
+		return self
 	#--------------------------------------#
 	#def __str__(self): pass
-	#--------------------------------------#
-	def hash(self):
-		hashedValue = ''
-		for column in self.primarykey__: pass
 	#--------------------------------------#
 	def __iter__(self): 
 		self.__iterationIndex = 0
@@ -943,12 +1028,11 @@ class Record:
 	#--------------------------------------#
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
-	def insert(self): self.database__.insert(self)
-	def read(self, selected="*", group_by='', limit=''): self.database__.read(self, selected, group_by, limit)
-	def update(self): self.database__.update(self)
-	def delete(self): self.database__.delete(self, selected='')
-	def startUpdate(self): self.database__.startUpdate(self)
-	def all(self): self.database__.all(self)
+	def insert(self): self.database__.insert(record=self, mode='values')
+	def read(self, selected="*", group_by='', limit=''): self.database__.read(Database.read, record=self, mode='values', selected=selected, group_by=group_by, limit=limit)
+	def update(self): self.database__.update(Database.update, record=self, mode='values')
+	def delete(self): self.database__.delete(Database.delete, record=self, mode='values')
+	def all(self): self.database__.all(record=self, mode='values')
 	def commit(self): self.database__.commit()
 	#--------------------------------------#
 	def join(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields)
@@ -956,6 +1040,10 @@ class Record:
 	def rightJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' RIGHT JOIN ')
 	#--------------------------------------#
 	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN ')
+	#--------------------------------------#
+	def toList(self): return list(self.fields.values())
+	#--------------------------------------#
+	def toDict(self): return self.fields
 	#--------------------------------------#
 	def getCopyInstance(self, base=(object, ), attributesDictionary={}):
 		return self.database__.getCopyInstance(self, base, attributesDictionary={})
@@ -1000,16 +1088,26 @@ class Recordset:
 	#--------------------------------------#
 	def insert(self):
 		if(self.firstRecord()): self.firstRecord().database__.insertMany(self.firstRecord())
-	def read(self, selected="*", group_by='', limit=''):
-		if(self.firstRecord()):  self.firstRecord().database__.readMany(self.firstRecord())
 	def update(self):
 		if(self.firstRecord()):  self.firstRecord().database__.updateMany(self.firstRecord())
-	def delete(self, selected=''):
-		if(self.firstRecord()):  self.firstRecord().database__.deleteMany(self.firstRecord(), selected)
-	def startUpdate(self):
-		if(self.firstRecord()):  self.firstRecord().database__.startUpdateMany(self.firstRecord())
+	def delete(self):
+		if(self.firstRecord()):  self.firstRecord().database__.deleteMany(self.firstRecord())
 	def commit(self):
 		if(self.firstRecord()):  self.firstRecord().database__.commit()
+	#--------------------------------------#
+	def toList(self):
+		data = []
+		for record in self.iterate():
+			data.append(record.toList())
+		return data
+	#--------------------------------------#
+	def toDict(self):
+		data = {}
+		id = 0
+		for record in self.iterate():
+			data[id] = record.toDict()
+			id += 1
+		return data
 	#--------------------------------------#
 	def to_json(self):
 		recordsetJSONList = []
@@ -1054,6 +1152,6 @@ class manipolatore:
 		value = self.__getValue(path)
 		if(value): return value
 		elif(value == ""): return ""
-		else: return NUL()
+		else: return NULL()
 	#--------------------
 #================================================================================#
