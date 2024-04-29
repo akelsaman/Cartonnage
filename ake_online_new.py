@@ -2,6 +2,15 @@
 
 #version: 202404221245
 
+# placeholder
+# none
+# test file
+# operators __str__
+# ==
+# subquery
+# join.value and joiners.value
+# record video explaining meta class and Fields
+# batch size
 #================================================================================#
 from string import Template
 from datetime import datetime
@@ -46,14 +55,21 @@ class LIKE(SpecialValue):
 		self.__value = value.replace("*","%")
 		SpecialValue.__init__(self, self.__value)
 	def operator(self): return " LIKE "
+	def filter(self, field): return f"{field} LIKE ?"
+	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class IN(SpecialValue):
 	def operator(self): return " IN "
-	def placeholder(self, placeholder): return '(' + ','.join([placeholder]*len(self._SpecialValue__value)) + ')'
+	def placeholder(self, placeholder): return f"({','.join('?'*len(self._SpecialValue__value))})"
+	def filter(self, field): return f"{field} IN {self.placeholder('?')}"
+	def parametersAppend(self, parameters): parameters += self.value()
+		# return parameters
 #--------------------
 class NOT_IN(SpecialValue):
 	def operator(self): return " NOT IN "
-	def placeholder(self, placeholder): return '(' + ','.join([placeholder]*len(self._SpecialValue__value)) + ')'
+	def placeholder(self, placeholder): return f"({','.join('?'*len(self._SpecialValue__value))})"
+	def filter(self, field): return f"{field} NOT IN {self.placeholder('?')}"
+	def parametersAppend(self, parameters): parameters += self.value()
 #--------------------
 class BETWEEN(SpecialValue):
 	def __init__(self, minValue, maxValue):
@@ -63,18 +79,28 @@ class BETWEEN(SpecialValue):
 	def value(self): return [self.__minValue, self.__maxValue]
 	def operator(self): return " BETWEEN "
 	def placeholder(self, placeholder): return placeholder + " AND " + placeholder
+	def filter(self, field): return f"{field} BETWEEN {self.placeholder('?')}"
+	def parametersAppend(self, parameters): parameters += self.value()
 #--------------------
 class gt(SpecialValue):
 	def operator(self): return " > "
+	def filter(self, field): return f"{field} > ?"
+	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class ge(SpecialValue):
 	def operator(self): return " >= "
+	def filter(self, field): return f"{field} >= ?"
+	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class lt(SpecialValue):
 	def operator(self): return " < "
+	def filter(self, field): return f"{field} < ?"
+	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class le(SpecialValue):
 	def operator(self): return " <= "
+	def filter(self, field): return f"{field} <= ?"
+	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class NULL(SpecialValue, dict): #to make it json serializable using jsonifiy
 	def operator(self, operation=2):
@@ -86,6 +112,8 @@ class NULL(SpecialValue, dict): #to make it json serializable using jsonifiy
 	def __str__(self): return "NULL"
 	def __repr__(self): return "NULL"
 	def __eq__(self, other): return "NULL"==other
+	def filter(self, field): return f"{field} IS NULL"
+	def parametersAppend(self, parameters): return parameters
 #--------------------
 class NOT_NULL(SpecialValue):
 	def __init__(self):
@@ -96,6 +124,8 @@ class NOT_NULL(SpecialValue):
 	def __str__(self): return "NOT NULL"
 	def __repr__(self): return "NOT NULL"
 	def __eq__(self, other): return "NOT NULL"==other
+	def filter(self, field): return f"{field} IS NOT NULL"
+	def parametersAppend(self, parameters): return parameters
 #--------------------
 class Join(SpecialValue):
 	def __init__(self, object, fields, type=' INNER JOIN ', value=None):
@@ -125,15 +155,6 @@ class Query:
 		self.result		= Result()
 		self.parameters	= [] #to prevent #ValueError: parameters are of unsupported type in line #self.__cursor.execute(query.statement, tuple(query.parameters))
 		self.operation	= None
-#================================================================================#
-class Prepared:
-	def __init__(self):
-		self.empty()
-
-	def empty(self):
-		self.statement = ""
-		self.parameters = []
-		self.fieldsNames = []
 #================================================================================#
 class Set:
 	def __init__(self, parent):
@@ -168,12 +189,22 @@ class Set:
 class Values:
 	#--------------------------------------#
 	@staticmethod
+	def fields(record):
+		fields = []
+		for field in record.__dict__: 
+			value = record.__dict__[field]
+			if(type(value) in [str, unicode, int, float, datetime, NULL]):
+				fields.append(field)
+		return fields
+	#--------------------------------------#
+	@staticmethod
 	def where(record):
 		#getStatement always used to collect values not filters so no "NOT NULL" but only "NULL" alongside with [str, unicode, int, float, and datetime] values.
 		#getStatement always used in 'WHERE' so "NULL" always be evaluated to "IS".
 		statement = ''
-		for field in record.fields:
-			value = record.fields[field]
+		fields = Values.fields(record)
+		for field in fields:
+			value = record.getField(field)
 			if(type(value) is NULL):
 				statement += f"{field} IS NULL AND "
 			else: statement += f"{record.alias.value()}.{field} = {record.database__.placeholder()} AND "
@@ -183,14 +214,14 @@ class Values:
 	def parameters(record, fieldsNames=None):
 		#getParameters always used to collect values not filters so no "NOT NULL" but only "NULL" alongside with [str, unicode, int, float, and datetime] values.
 		#getParameters used in 'SET' or 'WHERE' so "NULL" may be evaluated to "= ?" or "IS NULL".
-		fields = fieldsNames if (fieldsNames) else list(record.fields.keys())
+		fields = fieldsNames if (fieldsNames) else Values.fields(record)
 		parameters = []
 		for field in fields:
 			try:
-				value = record.fields[field]
+				value = record.getField(field)
 			except KeyError as e:
 				key = e.args[0]
-				print(f"\n{'?'*80}Missing '{key}' in Record {record.fields}!\n{'?'*80}")
+				print(f"\n{'?'*80}Missing '{key}' in Record {record.toDict()}!\n{'?'*80}")
 				# raise
 				exit()
 			
@@ -206,28 +237,24 @@ class Filter:
 		self.empty()
 
 	def empty(self):
-		self.__dict__['__conditions'] = {}
-		self.__dict__['__where'] = ''
-		self.__dict__['__parameters'] = []
+		# self.__conditions = {}
+		self.__where = ''
+		self.__parameters = []
 	
-	def read(self, selected="*", group_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, mode='filter', selected=selected, group_by=group_by, limit=limit)
-	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent, mode='filter')
-	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent, mode='filter')
+	def filter(self, **kwargs): return self.parent.filter(**kwargs)
+	def read(self, selected="*", group_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, mode='filter_', selected=selected, group_by=group_by, limit=limit)
+	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent, mode='filter_')
+	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent, mode='filter_')
 
 	def addCondition(self, field, value):
-		self.__dict__['__conditions'][field] = value
-
-	def __setattr__(self, field, value):
-		# print(field, value)
 		placeholder = self.parent.database__.placeholder()
+		field = f"{self.parent.alias.value()}.{field}"
 		if(type(value) in [str, unicode, int, float, datetime]):
-			self.addCondition(f"{field} = {value} AND ", (f"{field} = {placeholder} AND ", value))
-		elif(isinstance(value, (NULL, NOT_NULL, gt, ge, lt, le, LIKE))):
-			value.field = field #to be used in Filter.where
-			self.addCondition(f"{field}{value.operator()}{value.value()} AND ", value)
-		elif(isinstance(value, (IN, NOT_IN, BETWEEN))):
-			value.field = field #to be used in Filter.where
-			self.addCondition(f"{field}{value.operator()}{value.value()} AND ", value)
+			self.__where += f"{field} = {placeholder} AND "
+			self.__parameters.append(value)
+		else:
+			self.__where += f"{value.filter(field)} AND "
+			value.parametersAppend(self.__parameters)
 
 	#'record' parameter to follow the same signature/interface of 'Values.where' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
@@ -235,29 +262,20 @@ class Filter:
 		#because this is where so any NULL | NOT_NULL values will be evaluated to "IS NULL" | "IS NOT NULL"
 		where = ''
 		parameters = []
-		for key, value in self.__dict__['__conditions'].items():
-			if(type(value) is tuple): #tuple contains string, numeric and datetime values
-				where += f"{self.parent.alias.value()}.{value[0]}"
-				parameters.append(value[1])
-			else:
-				where += f"{self.parent.alias.value()}.{value.field}{value.operator()}{value.placeholder(self.parent.database__.placeholder())} AND "
-				conditionValue = value.value()
-				if(isinstance(value, (NULL, NOT_NULL))):
-					pass
-				elif(type(conditionValue) == list): #elif(isinstance(value, (IN, NOT_IN, BETWEEN))):
-					parameters += conditionValue
-				else:
-					parameters.append(conditionValue)
-		self.__dict__['__where'] = where[:-5]
-		self.__dict__['__parameters'] = parameters
-		# print(">>>>>>>>>>>>>>>>>>>>", self.__dict__['__conditions'])
-		# print(">>>>>>>>>>>>>>>>>>>>", self.__dict__['__where'])
-		# print(">>>>>>>>>>>>>>>>>>>>", self.__dict__['__parameters'])
-		return where[:-5]
+		
+		where = self.parent.values.where(self.parent)
+		where = f"{where} AND " if (where) else ""
+		parameters = self.parent.values.parameters(self.parent)
+
+		self.__where = where + self.__where
+		self.__parameters = parameters + self.__parameters
+		# print(">>>>>>>>>>>>>>>>>>>>", self.__where)
+		# print(">>>>>>>>>>>>>>>>>>>>", self.__parameters)
+		return self.__where[:-5]
 	
 	#This 'Filter.parameters' function follow the same signature/interface of 'Values.parameters' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
-	def parameters(self, record=None): return self.__dict__['__parameters']
+	def parameters(self, record=None): return self.__parameters
 #================================================================================#
 class Representer:
 
@@ -518,22 +536,30 @@ class ObjectRelationalMapper:
 	def __init__(self): pass
 	#--------------------------------------#
 	def map(self, passedObject):
-		object = passedObject
-		query = object.query__
-		passedObject.columns = [] #empty the columns of the passed object only since the new object created below for each row is empty
-		if(query.result.rows):
-			passedObject.recordset.empty()
-			for row in query.result.rows:
-				object.columns = query.result.columns
+		query = passedObject.query__
+		rows = query.result.rows
+		columns = query.result.columns
+		if(passedObject.recordset.count()):
+			object = passedObject.__class__() #object = Record() #bug
+		else:
+			object = passedObject
+		# passedObject.columns = [] #empty the columns of the passed object only since the new object created below for each row is empty
+		if(rows):
+			count = 0
+			for row in rows:
+				count += 1
+				# if(count % 10000 == 0): print(count)
+				object.columns = columns
 				index = 0
 				for fieldValue in row:
 					if(fieldValue is None):
 						fieldValue=NULL()
+						pass
 					elif(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
 						fieldValue = fieldValue.decode('utf-8')
 					# str() don't use # to map Null value to None field correctly.
-					# setattr(object, query.result.columns[index], fieldValue)
-					object.setField(query.result.columns[index], fieldValue) #to prevent invoke __setattr__
+					setattr(object, columns[index], fieldValue)
+					# object.setField(columns[index], fieldValue) #to prevent invoke __setattr__
 					index += 1
 				passedObject.recordset.add(object)
 				object = passedObject.__class__() #object = Record() #bug
@@ -673,32 +699,39 @@ class Database:
 			print(" > Execute statement: ", query.statement)
 			print(" > Execute parameters: ", query.parameters)
 			print(f"<|{'-'*20}|e>")
-			#result is a cursor object instance contains the returned records of select statement
-			#None is the returned value in case of insert/update/delete.
+			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
-			rows=None
+			#
 			count=0
+			rows=[]
+			columns = []
+			#for index, column in enumerate(self.__cursor.description): columns.append(column[0])
+			if(self.__cursor.description): columns = [column[0].lower() for column in self.__cursor.description] #lower() to low column names
+			query.result.columns = columns
+			#
 			if(query.operation in [Database.all, Database.read]):
-				rows = self.__cursor.fetchall()
-				count = len(rows)
+				mainRecord = query.mainRecord
+				mainRecord.recordset = Recordset()
+				while True:
+					fetchedRows = self.__cursor.fetchmany(10000)
+					# rows += fetchedRows
+					query.result.rows = fetchedRows
+					count += len(fetchedRows)
+					print(count)
+					self.orm.map(mainRecord)
+					if not fetchedRows:
+						break
 			else:
-				count = self.__cursor.rowcount	
-			#rowcount is readonly attribute
-			#rowcount contains the count/number of the inserted/updated/deleted records/rows.
+				count = self.__cursor.rowcount
+			#rowcount is readonly attribute and it contains the count/number of the inserted/updated/deleted records/rows.
 			#rowcount is -1 in case of rows/records select.
-			# rowcount = self.__cursor.rowcount
 
 			if hasattr(self.__cursor, 'lastrowid'): lastrowid = self.__cursor.lastrowid #MySQL has last row id
-			columns = []
 			#cursor.description returns a tuple of information describes each column in the table.
 			#(name, type_code, display_size, internal_size, precision, scale, null_ok)
-			#for index, column in enumerate(self.__cursor.description): columns.append(column[0])
-			
-			if(self.__cursor.description): columns = [column[0].lower() for column in self.__cursor.description] #lower() to low column names
+			rows = []
 			query.result = Result(columns, rows, count)
-			#for r in query.result.rows:
-			#	print(r)
 			return query
 	#--------------------------------------#
 	def executeMany(self, query):
@@ -727,7 +760,7 @@ class Database:
 			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_by} {limit}"
 		#-----
 		elif(operation==Database.insert):
-			fieldsValuesClause = f"({', '.join(record.fields)}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.fields))])})"
+			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
 			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
 		elif(operation==Database.update):
@@ -743,6 +776,7 @@ class Database:
 			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
 		#-----
 		record.query__ = Query()
+		record.query__.mainRecord = record
 		record.query__.statement = statement
 		record.query__.parameters = parameters
 		record.query__.parameters += current #state.parameters must be reset to empty list [] not None for this operation to work correctly
@@ -750,7 +784,7 @@ class Database:
 		if(record.secure__.user_id): self.secure(record)
 		record.query__.operation = operation
 		self.executeStatement(record.query__)
-		self.orm.map(record) #use self. instead Database. to be  able to override
+		# self.orm.map(record) #use self. instead Database. to be  able to override
 	#--------------------------------------#
 	def __crudMany(self, operation, record, selected="*", group_by='', limit=''):
 		joiners = self.joining(record, 'values')
@@ -760,7 +794,7 @@ class Database:
 		# parameters = record.values.parameters(record)
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
-			fieldsValuesClause = f"({', '.join(record.fields)}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.fields))])})"
+			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
 			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
 		elif(operation==Database.update):
@@ -770,19 +804,18 @@ class Database:
 		elif(operation==Database.delete):
 			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
-		fieldsNames = list(record.fields.keys()) #
+		fieldsNames = list(record.values.fields(record))
 		query = Query() # as 
 		query.statement = statement
 		for r in record.recordset.iterate():
 			params = r.set.parameters() + r.values.parameters(r, fieldsNames=fieldsNames) #no problem withr.set.parameters() as it's emptied after sucessful update
-		 	# r.prepared__.parameters = r.prepared__.parameters + r.state__.parameters #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		 	# #r_joiners = self.joining(r)
 			# #r.query__.parameters += r_joiners.parameters # parameters need to be implemented to be retrieved in the same order from all records
 			query.parameters.append(tuple(params))
 		#if(record.secure__.user_id): self.secure(record) #not implemented for many (insert and update)
 		query.opeartion = operation
 		record.recordset.rowsCount = self.executeMany(query)
-		#self.orm.map(record)  #not implemented for many (insert and update)
+		# self.orm.map(record)  #not implemented for many (insert and update)
 	#--------------------------------------#
 	def all(self, record, mode): self.__crud(operation=Database.all, record=record, mode=mode)
 	def insert(self, record, mode): self.__crud(operation=Database.insert, record=record, mode=mode)
@@ -917,18 +950,47 @@ class MicrosoftSQL(Database):
 			#self._Database__connection = pyodbc.connect('Driver={ODBC Driver 17 for SQL Server};Server=tcp:example.database.windows.net,1433;Database=example_db;;;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;')
 			self.cursor()
 #================================================================================#
-class Record:
+class Field:
+	def __init__(self, cls, name, value):
+		self.cls = cls
+		self.name = name
+		self.value = value
+		
+	def __eq__(self, value): 
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return f"{self.cls.__name__}.{self.name} = {value}"
+	def __ne__(self, value): 
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return f"{self.cls.__name__}.{self.name} <> {value}"
+	def __gt__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return f"{self.cls.__name__}.{self.name} > {value}"
+	def __ge__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return f"{self.cls.__name__}.{self.name} >= {value}"
+	def __lt__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return f"{self.cls.__name__}.{self.name} < {value}"
+	def __le__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return f"{self.cls.__name__}.{self.name} <= {value}"
+#================================================================================#
+class RecordMeta(type):
+	def __getattr__(cls, field):
+		value = Field(cls, field, None)
+		setattr(cls, field, value)
+		return value
+#================================================================================#
+class Record(metaclass=RecordMeta):
 	database__	= None
 	representer__ = Representer()
 	tableName__ = TableName()
 	#--------------------------------------#
 	def __init__(self, statement=None, parameters=None, alias=None, secure_by_user_id=None, **kwargs):
-		self.__dict__['filter'] = Filter(self) #should be the first attr to be added and in this format to prevent __setattr__ issue
 		self.values = Database.values
 		self.set = Set(self)
-		self.recordset = Recordset()
-		self.prepared__ = Prepared()
-		self.fields = {}
+		self.filter_ = Filter(self)
+		# self.recordset = Recordset()
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.joins__ = {}
 		self.secure__ = UserID(secure_by_user_id)
@@ -943,8 +1005,8 @@ class Record:
 			for key, value in kwargs.items():
 				setattr(self, key, value)
 
-		self.query__ = Query() # must be declared before self.query__(statement)
 		if(statement):
+			self.query__ = Query() # must be declared before self.query__(statement)
 			self.query__.statement = statement
 			if(parameters): self.query__.parameters = parameters #if prepared statement's parameters are passed
 			#self. instead of Record. #change the static field self.__database for inherited children classes
@@ -973,40 +1035,17 @@ class Record:
 	def getMode(self, mode): return self.__dict__[mode]
 	#--------------------------------------#
 	def getField(self, fieldName): return self.__dict__[fieldName] #get field without invoke __getattr__
-	def setField(self, fieldName, fieldValue):
-		 #set field without invoke __setattr__
-		self.__dict__[fieldName]=fieldValue
-		self.fields[fieldName]=fieldValue
+	def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue
 	#--------------------------------------#
-	def __delattr__(self, attr):
-		del self.__dict__[attr]
-		del self.fields[attr]
-	#--------------------------------------#
-	def __setattr__(self, field, value):
-		# print(field, value)
-		placeholder = self.database__.placeholder()
-		if(type(value) in [str, unicode, int, float, datetime]):
-			self.__dict__[field] = value
-			self.__dict__['fields'][field] = value
-			self.filter.addCondition(field, (f"{field} = {placeholder} AND ", value))
-		elif(isinstance(value, (NULL))):
-			self.__dict__[field] = value
-			self.__dict__['fields'][field] = value
-			value.field = field #to be used in Filter.where
-			self.filter.addCondition(field, value)
-		elif(isinstance(value, (NULL, NOT_NULL, gt, ge, lt, le, LIKE, IN, NOT_IN, BETWEEN))):
-			value.field = field #to be used in Filter.where
-			self.filter.addCondition(field, value)
-		self.__dict__[field] = value
-	#--------------------------------------#
-	def filter_(self, **kwargs):
+	def filter(self, **kwargs):
 		for field, value in kwargs.items():
-			setattr(self, field, value) # self.__setattr__(field, value)
-		return self
+			# setattr(self.filter_, field, value)
+			self.filter_.addCondition(field, value)
+		return self.filter_
 	#--------------------------------------#
 	def set_(self, **kwargs):
 		for field, value in kwargs.items():
-			setattr(self.set, field, value) # self.__setattr__(field, value)
+			setattr(self.set, field, value)
 		return self
 	#--------------------------------------#
 	#def __str__(self): pass
@@ -1041,9 +1080,14 @@ class Record:
 	#--------------------------------------#
 	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN ')
 	#--------------------------------------#
-	def toList(self): return list(self.fields.values())
+	def toDict(self):
+		fields = self.values.fields(self)
+		objectDict = {}
+		for field in fields:
+			objectDict[field] = self.getField(field)
+		return objectDict
 	#--------------------------------------#
-	def toDict(self): return self.fields
+	def toList(self): return list(self.toDict().values())
 	#--------------------------------------#
 	def getCopyInstance(self, base=(object, ), attributesDictionary={}):
 		return self.database__.getCopyInstance(self, base, attributesDictionary={})
