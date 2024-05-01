@@ -2,19 +2,17 @@
 
 #version: 202404221245
 
-# placeholder
-# none
+# free Record from all other instances
 # test file
-# operators __str__
 # ==
 # subquery
 # join.value and joiners.value
 # record video explaining meta class and Fields
 # batch size
 #================================================================================#
-from string import Template
+from string import Template #used for secure id
 from datetime import datetime
-import re
+import re #used for secure id
 #================================================================================#
 #Object attributes types and instance type affect the following classes function:
 #Database.prepare()	#ObjectRelationalMapper.map()
@@ -30,6 +28,8 @@ try:
 	a = unicode()
 except Exception as e:
 	unicode = str
+
+NoneType = type(None)
 #================================================================================#
 def createTableClass(tableName, base=(object, ), attributesDictionary={}):
 	return type(str(tableName), base, attributesDictionary) #str() to prevent any error from missed type casting/conversion
@@ -55,20 +55,23 @@ class LIKE(SpecialValue):
 		self.__value = value.replace("*","%")
 		SpecialValue.__init__(self, self.__value)
 	def operator(self): return " LIKE "
-	def filter(self, field): return f"{field} LIKE ?"
+	def filter(self, field, placeholder): return f"{field} LIKE {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class IN(SpecialValue):
 	def operator(self): return " IN "
-	def placeholder(self, placeholder): return f"({','.join('?'*len(self._SpecialValue__value))})"
-	def filter(self, field): return f"{field} IN {self.placeholder('?')}"
+	def placeholder(self, placeholder): 
+		__placeholder = ','.join(placeholder*len(self._SpecialValue__value))
+		return f"({__placeholder})"
+	def filter(self, field, placeholder): return f"{field} IN {self.placeholder(placeholder)}"
 	def parametersAppend(self, parameters): parameters += self.value()
-		# return parameters
 #--------------------
 class NOT_IN(SpecialValue):
 	def operator(self): return " NOT IN "
-	def placeholder(self, placeholder): return f"({','.join('?'*len(self._SpecialValue__value))})"
-	def filter(self, field): return f"{field} NOT IN {self.placeholder('?')}"
+	def placeholder(self, placeholder):
+		__placeholder = ','.join(placeholder*len(self._SpecialValue__value))
+		return f"({__placeholder})"
+	def filter(self, field, placeholder): return f"{field} NOT IN {self.placeholder(placeholder)}"
 	def parametersAppend(self, parameters): parameters += self.value()
 #--------------------
 class BETWEEN(SpecialValue):
@@ -79,27 +82,27 @@ class BETWEEN(SpecialValue):
 	def value(self): return [self.__minValue, self.__maxValue]
 	def operator(self): return " BETWEEN "
 	def placeholder(self, placeholder): return placeholder + " AND " + placeholder
-	def filter(self, field): return f"{field} BETWEEN {self.placeholder('?')}"
+	def filter(self, field, placeholder): return f"{field} BETWEEN {self.placeholder(placeholder)}"
 	def parametersAppend(self, parameters): parameters += self.value()
 #--------------------
 class gt(SpecialValue):
 	def operator(self): return " > "
-	def filter(self, field): return f"{field} > ?"
+	def filter(self, field, placeholder): return f"{field} > {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class ge(SpecialValue):
 	def operator(self): return " >= "
-	def filter(self, field): return f"{field} >= ?"
+	def filter(self, field, placeholder): return f"{field} >= {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class lt(SpecialValue):
 	def operator(self): return " < "
-	def filter(self, field): return f"{field} < ?"
+	def filter(self, field, placeholder): return f"{field} < {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class le(SpecialValue):
 	def operator(self): return " <= "
-	def filter(self, field): return f"{field} <= ?"
+	def filter(self, field, placeholder): return f"{field} <= {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class NULL(SpecialValue, dict): #to make it json serializable using jsonifiy
@@ -112,7 +115,7 @@ class NULL(SpecialValue, dict): #to make it json serializable using jsonifiy
 	def __str__(self): return "NULL"
 	def __repr__(self): return "NULL"
 	def __eq__(self, other): return "NULL"==other
-	def filter(self, field): return f"{field} IS NULL"
+	def filter(self, field, placeholder): return f"{field} IS NULL"
 	def parametersAppend(self, parameters): return parameters
 #--------------------
 class NOT_NULL(SpecialValue):
@@ -124,7 +127,7 @@ class NOT_NULL(SpecialValue):
 	def __str__(self): return "NOT NULL"
 	def __repr__(self): return "NOT NULL"
 	def __eq__(self, other): return "NOT NULL"==other
-	def filter(self, field): return f"{field} IS NOT NULL"
+	def filter(self, field, placeholder): return f"{field} IS NOT NULL"
 	def parametersAppend(self, parameters): return parameters
 #--------------------
 class Join(SpecialValue):
@@ -151,6 +154,7 @@ class Result:
 #================================================================================#
 class Query:
 	def __init__(self):
+		self.parent = None
 		self.statement	= None
 		self.result		= Result()
 		self.parameters	= [] #to prevent #ValueError: parameters are of unsupported type in line #self.__cursor.execute(query.statement, tuple(query.parameters))
@@ -183,8 +187,7 @@ class Set:
 	def __setattr__(self, field, value):
 		# print(field, value)
 		placeholder = self.parent.database__.placeholder()
-		if(type(value) in [str, unicode, int, float, datetime]): self.__dict__['new'][field] = value
-		elif(isinstance(value, (NULL))): self.__dict__['new'][field] = None
+		if(type(value) in [NoneType, str, unicode, int, float, datetime]): self.__dict__['new'][field] = value
 #================================================================================#
 class Values:
 	#--------------------------------------#
@@ -205,7 +208,7 @@ class Values:
 		fields = Values.fields(record)
 		for field in fields:
 			value = record.getField(field)
-			if(type(value) is NULL):
+			if(type(value) is None):
 				statement += f"{field} IS NULL AND "
 			else: statement += f"{record.alias.value()}.{field} = {record.database__.placeholder()} AND "
 		return statement[:-5]
@@ -224,10 +227,8 @@ class Values:
 				print(f"\n{'?'*80}Missing '{key}' in Record {record.toDict()}!\n{'?'*80}")
 				# raise
 				exit()
-			
-			if(type(value) is NULL):
-					pass #parameters.append(None)
-			else: parameters.append(value)
+
+			parameters.append(value)
 		return parameters
 	#--------------------------------------#
 #================================================================================#
@@ -249,11 +250,11 @@ class Filter:
 	def addCondition(self, field, value):
 		placeholder = self.parent.database__.placeholder()
 		field = f"{self.parent.alias.value()}.{field}"
-		if(type(value) in [str, unicode, int, float, datetime]):
+		if(type(value) in [NoneType, str, unicode, int, float, datetime]):
 			self.__where += f"{field} = {placeholder} AND "
 			self.__parameters.append(value)
 		else:
-			self.__where += f"{value.filter(field)} AND "
+			self.__where += f"{value.filter(field, placeholder)} AND "
 			value.parametersAppend(self.__parameters)
 
 	#'record' parameter to follow the same signature/interface of 'Values.where' function design pattern
@@ -522,9 +523,7 @@ class JSONRelationalMapper:
 				index = 0
 				jsonDictionary = {}
 				for fieldValue in row:
-					if(fieldValue is None):
-						fieldValue=""
-					elif(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
+					if(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
 						fieldValue = fieldValue.decode('utf-8')
 					# str() don't use # to map Null value to None field correctly.
 					jsonDictionary[query.result.columns[index]]=fieldValue
@@ -552,10 +551,36 @@ class ObjectRelationalMapper:
 				object.columns = columns
 				index = 0
 				for fieldValue in row:
-					if(fieldValue is None):
-						fieldValue=NULL()
-						pass
-					elif(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
+					# if(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
+					# 	fieldValue = fieldValue.decode('utf-8')
+					# str() don't use # to map Null value to None field correctly.
+					setattr(object, columns[index], fieldValue)
+					# object.setField(columns[index], fieldValue) #to prevent invoke __setattr__
+					index += 1
+				passedObject.recordset.add(object)
+				object = passedObject.__class__() #object = Record() #bug
+#================================================================================#
+class MySQLObjectRelationalMapper:
+	def __init__(self): pass
+	#--------------------------------------#
+	def map(self, passedObject):
+		query = passedObject.query__
+		rows = query.result.rows
+		columns = query.result.columns
+		if(passedObject.recordset.count()):
+			object = passedObject.__class__() #object = Record() #bug
+		else:
+			object = passedObject
+		# passedObject.columns = [] #empty the columns of the passed object only since the new object created below for each row is empty
+		if(rows):
+			count = 0
+			for row in rows:
+				count += 1
+				# if(count % 10000 == 0): print(count)
+				object.columns = columns
+				index = 0
+				for fieldValue in row:
+					if(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
 						fieldValue = fieldValue.decode('utf-8')
 					# str() don't use # to map Null value to None field correctly.
 					setattr(object, columns[index], fieldValue)
@@ -666,6 +691,10 @@ class Database:
 			
 			class Views(Record): pass
 			views = Views()
+			# views.recordset = Recordset()
+			views.query__ = Query()
+			views.query__.operation = Database.read
+			views.query__.parent = views
 			views.query__.statement = loadViews
 
 			# mysql.connector.errors.InterfaceError
@@ -675,7 +704,7 @@ class Database:
 
 			views.query__.parameters = [record.secure__.user_id] + tablesNames
 			self.executeStatement(views.query__)
-			Database.orm.map(views)
+			# Database.orm.map(views) #orm moved inside executeStatement method
 
 			#print(views.recordset.count())
 			for view in views:
@@ -711,15 +740,15 @@ class Database:
 			query.result.columns = columns
 			#
 			if(query.operation in [Database.all, Database.read]):
-				mainRecord = query.mainRecord
-				mainRecord.recordset = Recordset()
+				parent = query.parent
+				parent.recordset = Recordset()
 				while True:
 					fetchedRows = self.__cursor.fetchmany(10000)
 					# rows += fetchedRows
 					query.result.rows = fetchedRows
 					count += len(fetchedRows)
 					print(count)
-					self.orm.map(mainRecord)
+					self.orm.map(parent)
 					if not fetchedRows:
 						break
 			else:
@@ -776,7 +805,7 @@ class Database:
 			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
 		#-----
 		record.query__ = Query()
-		record.query__.mainRecord = record
+		record.query__.parent = record
 		record.query__.statement = statement
 		record.query__.parameters = parameters
 		record.query__.parameters += current #state.parameters must be reset to empty list [] not None for this operation to work correctly
@@ -858,7 +887,7 @@ class Database:
 		
 		for attributeName, attributeValue in record.__dict__.items(): #for a in dir(r): println(a)
 			# any other type will be execluded Class type, None type and others ...
-			if(type(attributeValue) in [str, unicode, int, float, datetime]):
+			if(type(attributeValue) in [NoneType, str, unicode, int, float, datetime]):
 				setattr(copy, attributeName, attributeValue)
 			elif(isinstance(attributeValue, IN)):
 				setattr(copy, attributeName, IN(list(attributeValue.value())))
@@ -1007,6 +1036,7 @@ class Record(metaclass=RecordMeta):
 
 		if(statement):
 			self.query__ = Query() # must be declared before self.query__(statement)
+			self.query__.parent = self
 			self.query__.statement = statement
 			if(parameters): self.query__.parameters = parameters #if prepared statement's parameters are passed
 			#self. instead of Record. #change the static field self.__database for inherited children classes
