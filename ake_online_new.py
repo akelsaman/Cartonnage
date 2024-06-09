@@ -50,6 +50,16 @@ class UserID(SpecialValue):
 	def __init__(self, value=None):
 		self.user_id = value
 #--------------------------------------#
+class SubQuery(SpecialValue):
+	def __init__(self, value):
+		self.__value = value
+		SpecialValue.__init__(self, self.__value)
+	def operator(self): return " LIKE "
+	def filter(self, field, placeholder): 
+		self.query = Database.crud(operation=Database.read, record=self.value(), mode='filter_', selected="employee_id", group_by='', limit='')
+		return f"{field} IN (\n{self.query.statement}\n) "
+	def parametersAppend(self, parameters): parameters += self.query.parameters
+#--------------------
 class LIKE(SpecialValue):
 	def __init__(self, value):
 		self.__value = value.replace("*","%")
@@ -252,7 +262,7 @@ class Filter:
 		field = f"{self.parent.alias.value()}.{field}"
 		if(type(value) in [NoneType, str, unicode, int, float, datetime]):
 			self.__where += f"{field} = {placeholder} AND "
-			self.__parameters.append(value)
+			self.__parameters.append(value)			
 		else:
 			self.__where += f"{value.filter(field, placeholder)} AND "
 			value.parametersAppend(self.__parameters)
@@ -644,9 +654,9 @@ class Database:
 		self.operationsCount = 0
 		return operationsCount
 	#--------------------------------------#
-	def joining(self, record, mode):
+	def joining(record, mode):
 		joiners = Joiners()
-		qouteChar = '' #self.escapeChar()
+		qouteChar = '' #cls.escapeChar()
 		for key, join in record.joins__.items():
 			#" INNER JOIN Persons pp ON "
 			inner_join = join.type + join.object.table__() + ' ' + join.object.alias.value() + ' ON '		
@@ -660,7 +670,7 @@ class Database:
 			if(statement): joiners.preparedStatement += " AND " + statement
 			joiners.parameters += join.object.getMode(mode).parameters(join.object)
 			#--------------------
-			child_joiners = self.joining(join.object, mode)
+			child_joiners = Database.joining(join.object, mode)
 			joiners.joinClause += child_joiners.joinClause
 			#if(child_joiners.preparedStatement): joiners.preparedStatement += child_joiners.preparedStatement
 			joiners.preparedStatement += child_joiners.preparedStatement
@@ -747,7 +757,7 @@ class Database:
 					# rows += fetchedRows
 					query.result.rows = fetchedRows
 					count += len(fetchedRows)
-					print(count)
+					# print(count)
 					self.orm.map(parent)
 					if not fetchedRows:
 						break
@@ -778,18 +788,19 @@ class Database:
 		sql = sqlScriptFile.read()
 		return self.__cursor.executescript(sql)
 	#--------------------------------------#
-	def __crud(self, operation, record, mode, selected="*", group_by='', limit=''):
+	@staticmethod
+	def crud(operation, record, mode, selected="*", group_by='', limit=''):
 		current = []
 		where = record.getMode(mode).where(record)
 		parameters = record.getMode(mode).parameters(record)
-		joiners = self.joining(record, mode)
+		joiners = Database.joining(record, mode)
 		joinsCriteria = joiners.preparedStatement
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.read):
 			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_by} {limit}"
 		#-----
 		elif(operation==Database.insert):
-			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
+			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([records.placeholder() for i in range(0, len(record.values.fields(record)))])})"
 			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
 		elif(operation==Database.update):
@@ -810,13 +821,14 @@ class Database:
 		record.query__.parameters = parameters
 		record.query__.parameters += current #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.parameters += joiners.parameters
-		if(record.secure__.user_id): self.secure(record)
+		if(record.secure__.user_id): Database.secure(record)
 		record.query__.operation = operation
-		self.executeStatement(record.query__)
+		# self.executeStatement(record.query__)
 		# self.orm.map(record) #use self. instead Database. to be  able to override
+		return record.query__
 	#--------------------------------------#
 	def __crudMany(self, operation, record, selected="*", group_by='', limit=''):
-		joiners = self.joining(record, 'values')
+		joiners = Database.joining(record, 'values')
 		joinsCriteria = joiners.preparedStatement
 		#
 		where = record.values.where(record)
@@ -846,12 +858,12 @@ class Database:
 		record.recordset.rowsCount = self.executeMany(query)
 		# self.orm.map(record)  #not implemented for many (insert and update)
 	#--------------------------------------#
-	def all(self, record, mode): self.__crud(operation=Database.all, record=record, mode=mode)
-	def insert(self, record, mode): self.__crud(operation=Database.insert, record=record, mode=mode)
-	def read(self, operation, record, mode, selected="*", group_by='', limit=''): self.__crud(operation=operation, record=record, mode=mode, selected=selected, group_by=group_by, limit=limit)
-	def delete(self, operation, record, mode): self.__crud(operation=operation, record=record, mode=mode)
+	def all(self, record, mode): self.executeStatement(self.crud(operation=Database.all, record=record, mode=mode))
+	def insert(self, record, mode): self.executeStatement(self.crud(operation=Database.insert, record=record, mode=mode))
+	def read(self, operation, record, mode, selected="*", group_by='', limit=''): self.executeStatement(self.crud(operation=operation, record=record, mode=mode, selected=selected, group_by=group_by, limit=limit))
+	def delete(self, operation, record, mode): self.executeStatement(self.crud(operation=operation, record=record, mode=mode))
 	def update(self, operation, record, mode):
-		self.__crud(operation=operation, record=record, mode=mode)
+		self.executeStatement(self.crud(operation=operation, record=record, mode=mode))
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
