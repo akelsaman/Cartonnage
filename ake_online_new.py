@@ -71,7 +71,7 @@ class LIKE(SpecialValue):
 class IN(SpecialValue):
 	def operator(self): return " IN "
 	def placeholder(self, placeholder): 
-		__placeholder = ','.join(placeholder*len(self._SpecialValue__value))
+		__placeholder = ','.join([placeholder]*len(self._SpecialValue__value))
 		return f"({__placeholder})"
 	def filter(self, field, placeholder): return f"{field} IN {self.placeholder(placeholder)}"
 	def parametersAppend(self, parameters): parameters += self.value()
@@ -79,7 +79,7 @@ class IN(SpecialValue):
 class NOT_IN(SpecialValue):
 	def operator(self): return " NOT IN "
 	def placeholder(self, placeholder):
-		__placeholder = ','.join(placeholder*len(self._SpecialValue__value))
+		__placeholder = ','.join([placeholder]*len(self._SpecialValue__value))
 		return f"({__placeholder})"
 	def filter(self, field, placeholder): return f"{field} NOT IN {self.placeholder(placeholder)}"
 	def parametersAppend(self, parameters): parameters += self.value()
@@ -734,10 +734,10 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			print(f"<s|{'-'*20}|>")
+			print(f"<s|{'-'*3}")
 			print(" > Execute statement: ", query.statement)
 			print(" > Execute parameters: ", query.parameters)
-			print(f"<|{'-'*20}|e>")
+			print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -774,8 +774,10 @@ class Database:
 			return query
 	#--------------------------------------#
 	def executeMany(self, query):
-		print(query.statement)
-		print(query.parameters)
+		print(f"<s|{'-'*3}")
+		print(" > Execute statement: ", query.statement)
+		print(" > Execute parameters: ", query.parameters)
+		print(f"{'-'*3}|e>")
 		rowcount = 0
 		if(query.statement):
 			self.__cursor.executemany(query.statement, query.parameters)
