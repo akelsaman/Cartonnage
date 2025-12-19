@@ -809,10 +809,10 @@ class Database:
 			current = parameters
 			setFields = record.set.setFields()
 			parameters = record.set.parameters()
-			statement = f"UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"UPDATE {record.table__()} {record.alias.value()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"DELETE FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		elif(operation==Database.all):
 			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
@@ -842,10 +842,10 @@ class Database:
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set.setFields()
-			statement = f"UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"UPDATE {record.table__()} {record.alias.value()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"DELETE FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		fieldsNames = list(record.values.fields(record))
 		query = Query() # as 
