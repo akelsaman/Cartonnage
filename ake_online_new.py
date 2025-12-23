@@ -60,6 +60,26 @@ class SubQuery(SpecialValue):
 		return f"{field} IN (\n{self.query.statement}\n) "
 	def parametersAppend(self, parameters): parameters += self.query.parameters
 #--------------------
+class EXISTS(SpecialValue):
+	def __init__(self, value):
+		self.__value = value
+		SpecialValue.__init__(self, self.__value)
+	def operator(self): return " LIKE "
+	def filter(self, field, placeholder): 
+		self.query = Database.crud(operation=Database.read, record=self.value(), mode='filter_', selected="employee_id", group_by='', limit='')
+		return f"EXISTS (\n{self.query.statement}\n) "
+	def parametersAppend(self, parameters): parameters += self.query.parameters
+#--------------------
+class NOTEXISTS(SpecialValue):
+	def __init__(self, value):
+		self.__value = value
+		SpecialValue.__init__(self, self.__value)
+	def operator(self): return " LIKE "
+	def filter(self, field, placeholder): 
+		self.query = Database.crud(operation=Database.read, record=self.value(), mode='filter_', selected="employee_id", group_by='', limit='')
+		return f"NOT EXISTS (\n{self.query.statement}\n) "
+	def parametersAppend(self, parameters): parameters += self.query.parameters
+#--------------------
 class LIKE(SpecialValue):
 	def __init__(self, value):
 		self.__value = value.replace("*","%")
@@ -256,13 +276,13 @@ class Filter:
 	def read(self, selected="*", group_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, mode='filter_', selected=selected, group_by=group_by, limit=limit)
 	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent, mode='filter_')
 	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent, mode='filter_')
-
+	
 	def addCondition(self, field, value):
 		placeholder = self.parent.database__.placeholder()
 		field = f"{self.parent.alias.value()}.{field}"
 		if(type(value) in [NoneType, str, unicode, int, float, datetime]):
 			self.__where += f"{field} = {placeholder} AND "
-			self.__parameters.append(value)			
+			self.__parameters.append(value)
 		else:
 			self.__where += f"{value.filter(field, placeholder)} AND "
 			value.parametersAppend(self.__parameters)
@@ -287,6 +307,60 @@ class Filter:
 	#This 'Filter.parameters' function follow the same signature/interface of 'Values.parameters' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
 	def parameters(self, record=None): return self.__parameters
+	#--------------------------------------#
+	def SubQuery(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, SubQuery(value))
+		return self
+	def EXISTS(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, EXISTS(value))
+		return self
+	def NOT_EXISTS(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, NOT_EXISTS(value))
+		return self
+	def IN(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, IN(value))
+		return self
+	def NOT_IN(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, NOT_IN(value))
+		return self
+	def LIKE(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, LIKE(value))
+		return self
+	def NULL(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, NULL())
+		return self
+	def NOT_NULL(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, NOT_NULL())
+		return self
+	def BETWEEN(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, BETWEEN(value[0], value[1]))
+		return self	
+	def gt(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, gt(value))
+		return self
+	def ge(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, ge(value))
+		return self
+	def lt(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, lt(value))
+		return self
+	def le(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, le(value))
+		return self
+	#--------------------------------------#
 #================================================================================#
 class Representer:
 
@@ -678,8 +752,9 @@ class Database:
 
 		return joiners
 	#--------------------------------------#
-	def secure(self, record):
-
+	@staticmethod
+	def secure(record):
+		__db__ = record.database__
 		queryStatement = record.query__.statement
 
 		#aa = re.search('{([a-zA-Z0-9_]+)}', query, re.IGNORECASE)
@@ -688,12 +763,12 @@ class Database:
 
 		tables_names_placeholders = ', '.join('?'*len(tablesNames))
 		
-		loadViews = """SELECT V.view, V.table_name, V.crud_statement
+		loadViews = f"""SELECT V.view, V.table_name, V.crud_statement
 		FROM Policys_Views_Authoritys PVA
 		INNER JOIN Users_Policys UP ON PVA.policy_fk = UP.policy_fk
 		INNER JOIN Views V ON PVA.view_fk = V.pk
 		WHERE UP.user_fk = ?
-			AND V.table_name IN (""" + tables_names_placeholders + ")"
+			AND V.table_name IN ({tables_names_placeholders})"""
 
 		#https://forums.mysql.com/read.php?100,630131,630158#msg-630158
 		secureViewsStatement = {}
@@ -713,16 +788,16 @@ class Database:
 			# "views.query__.parameters" was written by mistake "views.parameters"
 
 			views.query__.parameters = [record.secure__.user_id] + tablesNames
-			self.executeStatement(views.query__)
+			__db__.executeStatement(views.query__)
 			# Database.orm.map(views) #orm moved inside executeStatement method
 
 			#print(views.recordset.count())
 			for view in views:
 				#print(view.columns)
-				secureViewsStatement[str(view.table_name)] = '(' + str(view.crud_statement) + '\n)'
+					secureViewsStatement[str(view.table_name)] = f'({str(view.crud_statement)} \n)'
 			for tableName in tablesNames:
 				if(tableName not in secureViewsStatement):
-					secureViewsStatement[tableName] = f"{self.escapeChar()}{tableName}{self.escapeChar()}"
+					secureViewsStatement[tableName] = f"{__db__.escapeChar()}{tableName}{__db__.escapeChar()}"
 
 			#print(secureViewsStatement)
 
@@ -802,17 +877,17 @@ class Database:
 			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_by} {limit}"
 		#-----
 		elif(operation==Database.insert):
-			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([records.placeholder() for i in range(0, len(record.values.fields(record)))])})"
+			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
 			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
 		elif(operation==Database.update):
 			current = parameters
 			setFields = record.set.setFields()
 			parameters = record.set.parameters()
-			statement = f"UPDATE {record.table__()} {record.alias.value()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"DELETE FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		elif(operation==Database.all):
 			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
@@ -837,15 +912,15 @@ class Database:
 		# parameters = record.values.parameters(record)
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
-			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
+			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
 			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set.setFields()
-			statement = f"UPDATE {record.table__()} {record.alias.value()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"DELETE FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		fieldsNames = list(record.values.fields(record))
 		query = Query() # as 
@@ -1037,8 +1112,10 @@ class Record(metaclass=RecordMeta):
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.joins__ = {}
 		self.secure__ = UserID(secure_by_user_id)
-		quoteChar = '' #self.database__.escapeChar()
-		self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
+		
+		self.setupTableNameAndAlias()
+		# self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
+
 		if(self.secure__.user_id):
 			self.table__ = self.__tableSecure
 		else:
@@ -1063,14 +1140,41 @@ class Record(metaclass=RecordMeta):
 				self.database__.executeStatement(self.query__)
 			Database.orm.map(self)
 	#--------------------------------------#
+	def setupTableNameAndAlias(self):
+		quoteChar = '' #self.database__.escapeChar()
+		parentClassName = self.__class__.__bases__[0].__name__
+		if(parentClassName == "Record" or parentClassName.startswith('__')):
+			self.tableName__ = TableName(self.__class__.__name__)
+		else:
+			self.tableName__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
+		self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
+	#--------------------------------------#
 	def __table(self):
 		quoteChar = '' #self.database__.escapeChar()
-		if(self.tableName__.value()): return f"{quoteChar}{self.tableName__.value()}{quoteChar}"
-		else: return f"{quoteChar}{self.__class__.__name__}{quoteChar}"
+		# if(self.tableName__.value()): return f"{quoteChar}{self.tableName__.value()}{quoteChar}"
+		# else: return f"{quoteChar}{self.__class__.__name__}{quoteChar}"
+
+		# parentClassName = self.__class__.__bases__[0].__name__
+		# if(parentClassName == "Record" or parentClassName.startswith('__')):
+		# 	return f"{quoteChar}{self.__class__.__name__}{quoteChar}"
+		# else:
+		# 	return f"{quoteChar}{parentClassName}{quoteChar}"
+
+		return f"{quoteChar}{self.tableName__.value()}{quoteChar}"
 	#--------------------------------------#
 	def __tableSecure(self):
-		if(self.tableName__.value()): return "${" + self.tableName__.value() + "}"
-		else: return "${" + self.__class__.__name__ + "}"
+		# if(self.tableName__.value()): return "${" + self.tableName__.value() + "}"
+		# else: return "${" + self.__class__.__name__ + "}"
+
+		# quoteChar = '' #self.database__.escapeChar()
+		# parentClassName = self.__class__.__bases__[0].__name__
+		# if(parentClassName == "Record" or parentClassName.startswith('__')):
+		# 	return f"{quoteChar}${{{self.__class__.__name__}}}{quoteChar}"
+		# else:
+		# 	return f"{quoteChar}${{{parentClassName}}}{quoteChar}"
+
+		quoteChar = '' #self.database__.escapeChar()
+		return f"{quoteChar}${{{self.tableName__.value()}}}{quoteChar}"
 	#--------------------------------------#
 	def id(self): return self.query__.result.lastrowid
 	#--------------------------------------#
@@ -1086,6 +1190,46 @@ class Record(metaclass=RecordMeta):
 			# setattr(self.filter_, field, value)
 			self.filter_.addCondition(field, value)
 		return self.filter_
+	#--------------------------------------#
+	def SubQuery(self, **kwargs):
+		self.filter_.SubQuery(**kwargs)
+		return self
+	def EXISTS(self, **kwargs):
+		self.filter_.EXISTS(**kwargs)
+		return self
+	def NOT_EXISTS(self, **kwargs):
+		self.filter_.NOT_EXISTS(**kwargs)
+		return self
+	def IN(self, **kwargs):
+		self.filter_.IN(**kwargs)
+		return self
+	def NOT_IN(self, **kwargs):
+		self.filter_.NOT_IN(**kwargs)
+		return self
+	def LIKE(self, **kwargs):
+		self.filter_.LIKE(**kwargs)
+		return self
+	def NULL(self, **kwargs):
+		self.filter_.NULL(**kwargs)
+		return self
+	def NOT_NULL(self, **kwargs):
+		self.filter_.NOT_NULL(**kwargs)
+		return self
+	def BETWEEN(self, **kwargs):
+		self.filter_.BETWEEN(**kwargs)
+		return self	
+	def gt(self, **kwargs):
+		self.filter_.gt(**kwargs)
+		return self
+	def ge(self, **kwargs):
+		self.filter_.ge(**kwargs)
+		return self
+	def lt(self, **kwargs):
+		self.filter_.lt(**kwargs)
+		return self
+	def le(self, **kwargs):
+		self.filter_.le(**kwargs)
+		return self
 	#--------------------------------------#
 	def set_(self, **kwargs):
 		for field, value in kwargs.items():
