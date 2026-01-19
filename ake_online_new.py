@@ -1,27 +1,17 @@
 #!/usr/bin/python
 
-#version: 202404221245
+#version: 202601192302
 
 # free Record from all other instances
-# test file
-# ==
-# subquery
-# join.value and joiners.value
-# record video explaining meta class and Fields
 # batch size
 #================================================================================#
 from string import Template #used for secure id
 from datetime import datetime
 import re #used for secure id
 #================================================================================#
-#Object attributes types and instance type affect the following classes function:
-#Database.prepare()	#ObjectRelationalMapper.map()
-#Record.parameters()			#Record.getCopyInstance()
-#================================================================================#
 #python2 has two classes represent strings (str) and (unicode)
 #python3 has only one class represents string (str) and has no (unicode) class
 #the following code is for python3 and python2 compatibility-back
-#without it in Database().Prepare() check attribute/value using
 #type(value) in [str,] only will ignore unicode attributes/values if not casting
 # using str() explicity when assigning object.attribute = value of unicode()
 try:
@@ -34,6 +24,10 @@ NoneType = type(None)
 def createTableClass(tableName, base=(object, ), attributesDictionary={}):
 	return type(str(tableName), base, attributesDictionary) #str() to prevent any error from missed type casting/conversion
 #================================================================================#
+class Dummy:
+	def __init__(self, value):
+		self.value = value
+#--------------------------------------#
 # for new SpecialValue review
 # Database() #Database.parameterize() #Database.getCopyInstance()
 # for NULL review ObjectRelationalMapper also
@@ -50,42 +44,54 @@ class UserID(SpecialValue):
 	def __init__(self, value=None):
 		self.user_id = value
 #--------------------------------------#
+class Expression(SpecialValue):
+	def __init__(self, value):
+		self.__value = value
+		SpecialValue.__init__(self, self.__value)
+	def placeholder(self, placeholder): return self.__value
+	def fltr(self, field, placeholder): return f"{field} = {self.__value}"  # Add this
+	def parametersAppend(self, parameters): pass  # Add this - no params to append
+	def __str__(self): return self.__value
+	def __repr__(self): return self.__value
+	def __and__(self, other): return Expression(f"({self.value()} AND {other.value()})")
+	def __or__(self, other): return Expression(f"({self.value()} OR {other.value()})")
+#--------------------------------------#
 class SubQuery(SpecialValue):
 	def __init__(self, value):
 		self.__value = value
 		SpecialValue.__init__(self, self.__value)
-	def operator(self): return " LIKE "
-	def filter(self, field, placeholder): 
+	def operator(self): return ""
+	def fltr(self, field, placeholder): 
 		self.query = Database.crud(operation=Database.read, record=self.value(), mode='filter_', selected="employee_id", group_by='', limit='')
 		return f"{field} IN (\n{self.query.statement}\n) "
-	def parametersAppend(self, parameters): parameters += self.query.parameters
+	def parametersAppend(self, parameters): parameters.extend(self.query.parameters)
 #--------------------
 class EXISTS(SpecialValue):
 	def __init__(self, value):
 		self.__value = value
 		SpecialValue.__init__(self, self.__value)
-	def operator(self): return " LIKE "
-	def filter(self, field, placeholder): 
+	def operator(self): return ""
+	def fltr(self, field, placeholder): 
 		self.query = Database.crud(operation=Database.read, record=self.value(), mode='filter_', selected="employee_id", group_by='', limit='')
 		return f"EXISTS (\n{self.query.statement}\n) "
-	def parametersAppend(self, parameters): parameters += self.query.parameters
+	def parametersAppend(self, parameters): parameters.extend(self.query.parameters)
 #--------------------
 class NOTEXISTS(SpecialValue):
 	def __init__(self, value):
 		self.__value = value
 		SpecialValue.__init__(self, self.__value)
-	def operator(self): return " LIKE "
-	def filter(self, field, placeholder): 
+	def operator(self): return ""
+	def fltr(self, field, placeholder): 
 		self.query = Database.crud(operation=Database.read, record=self.value(), mode='filter_', selected="employee_id", group_by='', limit='')
 		return f"NOT EXISTS (\n{self.query.statement}\n) "
-	def parametersAppend(self, parameters): parameters += self.query.parameters
+	def parametersAppend(self, parameters): parameters.extend(self.query.parameters)
 #--------------------
 class LIKE(SpecialValue):
 	def __init__(self, value):
 		self.__value = value.replace("*","%")
 		SpecialValue.__init__(self, self.__value)
 	def operator(self): return " LIKE "
-	def filter(self, field, placeholder): return f"{field} LIKE {placeholder}"
+	def fltr(self, field, placeholder): return f"{field} LIKE {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class IN(SpecialValue):
@@ -93,16 +99,16 @@ class IN(SpecialValue):
 	def placeholder(self, placeholder): 
 		__placeholder = ','.join([placeholder]*len(self._SpecialValue__value))
 		return f"({__placeholder})"
-	def filter(self, field, placeholder): return f"{field} IN {self.placeholder(placeholder)}"
-	def parametersAppend(self, parameters): parameters += self.value()
+	def fltr(self, field, placeholder): return f"{field} IN {self.placeholder(placeholder)}"
+	def parametersAppend(self, parameters): parameters.extend(self.value())
 #--------------------
 class NOT_IN(SpecialValue):
 	def operator(self): return " NOT IN "
 	def placeholder(self, placeholder):
 		__placeholder = ','.join([placeholder]*len(self._SpecialValue__value))
 		return f"({__placeholder})"
-	def filter(self, field, placeholder): return f"{field} NOT IN {self.placeholder(placeholder)}"
-	def parametersAppend(self, parameters): parameters += self.value()
+	def fltr(self, field, placeholder): return f"{field} NOT IN {self.placeholder(placeholder)}"
+	def parametersAppend(self, parameters): parameters.extend(self.value())
 #--------------------
 class BETWEEN(SpecialValue):
 	def __init__(self, minValue, maxValue):
@@ -112,27 +118,27 @@ class BETWEEN(SpecialValue):
 	def value(self): return [self.__minValue, self.__maxValue]
 	def operator(self): return " BETWEEN "
 	def placeholder(self, placeholder): return placeholder + " AND " + placeholder
-	def filter(self, field, placeholder): return f"{field} BETWEEN {self.placeholder(placeholder)}"
-	def parametersAppend(self, parameters): parameters += self.value()
+	def fltr(self, field, placeholder): return f"{field} BETWEEN {self.placeholder(placeholder)}"
+	def parametersAppend(self, parameters): parameters.extend(self.value())
 #--------------------
 class gt(SpecialValue):
 	def operator(self): return " > "
-	def filter(self, field, placeholder): return f"{field} > {placeholder}"
+	def fltr(self, field, placeholder): return f"{field} > {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class ge(SpecialValue):
 	def operator(self): return " >= "
-	def filter(self, field, placeholder): return f"{field} >= {placeholder}"
+	def fltr(self, field, placeholder): return f"{field} >= {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class lt(SpecialValue):
 	def operator(self): return " < "
-	def filter(self, field, placeholder): return f"{field} < {placeholder}"
+	def fltr(self, field, placeholder): return f"{field} < {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class le(SpecialValue):
 	def operator(self): return " <= "
-	def filter(self, field, placeholder): return f"{field} <= {placeholder}"
+	def fltr(self, field, placeholder): return f"{field} <= {placeholder}"
 	def parametersAppend(self, parameters): parameters.append(self.value())
 #--------------------
 class NULL(SpecialValue, dict): #to make it json serializable using jsonifiy
@@ -145,7 +151,7 @@ class NULL(SpecialValue, dict): #to make it json serializable using jsonifiy
 	def __str__(self): return "NULL"
 	def __repr__(self): return "NULL"
 	def __eq__(self, other): return "NULL"==other
-	def filter(self, field, placeholder): return f"{field} IS NULL"
+	def fltr(self, field, placeholder): return f"{field} IS NULL"
 	def parametersAppend(self, parameters): return parameters
 #--------------------
 class NOT_NULL(SpecialValue):
@@ -157,7 +163,7 @@ class NOT_NULL(SpecialValue):
 	def __str__(self): return "NOT NULL"
 	def __repr__(self): return "NOT NULL"
 	def __eq__(self, other): return "NOT NULL"==other
-	def filter(self, field, placeholder): return f"{field} IS NOT NULL"
+	def fltr(self, field, placeholder): return f"{field} IS NOT NULL"
 	def parametersAppend(self, parameters): return parameters
 #--------------------
 class Join(SpecialValue):
@@ -203,7 +209,11 @@ class Set:
 		for field in self.new.keys():
 			# some databases reject tablename. or alias. before field in set clause as they are don't implement join update
 			# statement += f"{self.parent.alias.value()}.{field}={self.parent.database__.placeholder()}, "
-			statement += f"{field}={self.parent.database__.placeholder()}, "
+			value = self.new[field]
+			if isinstance(value, Expression):
+				statement += f"{field}={value.placeholder(None)}, "  # Expression directly
+			else:
+				statement += f"{field}={self.parent.database__.placeholder()}, "
 		return statement[:-2]
 	
 	def parameters(self, fieldsNames=None):
@@ -211,53 +221,51 @@ class Set:
 		parameters = []
 		for field in fields:
 			value = self.new[field]
-			parameters.append(value)
+			if not isinstance(value, Expression):  # Skip expressions
+				parameters.append(value) # 			if type(value) != Expression:
 		return parameters
 
-	def __setattr__(self, field, value):
-		# print(field, value)
-		placeholder = self.parent.database__.placeholder()
-		if(type(value) in [NoneType, str, unicode, int, float, datetime]): self.__dict__['new'][field] = value
+	def __setattr__(self, name, value):
+		# if(name=="custom"): self.__dict__["custom"] = value
+		if(type(value) in [NoneType, str, int, float, datetime, unicode] or isinstance(value, Expression)):
+			self.__dict__["new"][name] = value
+		else:
+			object.__setattr__(self, name, value)
 #================================================================================#
 class Values:
+	# Usage of Values:
+	#	1. insert FIELDS NAMES and VALUES
+	#	2. Where exact values
 	#--------------------------------------#
 	@staticmethod
 	def fields(record):
 		fields = []
-		for field in record.__dict__: 
-			value = record.__dict__[field]
-			if(type(value) in [str, unicode, int, float, datetime, NULL]):
+		# for field in record.__dict__: 
+		# 	value = record.__dict__[field]
+		for field in record.data: 
+			value = record.data[field]
+			if(type(value) in [str, int, float, datetime, unicode]):
 				fields.append(field)
 		return fields
 	#--------------------------------------#
 	@staticmethod
 	def where(record):
-		#getStatement always used to collect values not filters so no "NOT NULL" but only "NULL" alongside with [str, unicode, int, float, and datetime] values.
-		#getStatement always used in 'WHERE' so "NULL" always be evaluated to "IS".
+		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, unicode, int, float, and datetime] values.
 		statement = ''
 		fields = Values.fields(record)
 		for field in fields:
 			value = record.getField(field)
-			if(type(value) is None):
-				statement += f"{field} IS NULL AND "
-			else: statement += f"{record.alias.value()}.{field} = {record.database__.placeholder()} AND "
+			placeholder = record.database__.placeholder()
+			statement += f"{record.alias.value()}.{field} = {placeholder} AND "
 		return statement[:-5]
 	#--------------------------------------#
 	@staticmethod
 	def parameters(record, fieldsNames=None):
-		#getParameters always used to collect values not filters so no "NOT NULL" but only "NULL" alongside with [str, unicode, int, float, and datetime] values.
-		#getParameters used in 'SET' or 'WHERE' so "NULL" may be evaluated to "= ?" or "IS NULL".
+		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, unicode, int, float, and datetime] values.
 		fields = fieldsNames if (fieldsNames) else Values.fields(record)
 		parameters = []
 		for field in fields:
-			try:
-				value = record.getField(field)
-			except KeyError as e:
-				key = e.args[0]
-				print(f"\n{'?'*80}Missing '{key}' in Record {record.toDict()}!\n{'?'*80}")
-				# raise
-				exit()
-
+			value = record.getField(field)
 			parameters.append(value)
 		return parameters
 	#--------------------------------------#
@@ -268,23 +276,52 @@ class Filter:
 		self.empty()
 
 	def empty(self):
-		# self.__conditions = {}
 		self.__where = ''
 		self.__parameters = []
 	
-	def filter(self, **kwargs): return self.parent.filter(**kwargs)
+	def filter(self, **kwargs):
+		for field, value in kwargs.items():
+			self.addCondition(field, value)
+		return self
 	def read(self, selected="*", group_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, mode='filter_', selected=selected, group_by=group_by, limit=limit)
 	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent, mode='filter_')
 	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent, mode='filter_')
-	
+
+	def fltr(self, field, placeholder): return self.where__()
+	def parametersAppend(self, parameters): parameters.extend(self.parameters__())
+	def where__(self): return self.__where[:-5]
+	def parameters__(self): return self.__parameters
+	def combine(self, filter1, filter2, operator):
+		w1 = filter1.where__()
+		w2 = filter2.where__()
+		if(w1 and w2):
+			self.__where = f"(({w1}) {operator} ({w2})) AND "
+			self.__parameters.extend(filter1.parameters__())
+			self.__parameters.extend(filter2.parameters__())
+		elif(w1):
+			self.__where = f"({w1}) AND "
+			self.__parameters.extend(filter1.parameters__())
+		elif(w2):
+			self.__where = f"({w2}) AND "
+			self.__parameters.extend(filter2.parameters__())
+
+	def __or__(self, filter2):
+		filter = Filter(self.parent)
+		filter.combine(self, filter2, "OR")
+		return filter
+	def __and__(self, filter2):
+		filter = Filter(self.parent)
+		filter.combine(self, filter2, "AND")
+		return filter
+
 	def addCondition(self, field, value):
 		placeholder = self.parent.database__.placeholder()
 		field = f"{self.parent.alias.value()}.{field}"
-		if(type(value) in [NoneType, str, unicode, int, float, datetime]):
+		if(type(value) in [str, unicode, int, float, datetime]):
 			self.__where += f"{field} = {placeholder} AND "
 			self.__parameters.append(value)
 		else:
-			self.__where += f"{value.filter(field, placeholder)} AND "
+			self.__where += f"{value.fltr(field, placeholder)} AND "
 			value.parametersAppend(self.__parameters)
 
 	#'record' parameter to follow the same signature/interface of 'Values.where' function design pattern
@@ -292,21 +329,20 @@ class Filter:
 	def where(self, record=None):
 		#because this is where so any NULL | NOT_NULL values will be evaluated to "IS NULL" | "IS NOT NULL"
 		where = ''
-		parameters = []
-		
 		where = self.parent.values.where(self.parent)
 		where = f"{where} AND " if (where) else ""
-		parameters = self.parent.values.parameters(self.parent)
-
 		self.__where = where + self.__where
-		self.__parameters = parameters + self.__parameters
 		# print(">>>>>>>>>>>>>>>>>>>>", self.__where)
-		# print(">>>>>>>>>>>>>>>>>>>>", self.__parameters)
 		return self.__where[:-5]
 	
 	#This 'Filter.parameters' function follow the same signature/interface of 'Values.parameters' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
-	def parameters(self, record=None): return self.__parameters
+	def parameters(self, record=None):
+		parameters = []
+		parameters = self.parent.values.parameters(self.parent)
+		self.__parameters = parameters + self.__parameters
+		# print(">>>>>>>>>>>>>>>>>>>>", self.__parameters)
+		return self.__parameters
 	#--------------------------------------#
 	def SubQuery(self, **kwargs):
 		for field, value in kwargs.items():
@@ -428,37 +464,6 @@ class Representer:
 		xmlRecords += "\n</" + record.table__() + ">"
 
 		return xmlRecords
-	#--------------------------------------#
-	def to_html(self, record):
-		htmlTable = "<table>\n\t<tr><th>" + record.table__() + "</th></tr>"
-		
-		th = "\n\t<tr>"
-		for column in record.columns:
-			th += "<th>" + str(column) + "</th>"
-		th += "</tr>"
-		htmlTable += th
-
-		for r in record.recordset.iterate():
-			tr = "\n\t<tr>"
-			for column in r.columns:
-				tr += "\n\t\t<td>" + str(r.getField(column)) + "</td>"
-			tr += "\n\t</tr>"
-			htmlTable += tr
-
-		htmlTable += "\n</table>"
-
-		return htmlTable
-	#--------------------------------------#
-	def to_json(self, record):
-		recordJSON = {}
-		for column in record.columns:
-			recordJSON[column] = record.getField(column)
-		return recordJSON
-	#--------------------------------------#
-	def loadDictionary(self, record, dictionary):
-		for key, value in dictionary.items():
-			key = key.split('.')[-1]
-			record.setField(key, value)
 	#--------------------------------------#
 	def collectJoins(self, record, joins):
 		for join in record.joins__:
@@ -596,25 +601,7 @@ class Representer:
 			return searchCriteria
 		else: return {}
 #================================================================================#
-class JSONRelationalMapper:
-	def __init__(self): pass
-	def map(self, passedObject):
-		jsonDictionaryList = []
-		query = passedObject.query__
-		columns = query.result.columns #empty the columns of the passed object only since the new object created below for each row is empty
-		if(query.result.rows):
-			for row in query.result.rows:
-				index = 0
-				jsonDictionary = {}
-				for fieldValue in row:
-					if(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
-						fieldValue = fieldValue.decode('utf-8')
-					# str() don't use # to map Null value to None field correctly.
-					jsonDictionary[query.result.columns[index]]=fieldValue
-					index += 1
-				jsonDictionaryList.append(jsonDictionary)
-		passedObject.json = jsonDictionaryList
-#================================================================================#
+# fieldValue = fieldValue.decode('utf-8') # mysql python connector returns bytearray instead of string
 class ObjectRelationalMapper:
 	def __init__(self): pass
 	#--------------------------------------#
@@ -622,65 +609,22 @@ class ObjectRelationalMapper:
 		query = passedObject.query__
 		rows = query.result.rows
 		columns = query.result.columns
+		passedObject.recordset.data.extend(rows)
 		if(passedObject.recordset.count()):
 			object = passedObject.__class__() #object = Record() #bug
 		else:
 			object = passedObject
-		# passedObject.columns = [] #empty the columns of the passed object only since the new object created below for each row is empty
-		if(rows):
-			count = 0
-			for row in rows:
-				count += 1
-				# if(count % 10000 == 0): print(count)
-				object.columns = columns
-				index = 0
-				for fieldValue in row:
-					# if(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
-					# 	fieldValue = fieldValue.decode('utf-8')
-					# str() don't use # to map Null value to None field correctly.
-					setattr(object, columns[index], fieldValue)
-					# object.setField(columns[index], fieldValue) #to prevent invoke __setattr__
-					index += 1
-				passedObject.recordset.add(object)
-				object = passedObject.__class__() #object = Record() #bug
-#================================================================================#
-class MySQLObjectRelationalMapper:
-	def __init__(self): pass
-	#--------------------------------------#
-	def map(self, passedObject):
-		query = passedObject.query__
-		rows = query.result.rows
-		columns = query.result.columns
-		if(passedObject.recordset.count()):
+		for row in rows:
+			object.data = row
+			object.columns = columns
+			passedObject.recordset.add(object)
 			object = passedObject.__class__() #object = Record() #bug
-		else:
-			object = passedObject
-		# passedObject.columns = [] #empty the columns of the passed object only since the new object created below for each row is empty
-		if(rows):
-			count = 0
-			for row in rows:
-				count += 1
-				# if(count % 10000 == 0): print(count)
-				object.columns = columns
-				index = 0
-				for fieldValue in row:
-					if(type(fieldValue) == bytearray): #mysql python connector returns bytearray instead of string
-						fieldValue = fieldValue.decode('utf-8')
-					# str() don't use # to map Null value to None field correctly.
-					setattr(object, columns[index], fieldValue)
-					# object.setField(columns[index], fieldValue) #to prevent invoke __setattr__
-					index += 1
-				passedObject.recordset.add(object)
-				object = passedObject.__class__() #object = Record() #bug
 #================================================================================#
 class DummyObjectRelationalMapper:
 	def __init__(self): pass
 	#--------------------------------------#
 	def map(self, passedObject):
 		pass
-#================================================================================#
-class Field:
-	def  __init__(self): self.value = None
 #================================================================================#
 class Database:
 	# ------
@@ -704,7 +648,6 @@ class Database:
 		self.__placeholder	= '?'
 		self.__escapeChar	= '`'
 		self.operationsCount = 0
-		self.user_pk		= 0
 		# self.connect()
 	#--------------------------------------#
 	def placeholder(self): return self.__placeholder
@@ -730,25 +673,24 @@ class Database:
 	#--------------------------------------#
 	def joining(record, mode):
 		joiners = Joiners()
-		qouteChar = '' #cls.escapeChar()
+		quoteChar = '' #cls.escapeChar()
 		for key, join in record.joins__.items():
 			#" INNER JOIN Persons pp ON "
-			inner_join = join.type + join.object.table__() + ' ' + join.object.alias.value() + ' ON '		
+			main_join = f"{join.type}{join.object.table__()} {join.object.alias.value()} ON "
 			for foreign_key, primary_key in join.fields.items():
-				#"	uu.person.fk=pp.pk AND "
-				inner_join += "\n\t" + record.alias.value() + "." + qouteChar + foreign_key + qouteChar + "=" + join.object.alias.value() + "." + qouteChar + primary_key + qouteChar + " AND "
-			inner_join = "\n" + inner_join[:-5]
-			joiners.joinClause += inner_join
+				#"	cc.fk=pp.pk AND "
+				main_join += f"\n\t{record.alias.value()}.{quoteChar}{foreign_key}{quoteChar}={join.object.alias.value()}.{quoteChar}{primary_key}{quoteChar} AND "
+			main_join = "\n" + main_join[:-5]
+			joiners.joinClause += main_join
 			#--------------------
 			statement = join.object.getMode(mode).where(join.object)
-			if(statement): joiners.preparedStatement += " AND " + statement
-			joiners.parameters += join.object.getMode(mode).parameters(join.object)
+			if(statement): joiners.preparedStatement += f" AND {statement}"
+			joiners.parameters.extend(join.object.getMode(mode).parameters(join.object))
 			#--------------------
 			child_joiners = Database.joining(join.object, mode)
 			joiners.joinClause += child_joiners.joinClause
-			#if(child_joiners.preparedStatement): joiners.preparedStatement += child_joiners.preparedStatement
 			joiners.preparedStatement += child_joiners.preparedStatement
-			joiners.parameters += child_joiners.parameters
+			joiners.parameters.extend(child_joiners.parameters)
 
 		return joiners
 	#--------------------------------------#
@@ -818,21 +760,19 @@ class Database:
 			self.operationsCount +=1
 			#
 			count=0
-			rows=[]
 			columns = []
-			#for index, column in enumerate(self.__cursor.description): columns.append(column[0])
-			if(self.__cursor.description): columns = [column[0].lower() for column in self.__cursor.description] #lower() to low column names
-			query.result.columns = columns
-			#
+
 			if(query.operation in [Database.all, Database.read]):
+				# for index, column in enumerate(self.__cursor.description): columns.append(column[0].lower())
+				columns = [column[0].lower() for column in self.__cursor.description] #lower() to low column names
+				query.result.columns = columns
+				
 				parent = query.parent
 				parent.recordset = Recordset()
 				while True:
-					fetchedRows = self.__cursor.fetchmany(10000)
-					# rows += fetchedRows
+					fetchedRows = [dict(zip(columns, row)) for row in self.__cursor.fetchmany(10000)]
 					query.result.rows = fetchedRows
 					count += len(fetchedRows)
-					# print(count)
 					self.orm.map(parent)
 					if not fetchedRows:
 						break
@@ -896,12 +836,10 @@ class Database:
 		record.query__.parent = record
 		record.query__.statement = statement
 		record.query__.parameters = parameters
-		record.query__.parameters += current #state.parameters must be reset to empty list [] not None for this operation to work correctly
-		record.query__.parameters += joiners.parameters
+		record.query__.parameters.extend(current) #state.parameters must be reset to empty list [] not None for this operation to work correctly
+		record.query__.parameters.extend(joiners.parameters)
 		if(record.secure__.user_id): Database.secure(record)
 		record.query__.operation = operation
-		# self.executeStatement(record.query__)
-		# self.orm.map(record) #use self. instead Database. to be  able to override
 		return record.query__
 	#--------------------------------------#
 	def __crudMany(self, operation, record, selected="*", group_by='', limit=''):
@@ -909,7 +847,6 @@ class Database:
 		joinsCriteria = joiners.preparedStatement
 		#
 		where = record.values.where(record)
-		# parameters = record.values.parameters(record)
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
@@ -927,13 +864,10 @@ class Database:
 		query.statement = statement
 		for r in record.recordset.iterate():
 			params = r.set.parameters() + r.values.parameters(r, fieldsNames=fieldsNames) #no problem withr.set.parameters() as it's emptied after sucessful update
-		 	# #r_joiners = self.joining(r)
-			# #r.query__.parameters += r_joiners.parameters # parameters need to be implemented to be retrieved in the same order from all records
 			query.parameters.append(tuple(params))
 		#if(record.secure__.user_id): self.secure(record) #not implemented for many (insert and update)
-		query.opeartion = operation
+		query.operation = operation
 		record.recordset.rowsCount = self.executeMany(query)
-		# self.orm.map(record)  #not implemented for many (insert and update)
 	#--------------------------------------#
 	def all(self, record, mode): self.executeStatement(self.crud(operation=Database.all, record=record, mode=mode))
 	def insert(self, record, mode): self.executeStatement(self.crud(operation=Database.insert, record=record, mode=mode))
@@ -1076,22 +1010,56 @@ class Field:
 		
 	def __eq__(self, value): 
 		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return f"{self.cls.__name__}.{self.name} = {value}"
+		return Expression(f"{self.cls.__name__}.{self.name} = {value}")
 	def __ne__(self, value): 
 		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return f"{self.cls.__name__}.{self.name} <> {value}"
+		return Expression(f"{self.cls.__name__}.{self.name} <> {value}")
 	def __gt__(self, value):
 		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return f"{self.cls.__name__}.{self.name} > {value}"
+		return Expression(f"{self.cls.__name__}.{self.name} > {value}")
 	def __ge__(self, value):
 		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return f"{self.cls.__name__}.{self.name} >= {value}"
+		return Expression(f"{self.cls.__name__}.{self.name} >= {value}")
 	def __lt__(self, value):
 		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return f"{self.cls.__name__}.{self.name} < {value}"
+		return Expression(f"{self.cls.__name__}.{self.name} < {value}")
 	def __le__(self, value):
 		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return f"{self.cls.__name__}.{self.name} <= {value}"
+		return Expression(f"{self.cls.__name__}.{self.name} <= {value}")
+	def __mul__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return Expression(f"{self.cls.__name__}.{self.name} * {value}")
+	def __add__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return Expression(f"{self.cls.__name__}.{self.name} + {value}")
+	def __sub__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return Expression(f"{self.cls.__name__}.{self.name} - {value}")
+	def __truediv__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return Expression(f"{self.cls.__name__}.{self.name} / {value}")
+	def __or__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return Expression(f"{self.cls.__name__}.{self.name} OR {value}")
+	def __and__(self, value):
+		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
+		return Expression(f"{self.cls.__name__}.{self.name} AND {value}")
+
+	# New methods for SQL operations
+	def is_null(self):
+		return Expression(f"{self.cls.__name__}.{self.name} IS NULL")
+	def is_not_null(self):
+		return Expression(f"{self.cls.__name__}.{self.name} IS NOT NULL")
+	def like(self, pattern):
+		return Expression(f"{self.cls.__name__}.{self.name} LIKE '{pattern}'")
+	def in_(self, values):
+		vals = ', '.join(str(v) for v in values)
+		return Expression(f"{self.cls.__name__}.{self.name} IN ({vals})")
+	def not_in(self, values):
+		vals = ', '.join(str(v) for v in values)
+		return Expression(f"{self.cls.__name__}.{self.name} NOT IN ({vals})")
+	def between(self, low, high):
+		return Expression(f"{self.cls.__name__}.{self.name} BETWEEN {low} AND {high}")
 #================================================================================#
 class RecordMeta(type):
 	def __getattr__(cls, field):
@@ -1112,6 +1080,7 @@ class Record(metaclass=RecordMeta):
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.joins__ = {}
 		self.secure__ = UserID(secure_by_user_id)
+		self.data = {}
 		
 		self.setupTableNameAndAlias()
 		# self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
@@ -1140,6 +1109,23 @@ class Record(metaclass=RecordMeta):
 				self.database__.executeStatement(self.query__)
 			Database.orm.map(self)
 	#--------------------------------------#
+	def __getattr__(self, name):
+		# if(name=="custom"): return self.__dict__["custom"]
+		try:
+			return self.__dict__["data"][name]
+		except:
+			try:
+				return object.__getattribute__(self, name)
+			except:
+				return None
+
+	def __setattr__(self, name, value):
+		# if(name=="custom"): self.__dict__["custom"] = value
+		if(type(value) in [str, int, float, datetime, unicode]):
+			self.__dict__["data"][name] = value
+		else:
+			object.__setattr__(self, name, value)
+	#--------------------------------------#
 	def setupTableNameAndAlias(self):
 		quoteChar = '' #self.database__.escapeChar()
 		parentClassName = self.__class__.__bases__[0].__name__
@@ -1151,28 +1137,9 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def __table(self):
 		quoteChar = '' #self.database__.escapeChar()
-		# if(self.tableName__.value()): return f"{quoteChar}{self.tableName__.value()}{quoteChar}"
-		# else: return f"{quoteChar}{self.__class__.__name__}{quoteChar}"
-
-		# parentClassName = self.__class__.__bases__[0].__name__
-		# if(parentClassName == "Record" or parentClassName.startswith('__')):
-		# 	return f"{quoteChar}{self.__class__.__name__}{quoteChar}"
-		# else:
-		# 	return f"{quoteChar}{parentClassName}{quoteChar}"
-
 		return f"{quoteChar}{self.tableName__.value()}{quoteChar}"
 	#--------------------------------------#
 	def __tableSecure(self):
-		# if(self.tableName__.value()): return "${" + self.tableName__.value() + "}"
-		# else: return "${" + self.__class__.__name__ + "}"
-
-		# quoteChar = '' #self.database__.escapeChar()
-		# parentClassName = self.__class__.__bases__[0].__name__
-		# if(parentClassName == "Record" or parentClassName.startswith('__')):
-		# 	return f"{quoteChar}${{{self.__class__.__name__}}}{quoteChar}"
-		# else:
-		# 	return f"{quoteChar}${{{parentClassName}}}{quoteChar}"
-
 		quoteChar = '' #self.database__.escapeChar()
 		return f"{quoteChar}${{{self.tableName__.value()}}}{quoteChar}"
 	#--------------------------------------#
@@ -1182,14 +1149,12 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def getMode(self, mode): return self.__dict__[mode]
 	#--------------------------------------#
-	def getField(self, fieldName): return self.__dict__[fieldName] #get field without invoke __getattr__
-	def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue
+	# def getField(self, fieldName): return self.__dict__[fieldName] #get field without invoke __getattr__
+	# def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue #set field without invoke __setattr__
+	def getField(self, fieldName): return self.data[fieldName] #get field without invoke __getattr__
+	def setField(self, fieldName, fieldValue): self.data[fieldName]=fieldValue #set field without invoke __setattr__
 	#--------------------------------------#
-	def filter(self, **kwargs):
-		for field, value in kwargs.items():
-			# setattr(self.filter_, field, value)
-			self.filter_.addCondition(field, value)
-		return self.filter_
+	def filter(self, **kwargs): return self.filter_.filter(**kwargs)
 	#--------------------------------------#
 	def SubQuery(self, **kwargs):
 		self.filter_.SubQuery(**kwargs)
@@ -1238,15 +1203,15 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	#def __str__(self): pass
 	#--------------------------------------#
-	def __iter__(self): 
-		self.__iterationIndex = 0
-		self.__iterationBound = len(self.recordset.iterate())
+	def __iter__(self):
+		self.__iterationIndex = Dummy(0)
+		self.__iterationBound = Dummy(len(self.recordset.iterate()))
 		return self
 	#--------------------------------------#
 	def __next__(self): #python 3 compatibility
-		if(self.__iterationIndex < self.__iterationBound):
-			currentItem = self.recordset.iterate()[self.__iterationIndex]
-			self.__iterationIndex += 1
+		if(self.__iterationIndex.value < self.__iterationBound.value):
+			currentItem = self.recordset.iterate()[self.__iterationIndex.value]
+			self.__iterationIndex.value += 1
 			return currentItem
 		else:
 			del(self.__iterationIndex) # to prevent using them as database's column
@@ -1268,28 +1233,20 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN ')
 	#--------------------------------------#
-	def toDict(self):
-		fields = self.values.fields(self)
-		objectDict = {}
-		for field in fields:
-			objectDict[field] = self.getField(field)
-		return objectDict
+	def toDict(self): return self.data
 	#--------------------------------------#
 	def toList(self): return list(self.toDict().values())
 	#--------------------------------------#
 	def getCopyInstance(self, base=(object, ), attributesDictionary={}):
 		return self.database__.getCopyInstance(self, base, attributesDictionary={})
 	#--------------------------------------#
-	def to_json(self): return self.representer__.to_json(self)
 	def to_xml(self): return self.representer__.xml(self)
-	def to_html(self): return self.representer__.html(self)
-	def loadDictionary(self, dictionary): return self.representer__.loadDictionary(self, dictionary)
 	def searchURL(self, url): return self.representer__.search(self, url)
 	def importSearchCriteria(self, searchCriteria): return self.representer__.importSearchCriteria(self, searchCriteria)
 	def search(self, searchCriteria, selected="*", group_by='', limit=''):
 		self.importSearchCriteria(searchCriteria)
 		self.read(selected, group_by, limit)
-	def limit(self, pageNumber=1, recordsCount=1): return self.database__.limit(pageNumber, recordsCount)
+	def limit(self, pageNumber=1, recordsCount=1): return self.database__.paginate(pageNumber, recordsCount)
 	@staticmethod
 	def getURLData(url): return Record.representer__.getURLData(url)
 	@staticmethod
@@ -1300,6 +1257,7 @@ class Recordset:
 	def __init__(self):
 		self.__records = [] #mapped objects from records
 		self.rowsCount = 0
+		self.data = [] # extended in ORM
 	def table(self):
 		if(self.firstRecord()): return  self.firstRecord().table__()
 	def empty(self): self.__records = []
@@ -1341,6 +1299,9 @@ class Recordset:
 			id += 1
 		return data
 	#--------------------------------------#
+	def toListOfDict(self):
+		return self.data
+	#--------------------------------------#
 	def to_json(self):
 		recordsetJSONList = []
 		for record in self.iterate():
@@ -1349,7 +1310,7 @@ class Recordset:
 #================================================================================#
 class Collection(list): pass
 #================================================================================#
-class manipolatore:
+class Manipolatore:
 	def __init__(self, dictionary):
 		self.dictionary = dictionary
 	#--------------------
