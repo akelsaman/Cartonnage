@@ -1103,9 +1103,9 @@ class Field:
 #================================================================================#
 class RecordMeta(type):
 	def __getattr__(cls, field):
-		value = Field(cls, field, None)
-		setattr(cls, field, value)
-		return value
+		# Don't cache Field on class - return new Field each time
+		# This prevents Field objects from shadowing instance data attributes
+		return Field(cls, field, None)
 #================================================================================#
 class Record(metaclass=RecordMeta):
 	database__	= None
