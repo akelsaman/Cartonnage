@@ -24,6 +24,95 @@ NoneType = type(None)
 def createTableClass(tableName, base=(object, ), attributesDictionary={}):
 	return type(str(tableName), base, attributesDictionary) #str() to prevent any error from missed type casting/conversion
 #================================================================================#
+class Field:
+	def __init__(self, cls, name, value):
+		self.cls = cls
+		self.name = name
+		self.value = value
+		self.placeholder = '?'
+
+	def _field_name(self):
+		return f"{self.cls.__name__}.{self.name}"
+
+	def _resolve_value(self, value):
+		"""Returns (sql_value, parameters)"""
+		if type(value) == Field:
+			return (f"{value.cls.__name__}.{value.name}", [])
+		elif isinstance(value, Exp):
+			return (value.value, value.parameters)
+		else:
+			return (self.placeholder, [value])
+
+	def __eq__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} = {sql_val}", params)
+	def __ne__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} <> {sql_val}", params)
+	def __gt__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} > {sql_val}", params)
+	def __ge__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} >= {sql_val}", params)
+	def __lt__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} < {sql_val}", params)
+	def __le__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} <= {sql_val}", params)
+	def __add__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} + {sql_val}", params)
+	def __sub__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} - {sql_val}", params)
+	def __mul__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} * {sql_val}", params)
+	def __truediv__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} / {sql_val}", params)
+
+	# SQL-specific methods
+	def is_null(self):
+		return Exp(f"{self._field_name()} IS NULL", [])
+	def is_not_null(self):
+		return Exp(f"{self._field_name()} IS NOT NULL", [])
+	def like(self, pattern):
+		return Exp(f"{self._field_name()} LIKE {self.placeholder}", [pattern])
+	def in_(self, values):
+		placeholders = ', '.join([self.placeholder] * len(values))
+		return Exp(f"{self._field_name()} IN ({placeholders})", list(values))
+	def not_in(self, values):
+		placeholders = ', '.join([self.placeholder] * len(values))
+		return Exp(f"{self._field_name()} NOT IN ({placeholders})", list(values))
+	def between(self, low, high):
+		return Exp(f"{self._field_name()} BETWEEN {self.placeholder} AND {self.placeholder}", [low, high])
+
+	# Subquery methods - take a Record instance and generate SQL
+	def in_subquery(self, record, selected="*"):
+		"""field IN (SELECT ... FROM ...)"""
+		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		return Exp(f"{self._field_name()} IN (\n{query.statement}\n)", query.parameters)
+
+	def not_in_subquery(self, record, selected="*"):
+		"""field NOT IN (SELECT ... FROM ...)"""
+		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		return Exp(f"{self._field_name()} NOT IN (\n{query.statement}\n)", query.parameters)
+
+	@staticmethod
+	def exists(record, selected="1"):
+		"""EXISTS (SELECT ... FROM ... WHERE ...)"""
+		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		return Exp(f"EXISTS (\n{query.statement}\n)", query.parameters)
+
+	@staticmethod
+	def not_exists(record, selected="1"):
+		"""NOT EXISTS (SELECT ... FROM ... WHERE ...)"""
+		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		return Exp(f"NOT EXISTS (\n{query.statement}\n)", query.parameters)
+#================================================================================#
 class Dummy:
 	def __init__(self, value):
 		self.value = value
@@ -66,7 +155,7 @@ class Exp():
 	def __repr__(self): return self.value
 	def __and__(self, other): return Exp(f"({self.value} AND {other.value})", self.parameters + other.parameters)
 	def __or__(self, other): return Exp(f"({self.value} OR {other.value})", self.parameters + other.parameters)
-#--------------------------------------#
+# #--------------------------------------#
 class SubQuery(SpecialValue):
 	def __init__(self, value):
 		self.__value = value
@@ -176,7 +265,7 @@ class NOT_NULL(SpecialValue):
 	def __eq__(self, other): return "NOT NULL"==other
 	def fltr(self, field, placeholder): return f"{field} IS NOT NULL"
 	def parametersAppend(self, parameters): return parameters
-#--------------------
+# #--------------------
 class Join():
 	def __init__(self, object, fields, type=' INNER JOIN ', value=None):
 		self.type = type
@@ -322,7 +411,7 @@ class Filter:
 		filter = Filter(self.parent)
 		filter.combine(self, filter2, "AND")
 		return filter
-
+	
 	def addCondition(self, field, value):
 		placeholder = self.parent.database__.placeholder()
 		field = f"{self.parent.alias.value()}.{field}"
@@ -353,6 +442,59 @@ class Filter:
 		# Return combined parameters without modifying self.__parameters
 		# print(">>>>>>>>>>>>>>>>>>>>", parameters + self.__parameters)
 		return parameters + self.__parameters
+	#--------------------------------------#
+	# def SubQuery(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None).in_subquery(value))
+	# 	return self
+	# def EXISTS(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field.exists(value))
+	# 	return self
+	# def NOT_EXISTS(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field.not_exists(value))
+	# 	return self
+	# def IN(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None).in_(value))
+	# 	return self
+	# def NOT_IN(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None).not_in(value))
+	# 	return self
+	# def LIKE(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None).like(value))
+	# 	return self
+	# def NULL(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, value).is_null())
+	# 	return self
+	# def NOT_NULL(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None).is_not_null())
+	# 	return self
+	# def BETWEEN(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None).between(value[0], value[1]))
+	# 	return self
+	# def gt(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None) > value)
+	# 	return self
+	# def ge(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None) >= value)
+	# 	return self
+	# def lt(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None) < value)
+	# 	return self
+	# def le(self, **kwargs):
+	# 	for field, value in kwargs.items():
+	# 		self.filter(_=Field(self.parent.__class__, field, None) <= value)
+	# 	return self
 	#--------------------------------------#
 	def SubQuery(self, **kwargs):
 		for field, value in kwargs.items():
@@ -1011,95 +1153,6 @@ class MicrosoftSQL(Database):
 			self._Database__connection = pyodbc.connect(Driver='{ODBC Driver 17 for SQL Server}', database=self._Database__database, user=self._Database__username, password=self._Database__password, host=self._Database__host)
 			#self._Database__connection = pyodbc.connect('Driver={ODBC Driver 17 for SQL Server};Server=tcp:example.database.windows.net,1433;Database=example_db;;;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;')
 			self.cursor()
-#================================================================================#
-class Field:
-	def __init__(self, cls, name, value):
-		self.cls = cls
-		self.name = name
-		self.value = value
-		self.placeholder = '?'
-
-	def _field_name(self):
-		return f"{self.cls.__name__}.{self.name}"
-
-	def _resolve_value(self, value):
-		"""Returns (sql_value, parameters)"""
-		if type(value) == Field:
-			return (f"{value.cls.__name__}.{value.name}", [])
-		elif isinstance(value, Exp):
-			return (value.value, value.parameters)
-		else:
-			return (self.placeholder, [value])
-
-	def __eq__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} = {sql_val}", params)
-	def __ne__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} <> {sql_val}", params)
-	def __gt__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} > {sql_val}", params)
-	def __ge__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} >= {sql_val}", params)
-	def __lt__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} < {sql_val}", params)
-	def __le__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} <= {sql_val}", params)
-	def __add__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} + {sql_val}", params)
-	def __sub__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} - {sql_val}", params)
-	def __mul__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} * {sql_val}", params)
-	def __truediv__(self, value):
-		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} / {sql_val}", params)
-
-	# SQL-specific methods
-	def is_null(self):
-		return Exp(f"{self._field_name()} IS NULL", [])
-	def is_not_null(self):
-		return Exp(f"{self._field_name()} IS NOT NULL", [])
-	def like(self, pattern):
-		return Exp(f"{self._field_name()} LIKE {self.placeholder}", [pattern])
-	def in_(self, values):
-		placeholders = ', '.join([self.placeholder] * len(values))
-		return Exp(f"{self._field_name()} IN ({placeholders})", list(values))
-	def not_in(self, values):
-		placeholders = ', '.join([self.placeholder] * len(values))
-		return Exp(f"{self._field_name()} NOT IN ({placeholders})", list(values))
-	def between(self, low, high):
-		return Exp(f"{self._field_name()} BETWEEN {self.placeholder} AND {self.placeholder}", [low, high])
-
-	# Subquery methods - take a Record instance and generate SQL
-	def in_subquery(self, record, selected="*"):
-		"""field IN (SELECT ... FROM ...)"""
-		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
-		return Exp(f"{self._field_name()} IN (\n{query.statement}\n)", query.parameters)
-
-	def not_in_subquery(self, record, selected="*"):
-		"""field NOT IN (SELECT ... FROM ...)"""
-		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
-		return Exp(f"{self._field_name()} NOT IN (\n{query.statement}\n)", query.parameters)
-
-	@staticmethod
-	def exists(record, selected="1"):
-		"""EXISTS (SELECT ... FROM ... WHERE ...)"""
-		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
-		return Exp(f"EXISTS (\n{query.statement}\n)", query.parameters)
-
-	@staticmethod
-	def not_exists(record, selected="1"):
-		"""NOT EXISTS (SELECT ... FROM ... WHERE ...)"""
-		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
-		return Exp(f"NOT EXISTS (\n{query.statement}\n)", query.parameters)
 #================================================================================#
 class RecordMeta(type):
 	def __getattr__(cls, field):
