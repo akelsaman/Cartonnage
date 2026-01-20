@@ -38,80 +38,80 @@ class Field:
 		"""Returns (sql_value, parameters)"""
 		if type(value) == Field:
 			return (f"{value.cls.__name__}.{value.name}", [])
-		elif isinstance(value, Exp):
+		elif isinstance(value, Expression):
 			return (value.value, value.parameters)
 		else:
 			return (self.placeholder, [value])
 
 	def __eq__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} = {sql_val}", params)
+		return Expression(f"{self._field_name()} = {sql_val}", params)
 	def __ne__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} <> {sql_val}", params)
+		return Expression(f"{self._field_name()} <> {sql_val}", params)
 	def __gt__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} > {sql_val}", params)
+		return Expression(f"{self._field_name()} > {sql_val}", params)
 	def __ge__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} >= {sql_val}", params)
+		return Expression(f"{self._field_name()} >= {sql_val}", params)
 	def __lt__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} < {sql_val}", params)
+		return Expression(f"{self._field_name()} < {sql_val}", params)
 	def __le__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} <= {sql_val}", params)
+		return Expression(f"{self._field_name()} <= {sql_val}", params)
 	def __add__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} + {sql_val}", params)
+		return Expression(f"{self._field_name()} + {sql_val}", params)
 	def __sub__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} - {sql_val}", params)
+		return Expression(f"{self._field_name()} - {sql_val}", params)
 	def __mul__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} * {sql_val}", params)
+		return Expression(f"{self._field_name()} * {sql_val}", params)
 	def __truediv__(self, value):
 		sql_val, params = self._resolve_value(value)
-		return Exp(f"{self._field_name()} / {sql_val}", params)
+		return Expression(f"{self._field_name()} / {sql_val}", params)
 
 	# SQL-specific methods
 	def is_null(self):
-		return Exp(f"{self._field_name()} IS NULL", [])
+		return Expression(f"{self._field_name()} IS NULL", [])
 	def is_not_null(self):
-		return Exp(f"{self._field_name()} IS NOT NULL", [])
+		return Expression(f"{self._field_name()} IS NOT NULL", [])
 	def like(self, pattern):
-		return Exp(f"{self._field_name()} LIKE {self.placeholder}", [pattern])
+		return Expression(f"{self._field_name()} LIKE {self.placeholder}", [pattern])
 	def in_(self, values):
 		placeholders = ', '.join([self.placeholder] * len(values))
-		return Exp(f"{self._field_name()} IN ({placeholders})", list(values))
+		return Expression(f"{self._field_name()} IN ({placeholders})", list(values))
 	def not_in(self, values):
 		placeholders = ', '.join([self.placeholder] * len(values))
-		return Exp(f"{self._field_name()} NOT IN ({placeholders})", list(values))
+		return Expression(f"{self._field_name()} NOT IN ({placeholders})", list(values))
 	def between(self, low, high):
-		return Exp(f"{self._field_name()} BETWEEN {self.placeholder} AND {self.placeholder}", [low, high])
+		return Expression(f"{self._field_name()} BETWEEN {self.placeholder} AND {self.placeholder}", [low, high])
 
 	# Subquery methods - take a Record instance and generate SQL
 	def in_subquery(self, record, selected="*"):
 		"""field IN (SELECT ... FROM ...)"""
 		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
-		return Exp(f"{self._field_name()} IN (\n{query.statement}\n)", query.parameters)
+		return Expression(f"{self._field_name()} IN (\n{query.statement}\n)", query.parameters)
 
 	def not_in_subquery(self, record, selected="*"):
 		"""field NOT IN (SELECT ... FROM ...)"""
 		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
-		return Exp(f"{self._field_name()} NOT IN (\n{query.statement}\n)", query.parameters)
+		return Expression(f"{self._field_name()} NOT IN (\n{query.statement}\n)", query.parameters)
 
 	@staticmethod
 	def exists(record, selected="1"):
 		"""EXISTS (SELECT ... FROM ... WHERE ...)"""
 		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
-		return Exp(f"EXISTS (\n{query.statement}\n)", query.parameters)
+		return Expression(f"EXISTS (\n{query.statement}\n)", query.parameters)
 
 	@staticmethod
 	def not_exists(record, selected="1"):
 		"""NOT EXISTS (SELECT ... FROM ... WHERE ...)"""
 		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
-		return Exp(f"NOT EXISTS (\n{query.statement}\n)", query.parameters)
+		return Expression(f"NOT EXISTS (\n{query.statement}\n)", query.parameters)
 #================================================================================#
 class Dummy:
 	def __init__(self, value):
@@ -133,139 +133,17 @@ class UserID(SpecialValue):
 	def __init__(self, value=None):
 		self.user_id = value
 #--------------------------------------#
-class Expression(SpecialValue):
-	def __init__(self, value):
-		self.__value = value
-		SpecialValue.__init__(self, self.__value)
-	def placeholder(self, placeholder): return self.__value
-	def fltr(self, field, placeholder): return f"{field} = {self.__value}"  # Add this
-	def parametersAppend(self, parameters): pass  # Add this - no params to append
-	def __str__(self): return self.__value
-	def __repr__(self): return self.__value
-	def __and__(self, other): return Expression(f"({self.value()} AND {other.value()})")
-	def __or__(self, other): return Expression(f"({self.value()} OR {other.value()})")
-#--------------------------------------#
-class Exp():
-	def __init__(self, value, parameters):
+class Expression():
+	def __init__(self, value, parameters=[]):
 		self.value = value
 		self.parameters = parameters
 	def fltr(self, field, placeholder): return self.value
 	def parametersAppend(self, parameters): parameters.extend(self.parameters)
 	def __str__(self): return self.value
 	def __repr__(self): return self.value
-	def __and__(self, other): return Exp(f"({self.value} AND {other.value})", self.parameters + other.parameters)
-	def __or__(self, other): return Exp(f"({self.value} OR {other.value})", self.parameters + other.parameters)
+	def __and__(self, other): return Expression(f"({self.value} AND {other.value})", self.parameters + other.parameters)
+	def __or__(self, other): return Expression(f"({self.value} OR {other.value})", self.parameters + other.parameters)
 # #--------------------------------------#
-class SubQuery(SpecialValue):
-	def __init__(self, value):
-		self.__value = value
-		SpecialValue.__init__(self, self.__value)
-	def operator(self): return ""
-	def fltr(self, field, placeholder): 
-		self.query = Database.crud(operation=Database.read, record=self.value(), mode='filter_', selected="employee_id", group_by='', limit='')
-		return f"{field} IN (\n{self.query.statement}\n) "
-	def parametersAppend(self, parameters): parameters.extend(self.query.parameters)
-#--------------------
-class EXISTS(SpecialValue):
-	def __init__(self, value):
-		self.__value = value
-		SpecialValue.__init__(self, self.__value)
-	def operator(self): return ""
-	def fltr(self, field, placeholder): 
-		self.query = Database.crud(operation=Database.read, record=self.value(), mode='filter_', selected="employee_id", group_by='', limit='')
-		return f"EXISTS (\n{self.query.statement}\n) "
-	def parametersAppend(self, parameters): parameters.extend(self.query.parameters)
-#--------------------
-class NOTEXISTS(SpecialValue):
-	def __init__(self, value):
-		self.__value = value
-		SpecialValue.__init__(self, self.__value)
-	def operator(self): return ""
-	def fltr(self, field, placeholder): 
-		self.query = Database.crud(operation=Database.read, record=self.value(), mode='filter_', selected="employee_id", group_by='', limit='')
-		return f"NOT EXISTS (\n{self.query.statement}\n) "
-	def parametersAppend(self, parameters): parameters.extend(self.query.parameters)
-#--------------------
-class LIKE(SpecialValue):
-	def __init__(self, value):
-		self.__value = value.replace("*","%")
-		SpecialValue.__init__(self, self.__value)
-	def operator(self): return " LIKE "
-	def fltr(self, field, placeholder): return f"{field} LIKE {placeholder}"
-	def parametersAppend(self, parameters): parameters.append(self.value())
-#--------------------
-class IN(SpecialValue):
-	def operator(self): return " IN "
-	def placeholder(self, placeholder): 
-		__placeholder = ','.join([placeholder]*len(self._SpecialValue__value))
-		return f"({__placeholder})"
-	def fltr(self, field, placeholder): return f"{field} IN {self.placeholder(placeholder)}"
-	def parametersAppend(self, parameters): parameters.extend(self.value())
-#--------------------
-class NOT_IN(SpecialValue):
-	def operator(self): return " NOT IN "
-	def placeholder(self, placeholder):
-		__placeholder = ','.join([placeholder]*len(self._SpecialValue__value))
-		return f"({__placeholder})"
-	def fltr(self, field, placeholder): return f"{field} NOT IN {self.placeholder(placeholder)}"
-	def parametersAppend(self, parameters): parameters.extend(self.value())
-#--------------------
-class BETWEEN(SpecialValue):
-	def __init__(self, minValue, maxValue):
-		self.__minValue = minValue
-		self.__maxValue = maxValue
-
-	def value(self): return [self.__minValue, self.__maxValue]
-	def operator(self): return " BETWEEN "
-	def placeholder(self, placeholder): return placeholder + " AND " + placeholder
-	def fltr(self, field, placeholder): return f"{field} BETWEEN {self.placeholder(placeholder)}"
-	def parametersAppend(self, parameters): parameters.extend(self.value())
-#--------------------
-class gt(SpecialValue):
-	def operator(self): return " > "
-	def fltr(self, field, placeholder): return f"{field} > {placeholder}"
-	def parametersAppend(self, parameters): parameters.append(self.value())
-#--------------------
-class ge(SpecialValue):
-	def operator(self): return " >= "
-	def fltr(self, field, placeholder): return f"{field} >= {placeholder}"
-	def parametersAppend(self, parameters): parameters.append(self.value())
-#--------------------
-class lt(SpecialValue):
-	def operator(self): return " < "
-	def fltr(self, field, placeholder): return f"{field} < {placeholder}"
-	def parametersAppend(self, parameters): parameters.append(self.value())
-#--------------------
-class le(SpecialValue):
-	def operator(self): return " <= "
-	def fltr(self, field, placeholder): return f"{field} <= {placeholder}"
-	def parametersAppend(self, parameters): parameters.append(self.value())
-#--------------------
-class NULL(SpecialValue, dict): #to make it json serializable using jsonifiy
-	def operator(self, operation=2):
-		if(operation==Database.update):
-			return "="
-		else:
-			return " IS "
-	def placeholder(self, placeholder): return "NULL"
-	def __str__(self): return "NULL"
-	def __repr__(self): return "NULL"
-	def __eq__(self, other): return "NULL"==other
-	def fltr(self, field, placeholder): return f"{field} IS NULL"
-	def parametersAppend(self, parameters): return parameters
-#--------------------
-class NOT_NULL(SpecialValue):
-	def __init__(self):
-		self.__value = "NOT NULL"
-		SpecialValue.__init__(self, self.__value)
-	def operator(self): return " IS "
-	def placeholder(self, placeholder): return "NOT NULL"
-	def __str__(self): return "NOT NULL"
-	def __repr__(self): return "NOT NULL"
-	def __eq__(self, other): return "NOT NULL"==other
-	def fltr(self, field, placeholder): return f"{field} IS NOT NULL"
-	def parametersAppend(self, parameters): return parameters
-# #--------------------
 class Join():
 	def __init__(self, object, fields, type=' INNER JOIN ', value=None):
 		self.type = type
@@ -309,7 +187,7 @@ class Set:
 			# statement += f"{self.parent.alias.value()}.{field}={self.parent.database__.placeholder()}, "
 			value = self.new[field]
 			if isinstance(value, Expression):
-				statement += f"{field}={value.placeholder(None)}, "  # Expression directly
+				statement += f"{field}={value.value}, " # Expression directly # value.value = Expression.value
 			else:
 				statement += f"{field}={self.parent.database__.placeholder()}, "
 		return statement[:-2]
@@ -319,8 +197,10 @@ class Set:
 		parameters = []
 		for field in fields:
 			value = self.new[field]
-			if not isinstance(value, Expression):  # Skip expressions
-				parameters.append(value) # 			if type(value) != Expression:
+			if isinstance(value, Expression):  # Skip expressions
+				parameters.extend(value.parameters) # value.parameters = Expression.parameters
+			else:
+				parameters.append(value) #	if type(value) != Expression:
 		return parameters
 
 	def __setattr__(self, name, value):
@@ -377,10 +257,6 @@ class Filter:
 		self.__where = ''
 		self.__parameters = []
 	
-	def filter(self, **kwargs):
-		for field, value in kwargs.items():
-			self.addCondition(field, value)
-		return self
 	def read(self, selected="*", group_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, mode='filter_', selected=selected, group_by=group_by, limit=limit)
 	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent, mode='filter_')
 	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent, mode='filter_')
@@ -412,6 +288,13 @@ class Filter:
 		filter.combine(self, filter2, "AND")
 		return filter
 	
+	def filter(self, *args, **kwargs):
+		for exp in args:
+			self.addCondition('_', exp)
+		for field, value in kwargs.items():
+			self.addCondition(field, value)
+		return self
+		
 	def addCondition(self, field, value):
 		placeholder = self.parent.database__.placeholder()
 		field = f"{self.parent.alias.value()}.{field}"
@@ -443,110 +326,57 @@ class Filter:
 		# print(">>>>>>>>>>>>>>>>>>>>", parameters + self.__parameters)
 		return parameters + self.__parameters
 	#--------------------------------------#
-	# def SubQuery(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None).in_subquery(value))
-	# 	return self
-	# def EXISTS(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field.exists(value))
-	# 	return self
-	# def NOT_EXISTS(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field.not_exists(value))
-	# 	return self
-	# def IN(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None).in_(value))
-	# 	return self
-	# def NOT_IN(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None).not_in(value))
-	# 	return self
-	# def LIKE(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None).like(value))
-	# 	return self
-	# def NULL(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, value).is_null())
-	# 	return self
-	# def NOT_NULL(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None).is_not_null())
-	# 	return self
-	# def BETWEEN(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None).between(value[0], value[1]))
-	# 	return self
-	# def gt(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None) > value)
-	# 	return self
-	# def ge(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None) >= value)
-	# 	return self
-	# def lt(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None) < value)
-	# 	return self
-	# def le(self, **kwargs):
-	# 	for field, value in kwargs.items():
-	# 		self.filter(_=Field(self.parent.__class__, field, None) <= value)
-	# 	return self
-	#--------------------------------------#
 	def SubQuery(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, SubQuery(value))
+			self.filter(_=Field(self.parent.__class__, field, None).in_subquery(value))
 		return self
 	def EXISTS(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, EXISTS(value))
+			self.filter(_=Field.exists(value))
 		return self
 	def NOT_EXISTS(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, NOT_EXISTS(value))
+			self.filter(_=Field.not_exists(value))
 		return self
 	def IN(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, IN(value))
+			self.filter(_=Field(self.parent.__class__, field, None).in_(value))
 		return self
 	def NOT_IN(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, NOT_IN(value))
+			self.filter(_=Field(self.parent.__class__, field, None).not_in(value))
 		return self
 	def LIKE(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, LIKE(value))
+			self.filter(_=Field(self.parent.__class__, field, None).like(value))
 		return self
 	def NULL(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, NULL())
+			self.filter(_=Field(self.parent.__class__, field, None).is_null())
 		return self
 	def NOT_NULL(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, NOT_NULL())
+			self.filter(_=Field(self.parent.__class__, field, None).is_not_null())
 		return self
 	def BETWEEN(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, BETWEEN(value[0], value[1]))
-		return self	
+			self.filter(_=Field(self.parent.__class__, field, None).between(value[0], value[1]))
+		return self
 	def gt(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, gt(value))
+			self.filter(_=Field(self.parent.__class__, field, None) > value)
 		return self
 	def ge(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, ge(value))
+			self.filter(_=Field(self.parent.__class__, field, None) >= value)
 		return self
 	def lt(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, lt(value))
+			self.filter(_=Field(self.parent.__class__, field, None) < value)
 		return self
 	def le(self, **kwargs):
 		for field, value in kwargs.items():
-			self.addCondition(field, le(value))
+			self.filter(_=Field(self.parent.__class__, field, None) <= value)
 		return self
 	#--------------------------------------#
 #================================================================================#
@@ -1247,7 +1077,7 @@ class Record(metaclass=RecordMeta):
 	def getField(self, fieldName): return self.data[fieldName] #get field without invoke __getattr__
 	def setField(self, fieldName, fieldValue): self.data[fieldName]=fieldValue #set field without invoke __setattr__
 	#--------------------------------------#
-	def filter(self, **kwargs): return self.filter_.filter(**kwargs)
+	def filter(self, *args, **kwargs): return self.filter_.filter(*args, **kwargs)
 	#--------------------------------------#
 	def SubQuery(self, **kwargs):
 		self.filter_.SubQuery(**kwargs)
