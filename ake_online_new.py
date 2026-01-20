@@ -56,6 +56,17 @@ class Expression(SpecialValue):
 	def __and__(self, other): return Expression(f"({self.value()} AND {other.value()})")
 	def __or__(self, other): return Expression(f"({self.value()} OR {other.value()})")
 #--------------------------------------#
+class Exp():
+	def __init__(self, value, parameters):
+		self.value = value
+		self.parameters = parameters
+	def fltr(self, field, placeholder): return self.value
+	def parametersAppend(self, parameters): parameters.extend(self.parameters)
+	def __str__(self): return self.value
+	def __repr__(self): return self.value
+	def __and__(self, other): return Exp(f"({self.value} AND {other.value})", self.parameters + other.parameters)
+	def __or__(self, other): return Exp(f"({self.value} OR {other.value})", self.parameters + other.parameters)
+#--------------------------------------#
 class SubQuery(SpecialValue):
 	def __init__(self, value):
 		self.__value = value
@@ -166,21 +177,19 @@ class NOT_NULL(SpecialValue):
 	def fltr(self, field, placeholder): return f"{field} IS NOT NULL"
 	def parametersAppend(self, parameters): return parameters
 #--------------------
-class Join(SpecialValue):
+class Join():
 	def __init__(self, object, fields, type=' INNER JOIN ', value=None):
 		self.type = type
 		self.object = object
 		self.fields = fields
 		self.__value = value
-		SpecialValue.__init__(self, value)
 #--------------------
-class Joiners(SpecialValue):
+class Joiners():
 	def __init__(self, value=None):
 		self.joinClause = ''
 		self.preparedStatement = ''
 		self.parameters = []
 		self.__value = value
-		SpecialValue.__init__(self, value)
 #================================================================================#
 class Result:
 	def __init__(self, columns=None, rows=None, count=0):
@@ -331,18 +340,19 @@ class Filter:
 		where = ''
 		where = self.parent.values.where(self.parent)
 		where = f"{where} AND " if (where) else ""
-		self.__where = where + self.__where
-		# print(">>>>>>>>>>>>>>>>>>>>", self.__where)
-		return self.__where[:-5]
+		# Return combined where without modifying self.__where
+		combined_where = where + self.__where
+		# print(">>>>>>>>>>>>>>>>>>>>", combined_where)
+		return combined_where[:-5]
 	
 	#This 'Filter.parameters' function follow the same signature/interface of 'Values.parameters' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
 	def parameters(self, record=None):
 		parameters = []
 		parameters = self.parent.values.parameters(self.parent)
-		self.__parameters = parameters + self.__parameters
-		# print(">>>>>>>>>>>>>>>>>>>>", self.__parameters)
-		return self.__parameters
+		# Return combined parameters without modifying self.__parameters
+		# print(">>>>>>>>>>>>>>>>>>>>", parameters + self.__parameters)
+		return parameters + self.__parameters
 	#--------------------------------------#
 	def SubQuery(self, **kwargs):
 		for field, value in kwargs.items():
@@ -1007,59 +1017,89 @@ class Field:
 		self.cls = cls
 		self.name = name
 		self.value = value
-		
-	def __eq__(self, value): 
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} = {value}")
-	def __ne__(self, value): 
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} <> {value}")
-	def __gt__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} > {value}")
-	def __ge__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} >= {value}")
-	def __lt__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} < {value}")
-	def __le__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} <= {value}")
-	def __mul__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} * {value}")
-	def __add__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} + {value}")
-	def __sub__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} - {value}")
-	def __truediv__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} / {value}")
-	def __or__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} OR {value}")
-	def __and__(self, value):
-		if(type(value) == Field): value = f"{value.cls.__name__}.{value.name}"
-		return Expression(f"{self.cls.__name__}.{self.name} AND {value}")
+		self.placeholder = '?'
 
-	# New methods for SQL operations
+	def _field_name(self):
+		return f"{self.cls.__name__}.{self.name}"
+
+	def _resolve_value(self, value):
+		"""Returns (sql_value, parameters)"""
+		if type(value) == Field:
+			return (f"{value.cls.__name__}.{value.name}", [])
+		elif isinstance(value, Exp):
+			return (value.value, value.parameters)
+		else:
+			return (self.placeholder, [value])
+
+	def __eq__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} = {sql_val}", params)
+	def __ne__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} <> {sql_val}", params)
+	def __gt__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} > {sql_val}", params)
+	def __ge__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} >= {sql_val}", params)
+	def __lt__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} < {sql_val}", params)
+	def __le__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} <= {sql_val}", params)
+	def __add__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} + {sql_val}", params)
+	def __sub__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} - {sql_val}", params)
+	def __mul__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} * {sql_val}", params)
+	def __truediv__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Exp(f"{self._field_name()} / {sql_val}", params)
+
+	# SQL-specific methods
 	def is_null(self):
-		return Expression(f"{self.cls.__name__}.{self.name} IS NULL")
+		return Exp(f"{self._field_name()} IS NULL", [])
 	def is_not_null(self):
-		return Expression(f"{self.cls.__name__}.{self.name} IS NOT NULL")
+		return Exp(f"{self._field_name()} IS NOT NULL", [])
 	def like(self, pattern):
-		return Expression(f"{self.cls.__name__}.{self.name} LIKE '{pattern}'")
+		return Exp(f"{self._field_name()} LIKE {self.placeholder}", [pattern])
 	def in_(self, values):
-		vals = ', '.join(str(v) for v in values)
-		return Expression(f"{self.cls.__name__}.{self.name} IN ({vals})")
+		placeholders = ', '.join([self.placeholder] * len(values))
+		return Exp(f"{self._field_name()} IN ({placeholders})", list(values))
 	def not_in(self, values):
-		vals = ', '.join(str(v) for v in values)
-		return Expression(f"{self.cls.__name__}.{self.name} NOT IN ({vals})")
+		placeholders = ', '.join([self.placeholder] * len(values))
+		return Exp(f"{self._field_name()} NOT IN ({placeholders})", list(values))
 	def between(self, low, high):
-		return Expression(f"{self.cls.__name__}.{self.name} BETWEEN {low} AND {high}")
+		return Exp(f"{self._field_name()} BETWEEN {self.placeholder} AND {self.placeholder}", [low, high])
+
+	# Subquery methods - take a Record instance and generate SQL
+	def in_subquery(self, record, selected="*"):
+		"""field IN (SELECT ... FROM ...)"""
+		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		return Exp(f"{self._field_name()} IN (\n{query.statement}\n)", query.parameters)
+
+	def not_in_subquery(self, record, selected="*"):
+		"""field NOT IN (SELECT ... FROM ...)"""
+		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		return Exp(f"{self._field_name()} NOT IN (\n{query.statement}\n)", query.parameters)
+
+	@staticmethod
+	def exists(record, selected="1"):
+		"""EXISTS (SELECT ... FROM ... WHERE ...)"""
+		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		return Exp(f"EXISTS (\n{query.statement}\n)", query.parameters)
+
+	@staticmethod
+	def not_exists(record, selected="1"):
+		"""NOT EXISTS (SELECT ... FROM ... WHERE ...)"""
+		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		return Exp(f"NOT EXISTS (\n{query.statement}\n)", query.parameters)
 #================================================================================#
 class RecordMeta(type):
 	def __getattr__(cls, field):
