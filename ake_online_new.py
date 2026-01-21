@@ -134,9 +134,9 @@ class UserID(SpecialValue):
 		self.user_id = value
 #--------------------------------------#
 class Expression():
-	def __init__(self, value, parameters=[]):
+	def __init__(self, value, parameters=None):
 		self.value = value
-		self.parameters = parameters
+		self.parameters = parameters if parameters is not None else []
 	def fltr(self, field, placeholder): return self.value
 	def parametersAppend(self, parameters): parameters.extend(self.parameters)
 	def __str__(self): return self.value
@@ -148,7 +148,7 @@ class Join():
 	def __init__(self, object, fields, type=' INNER JOIN ', value=None):
 		self.type = type
 		self.object = object
-		self.fields = fields
+		self.predicates = fields
 		self.__value = value
 #--------------------
 class Joiners():
@@ -658,12 +658,7 @@ class Database:
 		quoteChar = '' #cls.escapeChar()
 		for key, join in record.joins__.items():
 			#" INNER JOIN Persons pp ON "
-			main_join = f"{join.type}{join.object.table__()} {join.object.alias.value()} ON "
-			for foreign_key, primary_key in join.fields.items():
-				#"	cc.fk=pp.pk AND "
-				main_join += f"\n\t{record.alias.value()}.{quoteChar}{foreign_key}{quoteChar}={join.object.alias.value()}.{quoteChar}{primary_key}{quoteChar} AND "
-			main_join = "\n" + main_join[:-5]
-			joiners.joinClause += main_join
+			joiners.joinClause = f"{join.type}{join.object.table__()} {join.object.alias.value()} ON {join.predicates.value}"
 			#--------------------
 			statement = join.object.getMode(mode).where(join.object)
 			if(statement): joiners.preparedStatement += f" AND {statement}"
@@ -673,7 +668,6 @@ class Database:
 			joiners.joinClause += child_joiners.joinClause
 			joiners.preparedStatement += child_joiners.preparedStatement
 			joiners.parameters.extend(child_joiners.parameters)
-
 		return joiners
 	#--------------------------------------#
 	@staticmethod
@@ -1039,7 +1033,14 @@ class Record(metaclass=RecordMeta):
 		except:
 			try:
 				return object.__getattribute__(self, name)
-			except:
+			# except:
+			# 	return None
+			# except KeyError:
+			# 		raise AttributeError(f"'{self.__class__.__name__}' has no field '{name}'")
+			except KeyError:
+				# Only return None if columns haven't been loaded yet
+				if self.columns and name not in self.columns:
+					raise AttributeError(f"'{self.__class__.__name__}' has no field '{name}'")
 				return None
 
 	def __setattr__(self, name, value):
@@ -1066,6 +1067,13 @@ class Record(metaclass=RecordMeta):
 		quoteChar = '' #self.database__.escapeChar()
 		return f"{quoteChar}${{{self.tableName__.value()}}}{quoteChar}"
 	#--------------------------------------#
+	def __repr__(self):
+		items = list(self.data.items())[:5]  # Show first 5 fields
+		fields = ', '.join(f'{k}={v!r}' for k, v in items)
+		if len(self.data) > 5:
+			fields += ', ...'
+		return f"<{self.__class__.__name__} {fields}>"
+	#--------------------------------------#	
 	def id(self): return self.query__.result.lastrowid
 	#--------------------------------------#
 	def rowsCount(self): return self.query__.result.count
