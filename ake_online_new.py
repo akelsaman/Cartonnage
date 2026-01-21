@@ -5,20 +5,11 @@
 # free Record from all other instances
 # batch size
 #================================================================================#
-from string import Template #used for secure id
 from datetime import datetime
+
+from string import Template #used for secure id
 import re #used for secure id
 #================================================================================#
-#python2 has two classes represent strings (str) and (unicode)
-#python3 has only one class represents string (str) and has no (unicode) class
-#the following code is for python3 and python2 compatibility-back
-#type(value) in [str,] only will ignore unicode attributes/values if not casting
-# using str() explicity when assigning object.attribute = value of unicode()
-try:
-	a = unicode()
-except Exception as e:
-	unicode = str
-
 NoneType = type(None)
 #================================================================================#
 def createTableClass(tableName, base=(object, ), attributesDictionary={}):
@@ -205,7 +196,7 @@ class Set:
 
 	def __setattr__(self, name, value):
 		# if(name=="custom"): self.__dict__["custom"] = value
-		if(type(value) in [NoneType, str, int, float, datetime, unicode] or isinstance(value, Expression)):
+		if(type(value) in [NoneType, str, int, float, datetime] or isinstance(value, Expression)):
 			self.__dict__["new"][name] = value
 		else:
 			object.__setattr__(self, name, value)
@@ -222,13 +213,13 @@ class Values:
 		# 	value = record.__dict__[field]
 		for field in record.data: 
 			value = record.data[field]
-			if(type(value) in [str, int, float, datetime, unicode]):
+			if(type(value) in [str, int, float, datetime]):
 				fields.append(field)
 		return fields
 	#--------------------------------------#
 	@staticmethod
 	def where(record):
-		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, unicode, int, float, and datetime] values.
+		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, and datetime] values.
 		statement = ''
 		fields = Values.fields(record)
 		for field in fields:
@@ -239,7 +230,7 @@ class Values:
 	#--------------------------------------#
 	@staticmethod
 	def parameters(record, fieldsNames=None):
-		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, unicode, int, float, and datetime] values.
+		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, and datetime] values.
 		fields = fieldsNames if (fieldsNames) else Values.fields(record)
 		parameters = []
 		for field in fields:
@@ -298,7 +289,7 @@ class Filter:
 	def addCondition(self, field, value):
 		placeholder = self.parent.database__.placeholder()
 		field = f"{self.parent.alias.value()}.{field}"
-		if(type(value) in [str, unicode, int, float, datetime]):
+		if(type(value) in [str, int, float, datetime]):
 			self.__where += f"{field} = {placeholder} AND "
 			self.__parameters.append(value)
 		else:
@@ -379,209 +370,6 @@ class Filter:
 			self.filter(_=Field(self.parent.__class__, field, None) <= value)
 		return self
 	#--------------------------------------#
-#================================================================================#
-class Representer:
-
-	unsafeCharactersEncoding = {
-		'%20': ' ', 
-		'%22': '"', 
-		'%23': '#', 
-		'%25': '%', 
-		'%60': '`', 
-		'%3C': '<', #capital
-		'%3E': '>', 
-		'%7B': '{', 
-		'%7D': '}', 
-		'%7C': '|', 
-		'%5C': '\\', 
-		'%5E': '^', 
-		'%7E': '~', 
-		'%5B': '[', 
-		'%5D': ']', 
-		'%3c': '<', #small
-		'%3e': '>', 
-		'%7b': '{', 
-		'%7d': '}', 
-		'%7c': '|', 
-		'%5c': '\\', 
-		'%5e': '^', 
-		'%7e': '~', 
-		'%5b': '[', 
-		'%5d': ']'
-	}
-
-	reservedCharactersEncoding = {
-		'%24': '$', 
-		'%26': '&', 
-		'%40': '@', 
-		'%2B': '+',  #captial
-		'%2C': ',', 
-		'%2F': '/', 
-		'%3A': ':', 
-		'%3B': ';', 
-		'%3D': '=', 
-		'%3F': '?', 
-		'%40': '@', 
-		'%2b': '+',  #small
-		'%2c': ',', 
-		'%2f': '/', 
-		'%3a': ':', 
-		'%3b': ';', 
-		'%3d': '=', 
-		'%3f': '?'
-	}
-
-	def __init__(self):
-		pass
-	#--------------------------------------#
-	def to_xml(self, record):
-		xmlRecords = "<" + record.table__() + ">"
-		for r in record.recordset.iterate():
-			xmlRecord = "\n\t<Record "
-			attributes = ""
-			for column in r.columns:
-				attributes += str(column) + "='" + str(r.getField(column)) + "' "
-			xmlRecord += attributes + "></Record>"
-			xmlRecords += xmlRecord
-		xmlRecords += "\n</" + record.table__() + ">"
-
-		return xmlRecords
-	#--------------------------------------#
-	def collectJoins(self, record, joins):
-		for join in record.joins__:
-			joins[join] = record.joins__[join]
-			self.collectJoins(joins[join].object, joins)
-	#--------------------------------------#
-	def importSearchCriteria(self, record, searchCriteria):
-		joins = {}
-		self.collectJoins(record, joins)
-
-		for criterion in searchCriteria:
-			info = criterion.split(".")
-			if(len(info) == 4):
-				operator=info[0]
-				alias=info[1]
-				attribute=info[2]
-				fieldType=info[3]
-				tableObjectInstance=None
-
-				if(record.alias.value() == alias):
-					tableObjectInstance = record
-				elif(alias in joins):
-					tableObjectInstance = joins[alias].object
-
-				if(tableObjectInstance):
-					if(operator=="is"): tableObjectInstance.setField(attribute, searchCriteria[criterion])
-					if(operator=="like"): tableObjectInstance.setField(attribute, LIKE(searchCriteria[criterion]))
-					if(operator=="in"): tableObjectInstance.setField(attribute, IN(searchCriteria[criterion]))
-					if(operator=="not_in"): tableObjectInstance.setField(attribute, NOT_IN(searchCriteria[criterion]))
-					if(operator=="gt"): tableObjectInstance.setField(attribute, gt(searchCriteria[criterion]))
-					if(operator=="ge"): tableObjectInstance.setField(attribute, ge(searchCriteria[criterion]))
-					if(operator=="lt"): tableObjectInstance.setField(attribute, lt(searchCriteria[criterion]))
-					if(operator=="le"): tableObjectInstance.setField(attribute, le(searchCriteria[criterion]))
-					if(operator=="between"):
-						betweenValues = searchCriteria[criterion]
-						if(type(betweenValues) is list and len(betweenValues) == 2):
-							tableObjectInstance.setField(attribute, BETWEEN(betweenValues[0], betweenValues[1]))
-	#--------------------------------------#
-	def getSearchURL(self, searchCriteria):
-		url = ''
-		for criterion in searchCriteria:
-			url += criterion + "=" + str(searchCriteria[criterion]) + "&"
-		return url
-	#--------------------------------------#
-	def deccodeURL(self, urlCriteria):
-		for encodedCharacter in Representer.reservedCharactersEncoding:
-			urlCriteria = urlCriteria.replace(encodedCharacter, Representer.reservedCharactersEncoding[encodedCharacter])
-		for encodedCharacter in Representer.unsafeCharactersEncoding:
-			urlCriteria = urlCriteria.replace(encodedCharacter, Representer.unsafeCharactersEncoding[encodedCharacter])
-		return urlCriteria
-	#--------------------------------------#
-	def checkValueType(self, fieldName, fieldValue, fieldType):
-		validatedValue = None
-		if(fieldType == 'i'):
-			try:
-				validatedValue = int(fieldValue)
-			except Exception as e: print("Error '" + fieldName + "' parsing int !") #print(str(e))
-		elif(fieldType == 'f'):
-			try:
-				validatedValue = float(fieldValue)
-			except Exception as e: print("Error '" + fieldName + "' parsing int !") #print(str(e))
-		elif(fieldType == 's'):
-			if(type(fieldValue) in [str, unicode] and fieldValue != ''): validatedValue = fieldValue
-			else: print("Error '" + fieldName + "' parsing str !") #print(str(e))
-		return validatedValue
-	#--------------------------------------#
-	def checkListValuesTypes(self, fieldName, listValues, fieldType):
-		listValues = listValues.replace('[', '')
-		listValues = listValues.replace(']', '')
-		listValues = listValues.split(",")
-		validatedValues = []
-		for v in listValues:
-			v = v.replace(' ', '')
-			if(fieldType == 'i'):
-				try:
-					v = int(v)
-					validatedValues.append(v)
-				except Exception as e: print("Error '" + fieldName + "' parsing int !") #print(str(e))
-			elif(fieldType == 'f'):
-				try:
-					v = float(v)
-					validatedValues.append(v)
-				except Exception as e: print("Error '" + fieldName + "' parsing float !") #print(str(e))
-			elif(fieldType == 's'):
-				print("|||>>>", v)
-				if(type(v) in [str, unicode] and v != ''): validatedValues.append(v)
-				else: print("Error in '" + fieldName + "' finiding string value to search !") #print(str(e))
-		return validatedValues
-	#--------------------------------------#
-	#in.restaurant.Restaurant_ID=[115]&like.branch.State=Cai*&like.branch.City=Shero*&like.branch.Address=Add*&like.branch.Telephone=*&in.feature.Feature_ID=[1, 2]&
-	def getURLData(self, url):
-		#http://localhost:5000/userSearch?like.restaurant.Name.s=*saman*&in.feature.Feature_ID.i=[2]
-		#http://localhost:5000/userSearch?like.restaurant.Name.s%3d*saman*&in.feature.Feature_ID.i%3d%5b2%5d
-
-		searchCriteria = {}
-
-		url = url.split("?")
-		if(len(url) >= 2):
-			urlCriteria = url[1]
-			
-			urlCriteria = self.deccodeURL(urlCriteria)
-			print(urlCriteria)
-
-			criteria = urlCriteria.split("&")
-			#print(criteria)
-
-			for criterion in criteria:
-				criterion = criterion.split("=")
-				if(len(criterion) == 2):
-					value = criterion[1]
-					criterion = criterion[0]
-					info = criterion.split(".")
-					if(len(info) == 4):
-						operator=info[0]
-						alias=info[1]
-						fieldName=info[2]
-						fieldType=info[3]
-						tableObjectInstance=None
-						#--------------------
-						if(operator in ['like', 'is', 'eq', 'gt', 'ge', 'lt', 'le', 'not_like']):
-							validatedValue = self.checkValueType(fieldName, value, fieldType)
-							if(validatedValue): searchCriteria[criterion] = validatedValue
-						#--------------------
-						elif(operator in ['in', 'not_in']):
-							validatedValues = self.checkListValuesTypes(fieldName, value, fieldType)
-							if(len(validatedValues)): searchCriteria[criterion] = validatedValues
-						#--------------------
-						elif(operator=='between'):
-							validatedValues = self.checkListValuesTypes(fieldName, value, fieldType)
-							if(len(validatedValues) == 2): searchCriteria[criterion] = validatedValues
-						#--------------------
-						else:
-							searchCriteria[criterion] = value
-						#--------------------
-			return searchCriteria
-		else: return {}
 #================================================================================#
 # fieldValue = fieldValue.decode('utf-8') # mysql python connector returns bytearray instead of string
 class ObjectRelationalMapper:
@@ -877,28 +665,6 @@ class Database:
 			print(e)
 			return ''
 	#--------------------------------------#
-	def getCopyInstance(self, record, base=(object, ), attributesDictionary={}):
-		if(base):
-			Copy = createTableClass(record.__class__.__name__, base, attributesDictionary)
-			copy = Copy()
-		else:
-			copy = record.__class__() #object = Record() #bug
-		
-		for attributeName, attributeValue in record.__dict__.items(): #for a in dir(r): println(a)
-			# any other type will be execluded Class type, None type and others ...
-			if(type(attributeValue) in [NoneType, str, unicode, int, float, datetime]):
-				setattr(copy, attributeName, attributeValue)
-			elif(isinstance(attributeValue, IN)):
-				setattr(copy, attributeName, IN(list(attributeValue.value())))
-			elif(isinstance(attributeValue, NULL)):
-				setattr(copy, attributeName, NULL())
-			elif(isinstance(attributeValue, NOT_NULL)):
-				setattr(copy, attributeName, NOT_NULL())
-			elif(isinstance(attributeValue, LIKE)):
-				setattr(copy, attributeName, LIKE(attributeValue.value()))
-		copy.columns = list(record.columns)
-		return copy
-	#--------------------------------------#
 #================================================================================#
 class SQLite(Database):
 	def __init__(self, connection):
@@ -986,7 +752,6 @@ class RecordMeta(type):
 #================================================================================#
 class Record(metaclass=RecordMeta):
 	database__	= None
-	representer__ = Representer()
 	tableName__ = TableName()
 	#--------------------------------------#
 	def __init__(self, statement=None, parameters=None, alias=None, secure_by_user_id=None, **kwargs):
@@ -1045,7 +810,7 @@ class Record(metaclass=RecordMeta):
 
 	def __setattr__(self, name, value):
 		# if(name=="custom"): self.__dict__["custom"] = value
-		if(type(value) in [str, int, float, datetime, unicode]):
+		if(type(value) in [str, int, float, datetime]):
 			self.__dict__["data"][name] = value
 		else:
 			object.__setattr__(self, name, value)
@@ -1168,20 +933,7 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def toList(self): return list(self.toDict().values())
 	#--------------------------------------#
-	def getCopyInstance(self, base=(object, ), attributesDictionary={}):
-		return self.database__.getCopyInstance(self, base, attributesDictionary={})
-	#--------------------------------------#
-	def to_xml(self): return self.representer__.xml(self)
-	def searchURL(self, url): return self.representer__.search(self, url)
-	def importSearchCriteria(self, searchCriteria): return self.representer__.importSearchCriteria(self, searchCriteria)
-	def search(self, searchCriteria, selected="*", group_by='', limit=''):
-		self.importSearchCriteria(searchCriteria)
-		self.read(selected, group_by, limit)
 	def limit(self, pageNumber=1, recordsCount=1): return self.database__.paginate(pageNumber, recordsCount)
-	@staticmethod
-	def getURLData(url): return Record.representer__.getURLData(url)
-	@staticmethod
-	def lastTotalRecords(): return Record.database__.lastTotalRows()
 	#--------------------------------------#
 #================================================================================#
 class Recordset:
@@ -1233,49 +985,4 @@ class Recordset:
 	def toListOfDict(self):
 		return self.data
 	#--------------------------------------#
-	def to_json(self):
-		recordsetJSONList = []
-		for record in self.iterate():
-			recordsetJSONList.append(record.to_json())
-		return recordsetJSONList
-#================================================================================#
-class Collection(list): pass
-#================================================================================#
-class Manipolatore:
-	def __init__(self, dictionary):
-		self.dictionary = dictionary
-	#--------------------
-	def path(self, path):
-		return path.split(".")[::-1]
-	#--------------------
-	def traverse(self, path, element):
-		if(len(path)):
-			if(type(element) is dict):
-				key=path.pop()
-				if(key in element):
-					return self.traverse(path, element[key])
-			elif(type(element) is list):
-				colection = Collection()
-				for elm in element:
-					newPath = list(path)
-					colection.append(self.traverse(newPath, elm))
-				if(len(colection)==1): return colection[0] # if list contains one element return the element itself
-				elif(len(colection)>1): return colection
-				#return colection
-			else:
-				return element
-		else:
-			return element
-	#--------------------
-	def __getValue(self, path):
-		path = self.path(path)
-		value = self.traverse(path, self.dictionary) ###
-		return value ###
-	#--------------------
-	def getValue(self, path):
-		value = self.__getValue(path)
-		if(value): return value
-		elif(value == ""): return ""
-		else: return NULL()
-	#--------------------
 #================================================================================#
