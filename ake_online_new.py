@@ -6,7 +6,6 @@
 # batch size
 #================================================================================#
 from datetime import datetime
-
 from string import Template #used for secure id
 import re #used for secure id
 #================================================================================#
@@ -196,7 +195,7 @@ class Set:
 
 	def __setattr__(self, name, value):
 		# if(name=="custom"): self.__dict__["custom"] = value
-		if(type(value) in [NoneType, str, int, float, datetime] or isinstance(value, Expression)):
+		if(type(value) in [NoneType, str, int, float, datetime, bool] or isinstance(value, Expression)):
 			self.__dict__["new"][name] = value
 		else:
 			object.__setattr__(self, name, value)
@@ -213,13 +212,13 @@ class Values:
 		# 	value = record.__dict__[field]
 		for field in record.data: 
 			value = record.data[field]
-			if(type(value) in [str, int, float, datetime]):
+			if(type(value) in [str, int, float, datetime, bool]):
 				fields.append(field)
 		return fields
 	#--------------------------------------#
 	@staticmethod
 	def where(record):
-		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, and datetime] values.
+		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, datetime, bool] values.
 		statement = ''
 		fields = Values.fields(record)
 		for field in fields:
@@ -230,7 +229,7 @@ class Values:
 	#--------------------------------------#
 	@staticmethod
 	def parameters(record, fieldsNames=None):
-		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, and datetime] values.
+		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, datetime, bool] values.
 		fields = fieldsNames if (fieldsNames) else Values.fields(record)
 		parameters = []
 		for field in fields:
@@ -289,7 +288,7 @@ class Filter:
 	def addCondition(self, field, value):
 		placeholder = self.parent.database__.placeholder()
 		field = f"{self.parent.alias.value()}.{field}"
-		if(type(value) in [str, int, float, datetime]):
+		if(type(value) in [str, int, float, datetime, bool]):
 			self.__where += f"{field} = {placeholder} AND "
 			self.__parameters.append(value)
 		else:
@@ -793,7 +792,7 @@ class Record(metaclass=RecordMeta):
 
 	def __setattr__(self, name, value):
 		# if(name=="custom"): self.__dict__["custom"] = value
-		if(type(value) in [str, int, float, datetime]):
+		if(type(value) in [str, int, float, datetime, bool]):
 			self.__dict__["data"][name] = value
 		else:
 			object.__setattr__(self, name, value)
