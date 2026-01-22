@@ -20,7 +20,7 @@ class Field:
 		self.cls = cls
 		self.name = name
 		self.value = value
-		self.placeholder = '?'
+		self.placeholder = cls.database__.placeholder()
 
 	def _field_name(self):
 		return f"{self.cls.__name__}.{self.name}"
@@ -248,7 +248,7 @@ class Filter:
 		self.__where = ''
 		self.__parameters = []
 	
-	def read(self, selected="*", group_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, mode='filter_', selected=selected, group_by=group_by, limit=limit)
+	def read(self, selected="*", group_by='', order_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, mode='filter_', selected=selected, group_by=group_by, order_by=order_by, limit=limit)
 	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent, mode='filter_')
 	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent, mode='filter_')
 
@@ -570,7 +570,7 @@ class Database:
 		return self.__cursor.executescript(sql)
 	#--------------------------------------#
 	@staticmethod
-	def crud(operation, record, mode, selected="*", group_by='', limit=''):
+	def crud(operation, record, mode, selected="*", group_by='', order_by='', limit=''):
 		current = []
 		where = record.getMode(mode).where(record)
 		parameters = record.getMode(mode).parameters(record)
@@ -578,7 +578,8 @@ class Database:
 		joinsCriteria = joiners.preparedStatement
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.read):
-			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_by} {limit}"
+			order_clause = f"ORDER BY {order_by}" if order_by else ''
+			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_by} {order_clause} {limit}"
 		#-----
 		elif(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
@@ -635,7 +636,7 @@ class Database:
 	#--------------------------------------#
 	def all(self, record, mode): self.executeStatement(self.crud(operation=Database.all, record=record, mode=mode))
 	def insert(self, record, mode): self.executeStatement(self.crud(operation=Database.insert, record=record, mode=mode))
-	def read(self, operation, record, mode, selected="*", group_by='', limit=''): self.executeStatement(self.crud(operation=operation, record=record, mode=mode, selected=selected, group_by=group_by, limit=limit))
+	def read(self, operation, record, mode, selected="*", group_by='', order_by='', limit=''): self.executeStatement(self.crud(operation=operation, record=record, mode=mode, selected=selected, group_by=group_by, order_by=order_by, limit=limit))
 	def delete(self, operation, record, mode): self.executeStatement(self.crud(operation=operation, record=record, mode=mode))
 	def update(self, operation, record, mode):
 		self.executeStatement(self.crud(operation=operation, record=record, mode=mode))
@@ -689,60 +690,42 @@ class Oracle(Database):
 		return f"OFFSET {offset} ROWS FETCH NEXT {recordsCount} ROWS ONLY"
 #================================================================================#
 class MySQL(Database):
-	def __init__(self, database=None, username=None, password=None, host=None):
-		Database.__init__(self, database=database, username=username, password=password, host=host)
-	def connect(self):
-		if(self.connectionParameters() == 4):
-			import mysql.connector
-			self._Database__connection = mysql.connector.connect(database=self._Database__database, user=self._Database__username, password=self._Database__password, host=self._Database__host)
-			self.cursor()
-			self._Database__cursor = self._Database__connection.cursor(prepared=True)
+	def __init__(self, connection):
+		Database.__init__(self)
+		self._Database__connection = connection
+		self._Database__placeholder = '%s'  # MySQL uses %s, not ?
+		self.cursor()
 	def prepared(self, prepared=True):
 		self._Database__cursor = self._Database__connection.cursor(prepared=prepared)
 	def lastTotalRows(self):
 		self._Database__cursor.execute("SELECT FOUND_ROWS() AS last_total_rows")
 		(last_total_rows,) = self._Database__cursor.fetchone()
 		return last_total_rows
+
 	@staticmethod
 	def limit(offset=0, recordsCount=1):
-		return f"LIMIT {offset}, {recordsCount}"
-#================================================================================#
-class MySQLClient(Database):
-	def __init__(self, database=None, username=None, password=None, host=None):
-		Database.__init__(self, database=database, username=username, password=password, host=host)
-	def connect(self):
-		if(self.connectionParameters() == 4):
-			import MySQLdb
-			self._Database__connection = MySQLdb.connect(db=self._Database__database, user=self._Database__username, password=self._Database__password, host=self._Database__host)
-			self.cursor()
-			self._Database__placeholder = '%s'
-	def lastTotalRows(self):
-		self._Database__cursor.execute("SELECT FOUND_ROWS() AS last_total_rows")
-		(last_total_rows,) = self._Database__cursor.fetchone()
-		return last_total_rows
-	@staticmethod
-	def limit(offset=0, recordsCount=1):
-		return f"LIMIT {offset}, {recordsCount}"
+		return f"LIMIT {offset}, {recordsCount}" # f"LIMIT {recordsCount} OFFSET {offset}"
 #================================================================================#
 class Postgres(Database):
-	def __init__(self, database=None, username=None, password=None, host=None):
-		Database.__init__(self, database=database, username=username, password=password, host=host)
-	def connect(self):
-		if(self.connectionParameters() == 4):
-			import psycopg2
-			self._Database__connection = psycopg2.connect(database=self._Database__database, user=self._Database__username, password=self._Database__password, host=self._Database__host)
-			self.cursor()
-			self._Database__placeholder = '%s'
+	def __init__(self, connection):
+		Database.__init__(self)
+		self._Database__connection = connection
+		self._Database__placeholder = '%s'  # MySQL uses %s, not ?
+		self.cursor()
+		
+	@staticmethod
+	def limit(offset=0, recordsCount=1):
+		return f"LIMIT {recordsCount} OFFSET {offset}"
 #================================================================================#
 class MicrosoftSQL(Database):
-	def __init__(self, database=None, username=None, password=None, host=None):
-		Database.__init__(self, database=database, username=username, password=password, host=host)
-	def connect(self):
-		if(self.connectionParameters() == 4):
-			import pyodbc
-			self._Database__connection = pyodbc.connect(Driver='{ODBC Driver 17 for SQL Server}', database=self._Database__database, user=self._Database__username, password=self._Database__password, host=self._Database__host)
-			#self._Database__connection = pyodbc.connect('Driver={ODBC Driver 17 for SQL Server};Server=tcp:example.database.windows.net,1433;Database=example_db;;;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;')
-			self.cursor()
+	def __init__(self, connection):
+		Database.__init__(self)
+		self._Database__connection = connection
+		self.cursor()
+		
+	@staticmethod
+	def limit(offset=0, recordsCount=1):
+		return f"OFFSET {offset} ROWS FETCH NEXT {recordsCount} ROWS ONLY"
 #================================================================================#
 class RecordMeta(type):
 	def __getattr__(cls, field):
@@ -917,7 +900,7 @@ class Record(metaclass=RecordMeta):
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
 	def insert(self): self.database__.insert(record=self, mode='values')
-	def read(self, selected="*", group_by='', limit=''): self.database__.read(Database.read, record=self, mode='values', selected=selected, group_by=group_by, limit=limit)
+	def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(Database.read, record=self, mode='values', selected=selected, group_by=group_by, order_by=order_by, limit=limit)
 	def update(self): self.database__.update(Database.update, record=self, mode='values')
 	def delete(self): self.database__.delete(Database.delete, record=self, mode='values')
 	def all(self): self.database__.all(record=self, mode='values')
