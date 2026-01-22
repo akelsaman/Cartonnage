@@ -316,39 +316,39 @@ class Filter:
 		# print(">>>>>>>>>>>>>>>>>>>>", parameters + self.__parameters)
 		return parameters + self.__parameters
 	#--------------------------------------#
-	def SubQuery(self, **kwargs):
+	def in_subquery(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(_=Field(self.parent.__class__, field, None).in_subquery(value))
 		return self
-	def EXISTS(self, **kwargs):
+	def exists(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(_=Field.exists(value))
 		return self
-	def NOT_EXISTS(self, **kwargs):
+	def not_exists(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(_=Field.not_exists(value))
 		return self
-	def IN(self, **kwargs):
+	def in_(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(_=Field(self.parent.__class__, field, None).in_(value))
 		return self
-	def NOT_IN(self, **kwargs):
+	def not_in(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(_=Field(self.parent.__class__, field, None).not_in(value))
 		return self
-	def LIKE(self, **kwargs):
+	def like(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(_=Field(self.parent.__class__, field, None).like(value))
 		return self
-	def NULL(self, **kwargs):
+	def is_null(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(_=Field(self.parent.__class__, field, None).is_null())
 		return self
-	def NOT_NULL(self, **kwargs):
+	def is_not_null(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(_=Field(self.parent.__class__, field, None).is_not_null())
 		return self
-	def BETWEEN(self, **kwargs):
+	def between(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(_=Field(self.parent.__class__, field, None).between(value[0], value[1]))
 		return self
@@ -834,32 +834,32 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def filter(self, *args, **kwargs): return self.filter_.filter(*args, **kwargs)
 	#--------------------------------------#
-	def SubQuery(self, **kwargs):
-		self.filter_.SubQuery(**kwargs)
+	def in_subquery(self, **kwargs):
+		self.filter_.in_subquery(**kwargs)
 		return self
-	def EXISTS(self, **kwargs):
-		self.filter_.EXISTS(**kwargs)
+	def exists(self, **kwargs):
+		self.filter_.exists(**kwargs)
 		return self
-	def NOT_EXISTS(self, **kwargs):
-		self.filter_.NOT_EXISTS(**kwargs)
+	def not_exists(self, **kwargs):
+		self.filter_.not_exists(**kwargs)
 		return self
-	def IN(self, **kwargs):
-		self.filter_.IN(**kwargs)
+	def in_(self, **kwargs):
+		self.filter_.in_(**kwargs)
 		return self
-	def NOT_IN(self, **kwargs):
-		self.filter_.NOT_IN(**kwargs)
+	def not_in(self, **kwargs):
+		self.filter_.not_in(**kwargs)
 		return self
-	def LIKE(self, **kwargs):
-		self.filter_.LIKE(**kwargs)
+	def like(self, **kwargs):
+		self.filter_.like(**kwargs)
 		return self
-	def NULL(self, **kwargs):
-		self.filter_.NULL(**kwargs)
+	def is_null(self, **kwargs):
+		self.filter_.is_null(**kwargs)
 		return self
-	def NOT_NULL(self, **kwargs):
-		self.filter_.NOT_NULL(**kwargs)
+	def is_not_null(self, **kwargs):
+		self.filter_.is_not_null(**kwargs)
 		return self
-	def BETWEEN(self, **kwargs):
-		self.filter_.BETWEEN(**kwargs)
+	def between(self, **kwargs):
+		self.filter_.between(**kwargs)
 		return self	
 	def gt(self, **kwargs):
 		self.filter_.gt(**kwargs)
