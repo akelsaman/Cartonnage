@@ -445,7 +445,7 @@ class Database:
 		quoteChar = '' #cls.escapeChar()
 		for key, join in record.joins__.items():
 			#" INNER JOIN Persons pp ON "
-			joiners.joinClause = f"{join.type}{join.object.table__()} {join.object.alias.value()} ON {join.predicates.value}"
+			joiners.joinClause += f"{join.type}{join.object.table__()} {join.object.alias.value()} ON {join.predicates.value}"
 			#--------------------
 			statement = join.object.getMode(mode).where(join.object)
 			if(statement): joiners.preparedStatement += f" AND {statement}"
