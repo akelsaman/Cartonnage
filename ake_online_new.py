@@ -318,55 +318,55 @@ class Filter:
 	#--------------------------------------#
 	def in_subquery(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None).in_subquery(value))
+			self.filter(Field(self.parent.__class__, field, None).in_subquery(value))
 		return self
 	def exists(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field.exists(value))
+			self.filter(Field.exists(value))
 		return self
 	def not_exists(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field.not_exists(value))
+			self.filter(Field.not_exists(value))
 		return self
 	def in_(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None).in_(value))
+			self.filter(Field(self.parent.__class__, field, None).in_(value))
 		return self
 	def not_in(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None).not_in(value))
+			self.filter(Field(self.parent.__class__, field, None).not_in(value))
 		return self
 	def like(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None).like(value))
+			self.filter(Field(self.parent.__class__, field, None).like(value))
 		return self
 	def is_null(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None).is_null())
+			self.filter(Field(self.parent.__class__, field, None).is_null())
 		return self
 	def is_not_null(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None).is_not_null())
+			self.filter(Field(self.parent.__class__, field, None).is_not_null())
 		return self
 	def between(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None).between(value[0], value[1]))
+			self.filter(Field(self.parent.__class__, field, None).between(value[0], value[1]))
 		return self
 	def gt(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None) > value)
+			self.filter(Field(self.parent.__class__, field, None) > value)
 		return self
 	def ge(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None) >= value)
+			self.filter(Field(self.parent.__class__, field, None) >= value)
 		return self
 	def lt(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None) < value)
+			self.filter(Field(self.parent.__class__, field, None) < value)
 		return self
 	def le(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(_=Field(self.parent.__class__, field, None) <= value)
+			self.filter(Field(self.parent.__class__, field, None) <= value)
 		return self
 	#--------------------------------------#
 #================================================================================#
