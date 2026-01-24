@@ -417,6 +417,7 @@ class Database:
 		self.__placeholder	= '?'
 		self.__escapeChar	= '`'
 		self.operationsCount = 0
+		self.batchSize = 10000
 		# self.connect()
 	#--------------------------------------#
 	def placeholder(self): return self.__placeholder
@@ -533,7 +534,7 @@ class Database:
 				parent = query.parent
 				parent.recordset = Recordset()
 				while True:
-					fetchedRows = [dict(zip(columns, row)) for row in self.__cursor.fetchmany(10000)]
+					fetchedRows = [dict(zip(columns, row)) for row in self.__cursor.fetchmany(self.batchSize)]
 					query.result.rows = fetchedRows
 					count += len(fetchedRows)
 					self.orm.map(parent)
@@ -577,8 +578,9 @@ class Database:
 		joinsCriteria = joiners.preparedStatement
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.read):
+			group_clause = f"GROUP BY {group_by}" if group_by else ''
 			order_clause = f"ORDER BY {order_by}" if order_by else ''
-			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_by} {order_clause} {limit}"
+			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_clause} {order_clause} {limit}"
 		#-----
 		elif(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
