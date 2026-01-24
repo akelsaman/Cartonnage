@@ -905,7 +905,8 @@ class Record(metaclass=RecordMeta):
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
 	def insert(self): self.database__.insert(record=self, mode='values')
-	def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(Database.read, record=self, mode='values', selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	# def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(Database.read, record=self, mode='values', selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	def read(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.read(selected, group_by, order_by, limit, **kwargs)
 	def update(self): self.database__.update(Database.update, record=self, mode='values')
 	def delete(self): self.database__.delete(Database.delete, record=self, mode='values')
 	def all(self): self.database__.all(record=self, mode='values')
