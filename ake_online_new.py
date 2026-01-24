@@ -316,9 +316,9 @@ class Filter:
 		# print(">>>>>>>>>>>>>>>>>>>>", parameters + self.__parameters)
 		return parameters + self.__parameters
 	#--------------------------------------#
-	def in_subquery(self, **kwargs):
+	def in_subquery(self, selected="*", **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None).in_subquery(value))
+			self.filter(Field(self.parent.__class__, field, None).in_subquery(value, selected=selected))
 		return self
 	def exists(self, **kwargs):
 		for field, value in kwargs.items():
@@ -613,7 +613,7 @@ class Database:
 		where = record.values.where(record)
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
-			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
+			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
 			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
 		elif(operation==Database.update):
@@ -721,6 +721,7 @@ class MicrosoftSQL(Database):
 		Database.__init__(self)
 		self._Database__connection = connection
 		self.cursor()
+		self._Database__cursor.fast_executemany = True
 		
 	@staticmethod
 	def limit(offset=0, recordsCount=1):
@@ -950,21 +951,13 @@ class Recordset:
 	def commit(self):
 		if(self.firstRecord()):  self.firstRecord().database__.commit()
 	#--------------------------------------#
-	def toList(self):
+	def toLists(self):
 		data = []
 		for record in self.iterate():
 			data.append(record.toList())
 		return data
 	#--------------------------------------#
-	def toDict(self):
-		data = {}
-		id = 0
-		for record in self.iterate():
-			data[id] = record.toDict()
-			id += 1
-		return data
-	#--------------------------------------#
-	def toListOfDict(self):
+	def toDicts(self):
 		return self.data
 	#--------------------------------------#
 #================================================================================#
