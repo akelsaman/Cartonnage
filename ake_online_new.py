@@ -669,6 +669,7 @@ class Database:
 class SQLite(Database):
 	def __init__(self, connection):
 		Database.__init__(self)
+		self.name = "SQLite3"
 		self._Database__connection = connection
 		self.cursor()
 		
@@ -679,6 +680,7 @@ class SQLite(Database):
 class Oracle(Database):
 	def __init__(self, connection):
 		Database.__init__(self)
+		self.name = "Oracle"
 		self._Database__connection = connection
 		self.cursor()
 		self._Database__placeholder = ':1' #1 #start of numeric
@@ -691,6 +693,7 @@ class Oracle(Database):
 class MySQL(Database):
 	def __init__(self, connection):
 		Database.__init__(self)
+		self.name = "MySQL"
 		self._Database__connection = connection
 		self._Database__placeholder = '%s'  # MySQL uses %s, not ?
 		self.cursor()
@@ -708,6 +711,7 @@ class MySQL(Database):
 class Postgres(Database):
 	def __init__(self, connection):
 		Database.__init__(self)
+		self.name = "Postgres"
 		self._Database__connection = connection
 		self._Database__placeholder = '%s'  # MySQL uses %s, not ?
 		self.cursor()
@@ -719,6 +723,7 @@ class Postgres(Database):
 class MicrosoftSQL(Database):
 	def __init__(self, connection):
 		Database.__init__(self)
+		self.name = "MicrosoftAzureSQL"
 		self._Database__connection = connection
 		self.cursor()
 		self._Database__cursor.fast_executemany = True
