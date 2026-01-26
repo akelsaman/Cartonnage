@@ -1,6 +1,6 @@
 #!/usr/bin/python3
-from cartonnage import *
-# from ake_cartonnage import *
+# from cartonnage import *
+from ake_cartonnage import *
 
 from decimal import Decimal
 from datetime import date
@@ -53,6 +53,97 @@ class DependentsAlias(Dependents): pass
 class Managers(Employees): pass
 
 employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
+
+### SQLite
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (?, ?, ?)
+# ON CONFLICT (employee_id)
+# DO UPDATE SET 
+#     first_name = EXCLUDED.first_name,
+#     salary = EXCLUDED.salary
+# """
+
+### Oracle
+# raw_sql = """
+# MERGE INTO Employees t
+# USING (SELECT :1 AS employee_id,:1 AS first_name, :1 AS salary FROM dual) s
+# ON (t.employee_id = s.employee_id)
+# WHEN MATCHED THEN
+#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+# WHEN NOT MATCHED THEN
+#     INSERT (employee_id, first_name, salary) VALUES (:1, :1, :1)
+# """
+
+### oracle ai23+
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (:1, :2, :3)
+# ON CONFLICT (employee_id)
+# DO UPDATE SET 
+#     first_name = :2,
+#     salary = :3
+# """
+
+### MySQL
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (%s, %s, %s)
+# ON DUPLICATE KEY UPDATE
+#     first_name = VALUES(first_name),
+#     salary = VALUES(salary)
+# """
+
+### Or with MySQL 8.0.19+ alias syntax:
+
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (%s, %s, %s) AS new
+# ON DUPLICATE KEY UPDATE
+#     first_name = new.first_name,
+#     salary = new.salary
+# """
+
+### Postgres
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (%s, %s, %s)
+# ON CONFLICT (employee_id)
+# DO UPDATE SET 
+#     first_name = EXCLUDED.first_name,
+#     salary = EXCLUDED.salary
+# """
+
+### MSSQL
+# raw_sql = """
+# MERGE INTO Employees AS t
+# USING (SELECT ? AS employee_id, ? AS first_name, ? AS salary) AS s
+# ON (t.employee_id = s.employee_id)
+# WHEN MATCHED THEN
+#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+# WHEN NOT MATCHED THEN
+#     INSERT (employee_id, first_name, salary) VALUES (s.employee_id, s.first_name, s.salary);
+# """
+
+
+
+# rec = Record(statement=raw_sql, parameters=(100, 'Ahmed', 4000))
+
+emp = Employees()
+emp.set.new = {}
+emp.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
+emp.upsert(onColumns='employee_id')
+
+emp = Employees()
+emp.employee_id = 100
+emp.read()
+
+### SQLite3
+assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+### Oracle
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+### MySQL | Postgres | Microsoft AzureSQL
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
 #==============================================================================#
 print("---------------------------------------00---------------------------------------")
 #==============================================================================#

@@ -392,6 +392,7 @@ class Database:
 	read			= 2
 	update			= 4
 	delete			= 5
+	upsert			= 6
 	#--------------------------------------#
 	def __init__(self, database=None, username=None, password=None, host=None):
 		self.__database		= database
@@ -446,10 +447,10 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			# print(f"<s|{'-'*3}")
-			# print(" > Execute statement: ", query.statement)
-			# print(" > Execute parameters: ", query.parameters)
-			# print(f"{'-'*3}|e>")
+			print(f"<s|{'-'*3}")
+			print(" > Execute statement: ", query.statement)
+			print(" > Execute parameters: ", query.parameters)
+			print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -457,13 +458,14 @@ class Database:
 			count=0
 			columns = []
 
+			parent = query.parent
+			parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
+
 			if(query.operation in [Database.all, Database.read]):
 				# for index, column in enumerate(self.__cursor.description): columns.append(column[0].lower())
 				columns = [column[0].lower() for column in self.__cursor.description] #lower() to low column names
 				query.result.columns = columns
 				
-				parent = query.parent
-				parent.recordset = Recordset()
 				while True:
 					fetchedRows = [dict(zip(columns, row)) for row in self.__cursor.fetchmany(self.batchSize)]
 					query.result.rows = fetchedRows
@@ -575,6 +577,8 @@ class Database:
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
+	def upsert(self, record, onColumns, mode):
+		self.executeStatement(self._upsert(operation=Database.upsert, record=record, onColumns=onColumns))
 	#--------------------------------------#
 	def insertMany(self, record): self.executeMany(self.crudMany(operation=Database.insert, record=record))
 	def deleteMany(self, record, onColumns): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns))
@@ -584,6 +588,9 @@ class Database:
 			for field, value in r.set.new.items():
 				r.setField(field, value)
 				r.set.empty()
+	# def upsertMany(self, record, onColumns, mode):
+	# 	self.executeMany(self.__upsert(operation=Database.upsert, record=record, onColumns=onColumns, mode=mode))
+
 	#--------------------------------------#
 	def paginate(self, pageNumber=1, recordsCount=1):
 		try:
@@ -609,6 +616,34 @@ class SQLite(Database):
 	@staticmethod
 	def limit(offset=0, recordsCount=1):
 		return f"LIMIT {offset}, {recordsCount}"
+	
+	def _upsert(self, operation, record, onColumns):
+		keys = list(record.set.new.keys())
+		fields = ', '.join(keys)
+		updateSet = ', '.join(map(lambda k: f"{k} = EXCLUDED.{k}", keys))
+		values = ', '.join('?' for _ in keys)
+		sql = f"""
+		INSERT INTO {record.table__()} ({fields})
+		VALUES ({values})
+		ON CONFLICT ({onColumns})
+		DO UPDATE SET {updateSet}
+		"""
+		record.query__ = Query
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.parameters = list(record.set.new.values())
+		record.query__.operation = operation
+		return record.query__
+
+	### SQLite
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (?, ?, ?)
+	# ON CONFLICT (employee_id)
+	# DO UPDATE SET 
+	#     first_name = EXCLUDED.first_name,
+	#     salary = EXCLUDED.salary
+	# """
 #================================================================================#
 class Oracle(Database):
 	def __init__(self, connection):
@@ -622,6 +657,27 @@ class Oracle(Database):
 	@staticmethod
 	def limit(offset=0, recordsCount=1):
 		return f"OFFSET {offset} ROWS FETCH NEXT {recordsCount} ROWS ONLY"
+
+	### Oracle
+	# raw_sql = """
+	# MERGE INTO Employees t
+	# USING (SELECT :1 AS employee_id,:1 AS first_name, :1 AS salary FROM dual) s
+	# ON (t.employee_id = s.employee_id)
+	# WHEN MATCHED THEN
+	#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+	# WHEN NOT MATCHED THEN
+	#     INSERT (employee_id, first_name, salary) VALUES (:1, :1, :1)
+	# """
+
+	### oracle ai23+
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (:1, :2, :3)
+	# ON CONFLICT (employee_id)
+	# DO UPDATE SET 
+	#     first_name = :2,
+	#     salary = :3
+	# """
 #================================================================================#
 class MySQL(Database):
 	def __init__(self, connection):
@@ -640,6 +696,25 @@ class MySQL(Database):
 	@staticmethod
 	def limit(offset=0, recordsCount=1):
 		return f"LIMIT {offset}, {recordsCount}" # f"LIMIT {recordsCount} OFFSET {offset}"
+
+	### MySQL
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (%s, %s, %s)
+	# ON DUPLICATE KEY UPDATE
+	#     first_name = VALUES(first_name),
+	#     salary = VALUES(salary)
+	# """
+
+	### Or with MySQL 8.0.19+ alias syntax:
+
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (%s, %s, %s) AS new
+	# ON DUPLICATE KEY UPDATE
+	#     first_name = new.first_name,
+	#     salary = new.salary
+	# """
 #================================================================================#
 class Postgres(Database):
 	def __init__(self, connection):
@@ -652,6 +727,16 @@ class Postgres(Database):
 	@staticmethod
 	def limit(offset=0, recordsCount=1):
 		return f"LIMIT {recordsCount} OFFSET {offset}"
+
+	### Postgres
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (%s, %s, %s)
+	# ON CONFLICT (employee_id)
+	# DO UPDATE SET 
+	#     first_name = EXCLUDED.first_name,
+	#     salary = EXCLUDED.salary
+	# """
 #================================================================================#
 class MicrosoftSQL(Database):
 	def __init__(self, connection):
@@ -664,6 +749,17 @@ class MicrosoftSQL(Database):
 	@staticmethod
 	def limit(offset=0, recordsCount=1):
 		return f"OFFSET {offset} ROWS FETCH NEXT {recordsCount} ROWS ONLY"
+
+	### MSSQL
+	# raw_sql = """
+	# MERGE INTO Employees AS t
+	# USING (SELECT ? AS employee_id, ? AS first_name, ? AS salary) AS s
+	# ON (t.employee_id = s.employee_id)
+	# WHEN MATCHED THEN
+	#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+	# WHEN NOT MATCHED THEN
+	#     INSERT (employee_id, first_name, salary) VALUES (s.employee_id, s.first_name, s.salary);
+	# """
 #================================================================================#
 class RecordMeta(type):
 	def __getattr__(cls, field):
@@ -679,7 +775,6 @@ class Record(metaclass=RecordMeta):
 		self.values = Database.values
 		self.set = Set(self)
 		self.filter_ = Filter(self)
-		# self.recordset = Recordset()
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.joins__ = {}
 		self.data = {}
@@ -834,6 +929,7 @@ class Record(metaclass=RecordMeta):
 	def update(self): self.database__.update(Database.update, record=self, mode='values')
 	def delete(self): self.database__.delete(Database.delete, record=self, mode='values')
 	def all(self): self.database__.all(record=self, mode='values')
+	def upsert(self, onColumns): self.database__.upsert(record=self, onColumns=onColumns, mode='values')
 	def commit(self): self.database__.commit()
 	#--------------------------------------#
 	def join(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields)
