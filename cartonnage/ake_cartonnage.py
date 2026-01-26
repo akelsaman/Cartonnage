@@ -75,24 +75,24 @@ class Field:
 	# Subquery methods - take a Record instance and generate SQL
 	def in_subquery(self, record, selected="*"):
 		"""field IN (SELECT ... FROM ...)"""
-		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		query = Database.crud(operation=Database.read, record=record, selected=selected, group_by='', limit='')
 		return Expression(f"{self._field_name()} IN (\n{query.statement}\n)", query.parameters)
 
 	def not_in_subquery(self, record, selected="*"):
 		"""field NOT IN (SELECT ... FROM ...)"""
-		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		query = Database.crud(operation=Database.read, record=record, selected=selected, group_by='', limit='')
 		return Expression(f"{self._field_name()} NOT IN (\n{query.statement}\n)", query.parameters)
 
 	@staticmethod
 	def exists(record, selected="1"):
 		"""EXISTS (SELECT ... FROM ... WHERE ...)"""
-		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		query = Database.crud(operation=Database.read, record=record, selected=selected, group_by='', limit='')
 		return Expression(f"EXISTS (\n{query.statement}\n)", query.parameters)
 
 	@staticmethod
 	def not_exists(record, selected="1"):
 		"""NOT EXISTS (SELECT ... FROM ... WHERE ...)"""
-		query = Database.crud(operation=Database.read, record=record, mode='filter_', selected=selected, group_by='', limit='')
+		query = Database.crud(operation=Database.read, record=record, selected=selected, group_by='', limit='')
 		return Expression(f"NOT EXISTS (\n{query.statement}\n)", query.parameters)
 #================================================================================#
 class Dummy:
@@ -233,9 +233,9 @@ class Filter:
 		self.__where = ''
 		self.__parameters = []
 	
-	def read(self, selected="*", group_by='', order_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, mode='filter_', selected=selected, group_by=group_by, order_by=order_by, limit=limit)
-	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent, mode='filter_')
-	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent, mode='filter_')
+	def read(self, selected="*", group_by='', order_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent)
+	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent)
 
 	def fltr(self, field, placeholder): return self.where__()
 	def parametersAppend(self, parameters): parameters.extend(self.parameters__())
@@ -286,21 +286,23 @@ class Filter:
 	def where(self, record=None):
 		#because this is where so any NULL | NOT_NULL values will be evaluated to "IS NULL" | "IS NOT NULL"
 		where = ''
-		where = self.parent.values.where(self.parent)
-		where = f"{where} AND " if (where) else ""
+		# where = self.parent.values.where(self.parent)
+		# where = f"{where} AND " if (where) else ""
 		# Return combined where without modifying self.__where
-		combined_where = where + self.__where
+		# combined_where = where + self.__where
 		# print(">>>>>>>>>>>>>>>>>>>>", combined_where)
-		return combined_where[:-5]
+		# return combined_where[:-5]
+		return self.__where[:-5]
 	
 	#This 'Filter.parameters' function follow the same signature/interface of 'Values.parameters' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
 	def parameters(self, record=None):
-		parameters = []
-		parameters = self.parent.values.parameters(self.parent)
+		# parameters = []
+		# parameters = self.parent.values.parameters(self.parent)
 		# Return combined parameters without modifying self.__parameters
 		# print(">>>>>>>>>>>>>>>>>>>>", parameters + self.__parameters)
-		return parameters + self.__parameters
+		# return parameters + self.__parameters
+		return self.__parameters
 	#--------------------------------------#
 	def in_subquery(self, selected="*", **kwargs):
 		for field, value in kwargs.items():
@@ -428,18 +430,27 @@ class Database:
 		self.operationsCount = 0
 		return operationsCount
 	#--------------------------------------#
-	def joining(record, mode):
+	def joining(record):
 		joiners = Joiners()
 		quoteChar = '' #cls.escapeChar()
 		for key, join in record.joins__.items():
 			#" INNER JOIN Persons pp ON "
 			joiners.joinClause += f"{join.type}{join.object.table__()} {join.object.alias.value()} ON {join.predicates.value}"
 			#--------------------
-			statement = join.object.getMode(mode).where(join.object)
+			# Include both values (exact field matches) and filter conditions from joined object
+			valuesStatement = join.object.values.where(join.object)
+			filterStatement = join.object.filter_.where(join.object)
+			if valuesStatement and filterStatement:
+				statement = f"{valuesStatement} AND {filterStatement}"
+			elif valuesStatement:
+				statement = valuesStatement
+			else:
+				statement = filterStatement
 			if(statement): joiners.preparedStatement += f" AND {statement}"
-			joiners.parameters.extend(join.object.getMode(mode).parameters(join.object))
+			joiners.parameters.extend(join.object.values.parameters(join.object))
+			joiners.parameters.extend(join.object.filter_.parameters(join.object))
 			#--------------------
-			child_joiners = Database.joining(join.object, mode)
+			child_joiners = Database.joining(join.object)
 			joiners.joinClause += child_joiners.joinClause
 			joiners.preparedStatement += child_joiners.preparedStatement
 			joiners.parameters.extend(child_joiners.parameters)
@@ -447,10 +458,10 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			print(f"<s|{'-'*3}")
-			print(" > Execute statement: ", query.statement)
-			print(" > Execute parameters: ", query.parameters)
-			print(f"{'-'*3}|e>")
+			# print(f"<s|{'-'*3}")
+			# print(" > Execute statement: ", query.statement)
+			# print(" > Execute parameters: ", query.parameters)
+			# print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -504,11 +515,18 @@ class Database:
 		return self.__cursor.executescript(sql)
 	#--------------------------------------#
 	@staticmethod
-	def crud(operation, record, mode, selected="*", group_by='', order_by='', limit=''):
+	def crud(operation, record, selected="*", group_by='', order_by='', limit=''):
 		current = []
-		where = record.getMode(mode).where(record)
-		parameters = record.getMode(mode).parameters(record)
-		joiners = Database.joining(record, mode)
+		whereValues = record.values.where(record)
+		whereFilter = record.filter_.where(record)
+		if whereValues and whereFilter:
+			where = f"{whereValues} AND {whereFilter}"
+		elif whereValues:
+			where = whereValues
+		else:
+			where = whereFilter
+
+		joiners = Database.joining(record)
 		joinsCriteria = joiners.preparedStatement
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.read):
@@ -521,9 +539,7 @@ class Database:
 			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
 		elif(operation==Database.update):
-			current = parameters
 			setFields = record.set.setFields()
-			parameters = record.set.parameters()
 			statement = f"UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
@@ -535,18 +551,26 @@ class Database:
 		record.query__ = Query()
 		record.query__.parent = record
 		record.query__.statement = statement
-		record.query__.parameters = parameters
-		record.query__.parameters.extend(current) #state.parameters must be reset to empty list [] not None for this operation to work correctly
+		record.query__.parameters = []
+		record.query__.parameters.extend(record.set.parameters()) # if update extend with fields set values first
+		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters(record)) #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.parameters.extend(joiners.parameters)
 		record.query__.operation = operation
 		return record.query__
 	#--------------------------------------#
 	def crudMany(self, operation, record, selected="*", onColumns=None, group_by='', limit=''):
-		joiners = Database.joining(record, 'values')
+		joiners = Database.joining(record)
 		joinsCriteria = joiners.preparedStatement
 		#
 		fieldsNames = onColumns if onColumns else list(record.values.fields(record))
-		where = record.values.where(record, fieldsNames)
+		whereValues = record.values.where(record, fieldsNames)
+		whereFilter = record.filter_.where(record)
+		if whereValues and whereFilter:
+			where = f"{whereValues} AND {whereFilter}"
+		elif whereValues:
+			where = whereValues
+		else:
+			where = whereFilter
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
@@ -562,22 +586,27 @@ class Database:
 		record.query__ = Query() # as 
 		record.query__.parent = record
 		record.query__.statement = statement
+		filterParamters = record.filter_.parameters(record)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() + r.values.parameters(r, fieldsNames=fieldsNames) #no problem withr.set.parameters() as it's emptied after sucessful update
+			#no problem with r.set.parameters() as it's emptied after sucessful update
+			params = []
+			params.extend(r.set.parameters())
+			params.extend(r.values.parameters(r, fieldsNames=fieldsNames) )
+			params.extend(filterParamters)
 			record.query__.parameters.append(tuple(params))
 		record.query__.operation = operation
 		return record.query__
 	#--------------------------------------#
-	def all(self, record, mode): self.executeStatement(self.crud(operation=Database.all, record=record, mode=mode))
-	def insert(self, record, mode): self.executeStatement(self.crud(operation=Database.insert, record=record, mode=mode))
-	def read(self, operation, record, mode, selected="*", group_by='', order_by='', limit=''): self.executeStatement(self.crud(operation=operation, record=record, mode=mode, selected=selected, group_by=group_by, order_by=order_by, limit=limit))
-	def delete(self, operation, record, mode): self.executeStatement(self.crud(operation=operation, record=record, mode=mode))
-	def update(self, operation, record, mode):
-		self.executeStatement(self.crud(operation=operation, record=record, mode=mode))
+	def all(self, record): self.executeStatement(self.crud(operation=Database.all, record=record))
+	def insert(self, record): self.executeStatement(self.crud(operation=Database.insert, record=record))
+	def read(self, operation, record, selected="*", group_by='', order_by='', limit=''): self.executeStatement(self.crud(operation=operation, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit))
+	def delete(self, operation, record): self.executeStatement(self.crud(operation=operation, record=record))
+	def update(self, operation, record):
+		self.executeStatement(self.crud(operation=operation, record=record))
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
-	def upsert(self, record, onColumns, mode):
+	def upsert(self, record, onColumns):
 		self.executeStatement(self._upsert(operation=Database.upsert, record=record, onColumns=onColumns))
 		for field, value in record.set.new.items():
 			record.setField(field, value)
@@ -639,7 +668,7 @@ class SQLite(Database):
 		record.query__.operation = operation
 		return record
 
-	def _upsert(self, operation, record, onColumns):		
+	def _upsert(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		record.query__.parameters = list(record.set.new.values())
 		return record.query__
@@ -866,8 +895,6 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def rowsCount(self): return self.query__.result.count
 	#--------------------------------------#
-	def getMode(self, mode): return self.__dict__[mode]
-	#--------------------------------------#
 	# def getField(self, fieldName): return self.__dict__[fieldName] #get field without invoke __getattr__
 	# def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue #set field without invoke __setattr__
 	def getField(self, fieldName): return self.data[fieldName] #get field without invoke __getattr__
@@ -939,13 +966,13 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
-	def insert(self): self.database__.insert(record=self, mode='values')
-	# def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(Database.read, record=self, mode='values', selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	def insert(self): self.database__.insert(record=self)
+	# def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(Database.read, record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
 	def read(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.read(selected, group_by, order_by, limit, **kwargs)
-	def update(self): self.database__.update(Database.update, record=self, mode='values')
-	def delete(self): self.database__.delete(Database.delete, record=self, mode='values')
-	def all(self): self.database__.all(record=self, mode='values')
-	def upsert(self, onColumns): self.database__.upsert(record=self, onColumns=onColumns, mode='values')
+	def update(self): self.database__.update(Database.update, record=self)
+	def delete(self): self.database__.delete(Database.delete, record=self)
+	def all(self): self.database__.all(record=self)
+	def upsert(self, onColumns): self.database__.upsert(record=self, onColumns=onColumns)
 	def commit(self): self.database__.commit()
 	#--------------------------------------#
 	def join(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields)

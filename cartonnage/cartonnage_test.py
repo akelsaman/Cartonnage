@@ -542,7 +542,6 @@ assert jobs.recordset.toLists() == [[1, 'Public Accountant', 4200, 9000], [6, 'A
 assert jobs.recordset.toDicts() == [{'job_id': 1, 'job_title': 'Public Accountant', 'min_salary': 4200, 'max_salary': 9000}, {'job_id': 6, 'job_title': 'Accountant', 'min_salary': 4200, 'max_salary': 9000}]
 print("----------02A----------")
 # iterate over recordset and update records one by one: (not recommended if you can update with one predicate)
-jobs.filter(Jobs.min_salary > 1000)
 for job in jobs:
 	job.set.min_salary = 5000
 jobs.recordset.update()
@@ -553,7 +552,7 @@ jobs.recordset.update()
 
 jobs = Jobs()
 jobs.filter(Jobs.job_title.like('%Accountant%')).read()
-assert jobs.recordset.toLists() == [[1, 'Public Accountant', 5000, 9000], [6, 'Accountant', 5000, 9000]] # confirm recordset update
+assert jobs.recordset.toLists() == [[1, 'Public Accountant', 5000, 9000], [6, 'Accountant', 5000, 9000]], jobs.recordset.toLists() # confirm recordset update
 print("----------02B----------")
 jobs.recordset.delete()
 
@@ -598,6 +597,7 @@ else:
 
 e1.set.manager_id = 77
 e2.set.manager_id = 88
+e1.filter(Employees.employee_id > 4) # add general condition to all records of the recordset
 
 # Recordset update:
 recordset.update()
@@ -612,6 +612,7 @@ else:
 	assert recordset.rowsCount == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
 
 # Recordset delete:
+e1.filter(Employees.manager_id < 100) # add general condition to all records of the recordset
 recordset.delete()
 
 if e1.database__.name == "MicrosoftAzureSQL":
