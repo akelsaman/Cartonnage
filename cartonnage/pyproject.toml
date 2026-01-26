@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cartonnage"
+version = "0.1.2"
+description = "A lightweight Python ORM supporting SQLite, MySQL, PostgreSQL, Oracle, and Microsoft SQL Server"
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+requires-python = ">=3.8"
+authors = [
+    { name = "Ahmed Kamal ELSamman", email = "ak.elsaman@gmail.com" }
+]
+keywords = ["orm", "database", "sqlite", "mysql", "postgresql", "oracle", "sql"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Database",
+]
+
+[project.optional-dependencies]
+mysql = ["mysql-connector-python"]
+postgres = ["psycopg2-binary"]
+oracle = ["oracledb"]
+mssql = ["pyodbc"]
+all = ["mysql-connector-python", "psycopg2-binary", "oracledb", "pyodbc"]
+
+[project.urls]
+Homepage = "https://cartonnage-orm.com"
+Repository = "https://github.com/akelsaman/Cartonnage"
+
+[tool.setuptools]
+py-modules = ["cartonnage"]

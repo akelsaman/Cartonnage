@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from cartonnage import *
+# from ake_cartonnage import *
 
 from decimal import Decimal
 from datetime import date
@@ -9,7 +10,7 @@ start = time.time()
 
 
 #================================================================================#
-from cartonnage_connections import *
+from ake_connections import *
 initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
@@ -414,11 +415,21 @@ for job in jobs:
 	job.set.min_salary = 5000
 jobs.recordset.update()
 
+### it works because no field in any record of the recordset's records is set to Null.
+### but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter.
+# jobs.recordset.update(onColumns=['job_id'])
+
 jobs = Jobs()
 jobs.filter(Jobs.job_title.like('%Accountant%')).read()
 assert jobs.recordset.toLists() == [[1, 'Public Accountant', 5000, 9000], [6, 'Accountant', 5000, 9000]] # confirm recordset update
 print("----------02B----------")
 jobs.recordset.delete()
+
+### it works because no field in any record of the recordset's records is set to Null.
+### but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter.
+# jobs.recordset.delete(onColumns=['job_id'])
+
+print("----------02C----------")
 jobs = Jobs()
 jobs.filter(Jobs.job_title.like('%Accountant%')).read()
 
@@ -718,7 +729,7 @@ print("---------------------------------------Expression Tests Complete---------
 Record.database__.rollback() # Record.database__.commit()
 Record.database__.close()
 print("---------------------------------------ALL FEATURES TESTED---------------------------------------")
-print(f"Operations Count: {Record.database__.operationsCount}")
+print(f"{Record.database__.name} Operations Count: {Record.database__.operationsCount}")
 # assert Record.database__.operationsCount == 13
 
 end = time.time()

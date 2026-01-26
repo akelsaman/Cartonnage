@@ -1,18 +1,10 @@
 #!/usr/bin/python
 
-#version: 202601192302
-
-# free Record from all other instances
-# batch size
+#version: 202601250248
 #================================================================================#
 from datetime import datetime
-from string import Template #used for secure id
-import re #used for secure id
 #================================================================================#
 NoneType = type(None)
-#================================================================================#
-def createTableClass(tableName, base=(object, ), attributesDictionary={}):
-	return type(str(tableName), base, attributesDictionary) #str() to prevent any error from missed type casting/conversion
 #================================================================================#
 class Field:
 	def __init__(self, cls, name, value):
@@ -119,9 +111,6 @@ class SpecialValue:
 #--------------------------------------#
 class TableName(SpecialValue): pass
 class Alias(SpecialValue): pass
-class UserID(SpecialValue):
-	def __init__(self, value=None):
-		self.user_id = value
 #--------------------------------------#
 class Expression():
 	def __init__(self, value, parameters=None):
@@ -217,10 +206,11 @@ class Values:
 		return fields
 	#--------------------------------------#
 	@staticmethod
-	def where(record):
+	def where(record, fieldsNames=None):
 		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, datetime, bool] values.
 		statement = ''
-		fields = Values.fields(record)
+		# fields = Values.fields(record)
+		fields = fieldsNames if (fieldsNames) else Values.fields(record)
 		for field in fields:
 			value = record.getField(field)
 			placeholder = record.database__.placeholder()
@@ -231,11 +221,7 @@ class Values:
 	def parameters(record, fieldsNames=None):
 		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, datetime, bool] values.
 		fields = fieldsNames if (fieldsNames) else Values.fields(record)
-		parameters = []
-		for field in fields:
-			value = record.getField(field)
-			parameters.append(value)
-		return parameters
+		return list(map(record.getField, fields))
 	#--------------------------------------#
 #================================================================================#
 class Filter:
@@ -458,67 +444,12 @@ class Database:
 			joiners.parameters.extend(child_joiners.parameters)
 		return joiners
 	#--------------------------------------#
-	@staticmethod
-	def secure(record):
-		__db__ = record.database__
-		queryStatement = record.query__.statement
-
-		#aa = re.search('{([a-zA-Z0-9_]+)}', query, re.IGNORECASE)
-		#if (aa): print(a.groups(1))
-		tablesNames = re.findall(r"\${([a-zA-Z0-9_]+)}", queryStatement)
-
-		tables_names_placeholders = ', '.join('?'*len(tablesNames))
-		
-		loadViews = f"""SELECT V.view, V.table_name, V.crud_statement
-		FROM Policys_Views_Authoritys PVA
-		INNER JOIN Users_Policys UP ON PVA.policy_fk = UP.policy_fk
-		INNER JOIN Views V ON PVA.view_fk = V.pk
-		WHERE UP.user_fk = ?
-			AND V.table_name IN ({tables_names_placeholders})"""
-
-		#https://forums.mysql.com/read.php?100,630131,630158#msg-630158
-		secureViewsStatement = {}
-		if(tables_names_placeholders):
-			
-			class Views(Record): pass
-			views = Views()
-			# views.recordset = Recordset()
-			views.query__ = Query()
-			views.query__.operation = Database.read
-			views.query__.parent = views
-			views.query__.statement = loadViews
-
-			# mysql.connector.errors.InterfaceError
-			# InterfaceError: No result set to fetch from.
-			# No parameters were provided with the prepared statement
-			# "views.query__.parameters" was written by mistake "views.parameters"
-
-			views.query__.parameters = [record.secure__.user_id] + tablesNames
-			__db__.executeStatement(views.query__)
-			# Database.orm.map(views) #orm moved inside executeStatement method
-
-			#print(views.recordset.count())
-			for view in views:
-				#print(view.columns)
-					secureViewsStatement[str(view.table_name)] = f'({str(view.crud_statement)} \n)'
-			for tableName in tablesNames:
-				if(tableName not in secureViewsStatement):
-					secureViewsStatement[tableName] = f"{__db__.escapeChar()}{tableName}{__db__.escapeChar()}"
-
-			#print(secureViewsStatement)
-
-			queryStatementTemplate = Template(queryStatement)
-			secureQuerySatement = queryStatementTemplate.safe_substitute(secureViewsStatement)
-			secureQuerySatement = secureQuerySatement.replace("$|user.pk|", str(record.secure__.user_id))
-			record.query__.statement = secureQuerySatement
-			#return secureQuery
-	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			print(f"<s|{'-'*3}")
-			print(" > Execute statement: ", query.statement)
-			print(" > Execute parameters: ", query.parameters)
-			print(f"{'-'*3}|e>")
+			# print(f"<s|{'-'*3}")
+			# print(" > Execute statement: ", query.statement)
+			# print(" > Execute parameters: ", query.parameters)
+			# print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -553,15 +484,16 @@ class Database:
 			return query
 	#--------------------------------------#
 	def executeMany(self, query):
-		print(f"<s|{'-'*3}")
-		print(" > Execute statement: ", query.statement)
-		print(" > Execute parameters: ", query.parameters)
-		print(f"{'-'*3}|e>")
+		# print(f"<s|{'-'*3}")
+		# print(" > Execute statement: ", query.statement)
+		# print(" > Execute parameters: ", query.parameters)
+		# print(f"{'-'*3}|e>")
 		rowcount = 0
 		if(query.statement):
 			self.__cursor.executemany(query.statement, query.parameters)
 			self.operationsCount +=1
 			rowcount = self.__cursor.rowcount
+			query.parent.recordset.rowsCount = rowcount
 		return rowcount
 	#--------------------------------------#
 	def executeScript(self, sqlScriptFileName):
@@ -604,15 +536,15 @@ class Database:
 		record.query__.parameters = parameters
 		record.query__.parameters.extend(current) #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.parameters.extend(joiners.parameters)
-		if(record.secure__.user_id): Database.secure(record)
 		record.query__.operation = operation
 		return record.query__
 	#--------------------------------------#
-	def __crudMany(self, operation, record, selected="*", group_by='', limit=''):
+	def crudMany(self, operation, record, selected="*", onColumns=None, group_by='', limit=''):
 		joiners = Database.joining(record, 'values')
 		joinsCriteria = joiners.preparedStatement
 		#
-		where = record.values.where(record)
+		fieldsNames = onColumns if onColumns else list(record.values.fields(record))
+		where = record.values.where(record, fieldsNames)
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
@@ -625,15 +557,14 @@ class Database:
 		elif(operation==Database.delete):
 			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
-		fieldsNames = list(record.values.fields(record))
-		query = Query() # as 
-		query.statement = statement
+		record.query__ = Query() # as 
+		record.query__.parent = record
+		record.query__.statement = statement
 		for r in record.recordset.iterate():
 			params = r.set.parameters() + r.values.parameters(r, fieldsNames=fieldsNames) #no problem withr.set.parameters() as it's emptied after sucessful update
-			query.parameters.append(tuple(params))
-		#if(record.secure__.user_id): self.secure(record) #not implemented for many (insert and update)
-		query.operation = operation
-		record.recordset.rowsCount = self.executeMany(query)
+			record.query__.parameters.append(tuple(params))
+		record.query__.operation = operation
+		return record.query__
 	#--------------------------------------#
 	def all(self, record, mode): self.executeStatement(self.crud(operation=Database.all, record=record, mode=mode))
 	def insert(self, record, mode): self.executeStatement(self.crud(operation=Database.insert, record=record, mode=mode))
@@ -645,10 +576,10 @@ class Database:
 			record.setField(field, value)
 			record.set.empty()
 	#--------------------------------------#
-	def insertMany(self, record): self.__crudMany(operation=Database.insert, record=record)
-	def deleteMany(self, record): self.__crudMany(operation=Database.delete, record=record)
-	def updateMany(self, record): 
-		self.__crudMany(operation=Database.update, record=record)
+	def insertMany(self, record): self.executeMany(self.crudMany(operation=Database.insert, record=record))
+	def deleteMany(self, record, onColumns): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns))
+	def updateMany(self, record, onColumns):
+		self.executeMany(self.crudMany(operation=Database.update, record=record, onColumns=onColumns))
 		for r in record.recordset.iterate():
 			for field, value in r.set.new.items():
 				r.setField(field, value)
@@ -744,23 +675,19 @@ class Record(metaclass=RecordMeta):
 	database__	= None
 	tableName__ = TableName()
 	#--------------------------------------#
-	def __init__(self, statement=None, parameters=None, alias=None, secure_by_user_id=None, **kwargs):
+	def __init__(self, statement=None, parameters=None, alias=None, **kwargs):
 		self.values = Database.values
 		self.set = Set(self)
 		self.filter_ = Filter(self)
 		# self.recordset = Recordset()
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.joins__ = {}
-		self.secure__ = UserID(secure_by_user_id)
 		self.data = {}
 		
 		self.setupTableNameAndAlias()
 		# self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
 
-		if(self.secure__.user_id):
-			self.table__ = self.__tableSecure
-		else:
-			self.table__ = self.__table
+		self.table__ = self.__table
 
 		if(kwargs):
 			for key, value in kwargs.items():
@@ -772,7 +699,6 @@ class Record(metaclass=RecordMeta):
 			self.query__.statement = statement
 			if(parameters): self.query__.parameters = parameters #if prepared statement's parameters are passed
 			#self. instead of Record. #change the static field self.__database for inherited children classes
-			if(self.secure__.user_id): self.database__.secure(self)
 			if(str((statement.strip())[:6]).lower()=="select"):
 				self.query__.operation = Database.read
 			if(len(self.query__.parameters) and type(self.query__.parameters[0]) in (list, tuple)):
@@ -817,10 +743,6 @@ class Record(metaclass=RecordMeta):
 	def __table(self):
 		quoteChar = '' #self.database__.escapeChar()
 		return f"{quoteChar}{self.tableName__.value()}{quoteChar}"
-	#--------------------------------------#
-	def __tableSecure(self):
-		quoteChar = '' #self.database__.escapeChar()
-		return f"{quoteChar}${{{self.tableName__.value()}}}{quoteChar}"
 	#--------------------------------------#
 	def __repr__(self):
 		items = list(self.data.items())[:5]  # Show first 5 fields
@@ -952,10 +874,10 @@ class Recordset:
 	#--------------------------------------#
 	def insert(self):
 		if(self.firstRecord()): self.firstRecord().database__.insertMany(self.firstRecord())
-	def update(self):
-		if(self.firstRecord()):  self.firstRecord().database__.updateMany(self.firstRecord())
-	def delete(self):
-		if(self.firstRecord()):  self.firstRecord().database__.deleteMany(self.firstRecord())
+	def update(self, onColumns=None):
+		if(self.firstRecord()):  self.firstRecord().database__.updateMany(self.firstRecord(), onColumns=onColumns)
+	def delete(self, onColumns=None):
+		if(self.firstRecord()):  self.firstRecord().database__.deleteMany(self.firstRecord(), onColumns=onColumns)
 	def commit(self):
 		if(self.firstRecord()):  self.firstRecord().database__.commit()
 	#--------------------------------------#
