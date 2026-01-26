@@ -55,14 +55,15 @@ class Managers(Employees): pass
 employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
 
 ### SQLite
-# raw_sql = """
-# INSERT INTO Employees (employee_id, first_name, salary)
-# VALUES (?, ?, ?)
-# ON CONFLICT (employee_id)
-# DO UPDATE SET 
-#     first_name = EXCLUDED.first_name,
-#     salary = EXCLUDED.salary
-# """
+raw_sql = """
+INSERT INTO Employees (employee_id, first_name, salary)
+VALUES (?, ?, ?)
+ON CONFLICT (employee_id)
+DO UPDATE SET 
+    first_name = EXCLUDED.first_name,
+    salary = EXCLUDED.salary
+	WHERE EXCLUDED.salary > 10000
+"""
 
 ### Oracle
 # raw_sql = """
@@ -70,7 +71,7 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
 # USING (SELECT :1 AS employee_id,:1 AS first_name, :1 AS salary FROM dual) s
 # ON (t.employee_id = s.employee_id)
 # WHEN MATCHED THEN
-#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+#     UPDATE SET t.first_name = s.first_name, s
 # WHEN NOT MATCHED THEN
 #     INSERT (employee_id, first_name, salary) VALUES (:1, :1, :1)
 # """
@@ -125,21 +126,34 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
 #     INSERT (employee_id, first_name, salary) VALUES (s.employee_id, s.first_name, s.salary);
 # """
 
+rec = Record(statement=raw_sql, parameters=(100, 'Ahmed', 4000))
 
+rs = Recordset()
 
-# rec = Record(statement=raw_sql, parameters=(100, 'Ahmed', 4000))
+emp1 = Employees()
+emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
 
-emp = Employees()
-emp.set.new = {}
-emp.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
-emp.upsert(onColumns='employee_id')
+emp2 = Employees()
+emp2.set.new = {'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000}
 
+rs.add(emp1)
+rs.add(emp2)
+
+# emp1.upsert(onColumns='employee_id')
 emp = Employees()
 emp.employee_id = 100
 emp.read()
 
+# rs.upsert(onColumns='employee_id')
+# print(emp1.query__.statement)
+# print(emp1.query__.parameters)
+# emp = Employees()
+# emp.filter(Employees.employee_id.in_([100,101]))
+# emp.read()
+
 ### SQLite3
 assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+# assert emp.recordset.data == {}, emp.recordset.data
 ### Oracle
 # assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
 ### MySQL | Postgres | Microsoft AzureSQL

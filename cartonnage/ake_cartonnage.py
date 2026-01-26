@@ -579,6 +579,9 @@ class Database:
 			record.set.empty()
 	def upsert(self, record, onColumns, mode):
 		self.executeStatement(self._upsert(operation=Database.upsert, record=record, onColumns=onColumns))
+		for field, value in record.set.new.items():
+			record.setField(field, value)
+			record.set.empty()
 	#--------------------------------------#
 	def insertMany(self, record): self.executeMany(self.crudMany(operation=Database.insert, record=record))
 	def deleteMany(self, record, onColumns): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns))
@@ -588,9 +591,11 @@ class Database:
 			for field, value in r.set.new.items():
 				r.setField(field, value)
 				r.set.empty()
-	# def upsertMany(self, record, onColumns, mode):
-	# 	self.executeMany(self.__upsert(operation=Database.upsert, record=record, onColumns=onColumns, mode=mode))
-
+	def upsertMany(self, record, onColumns):
+		self.executeMany(self._upsertMany(operation=Database.upsert, record=record, onColumns=onColumns))
+		for field, value in record.set.new.items():
+			record.setField(field, value)
+			record.set.empty()
 	#--------------------------------------#
 	def paginate(self, pageNumber=1, recordsCount=1):
 		try:
@@ -617,7 +622,7 @@ class SQLite(Database):
 	def limit(offset=0, recordsCount=1):
 		return f"LIMIT {offset}, {recordsCount}"
 	
-	def _upsert(self, operation, record, onColumns):
+	def upsertStatement(self, operation, record, onColumns):
 		keys = list(record.set.new.keys())
 		fields = ', '.join(keys)
 		updateSet = ', '.join(map(lambda k: f"{k} = EXCLUDED.{k}", keys))
@@ -628,11 +633,22 @@ class SQLite(Database):
 		ON CONFLICT ({onColumns})
 		DO UPDATE SET {updateSet}
 		"""
-		record.query__ = Query
+		record.query__ = Query()
 		record.query__.parent = record
 		record.query__.statement = sql
-		record.query__.parameters = list(record.set.new.values())
 		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns):		
+		self.upsertStatement(operation, record, onColumns)
+		record.query__.parameters = list(record.set.new.values())
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns):
+		self.upsertStatement(operation, record, onColumns)
+		for r in record.recordset.iterate():
+			params = r.set.parameters() #no problem withr.set.parameters() as it's emptied after sucessful update
+			record.query__.parameters.append(tuple(params))
 		return record.query__
 
 	### SQLite
@@ -974,6 +990,8 @@ class Recordset:
 		if(self.firstRecord()):  self.firstRecord().database__.updateMany(self.firstRecord(), onColumns=onColumns)
 	def delete(self, onColumns=None):
 		if(self.firstRecord()):  self.firstRecord().database__.deleteMany(self.firstRecord(), onColumns=onColumns)
+	def upsert(self, onColumns=None):
+		if(self.firstRecord()):  self.firstRecord().database__.upsertMany(self.firstRecord(), onColumns=onColumns)
 	def commit(self):
 		if(self.firstRecord()):  self.firstRecord().database__.commit()
 	#--------------------------------------#
