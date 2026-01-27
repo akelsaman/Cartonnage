@@ -656,11 +656,14 @@ class SQLite(Database):
 		fields = ', '.join(keys)
 		updateSet = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
 		values = ', '.join('?' for _ in keys)
+		# Build WHERE clause from filter_ if present
+		whereFilter = record.filter_.where(record)
+		whereClause = f"\n\t\tWHERE {whereFilter}" if whereFilter else ''
 		sql = f"""
 		INSERT INTO {record.table__()} ({fields})
 		VALUES ({values})
 		ON CONFLICT ({onColumns})
-		DO UPDATE SET {updateSet}
+		DO UPDATE SET {updateSet}{whereClause}
 		"""
 		record.query__ = Query()
 		record.query__.parent = record
@@ -671,12 +674,13 @@ class SQLite(Database):
 	def _upsert(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		record.query__.parameters = list(record.set.new.values())
+		record.query__.parameters.extend(record.filter_.parameters(record))
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() #no problem withr.set.parameters() as it's emptied after sucessful update
+			params = r.set.parameters() + record.filter_.parameters(record)
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 

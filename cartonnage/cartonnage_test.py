@@ -142,10 +142,21 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
 # assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
 
 #=====
+class EXCLUDED(Record): pass
+emp = Employees()
+emp.first_name = "Steven"
+
+
 emp1 = Employees()
 emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
-
+emp1.filter(
+	(EXCLUDED.salary < Employees.salary) & 
+	(Employees.last_name.in_subquery(emp, selected='last_name'))
+) # 
 emp1.upsert(onColumns='employee_id')
+
+print(emp1.query__.statement)
+print(emp1.query__.parameters)
 
 emp = Employees()
 emp.employee_id = 100
