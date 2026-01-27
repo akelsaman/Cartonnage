@@ -56,7 +56,65 @@ class EXCLUDED(Record): pass # used for upsert
 class S(Record): pass # used for upsert
 class T(Record): pass # used for upsert
 
-employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
+employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
+#==============================================================================#
+# emp = Employees()
+# emp.recordset = Recordset()
+# emp.filter(
+# 	(Employees.first_name == 'Steven') & 
+# 	(Employees.last_name == 'King')
+# )
+
+# select = emp.select() # select = emp.database__.crud(Database.read, emp)
+# print(f">>>>>>>>>>>>>>>>>>>>> {select.statement}")
+
+# delete = emp.database__.crudMany(Database.delete, emp)
+# select = emp.select()
+# print(f">>>>>>>>>>>>>>>>>>>>> {delete.statement}")
+
+# class P(Employees): pass
+# class C(Employees): pass
+# class Heirarchy(Employees): pass
+# class H(Heirarchy): pass
+# hieirarchy = H()
+
+# p = P()
+# c = C()
+
+# p.filter(P.manager_id.is_null())
+# c.join(hieirarchy, (C.manager_id == Heirarchy.employee_id))
+# c.filter(C.employee_name == 'Neena')
+
+# p_select = p.select(selected='employee_id, manager_id, first_name')
+# c_select = c.select(selected='c.employee_id, c.manager_id, c.first_name')
+
+# print(p_select.statement)
+# print(c_select.statement)
+
+# cte = """
+# WITH RECURSIVE Heirarchy AS (
+# 	SELECT employee_id, manager_id, first_name FROM Employees P
+# 	WHERE P.manager_id IS NULL
+# 	UNION ALL
+# 	SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C  INNER JOIN Heirarchy H ON C.manager_id = H.employee_id
+# 	WHERE 1=1
+# 	UNION ALL
+# 	SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C  INNER JOIN Heirarchy H ON C.manager_id = H.employee_id
+# )
+# SELECT * FROM Heirarchy
+# """
+
+# ee1 = Expression(p_select.statement, p_select.parameters)
+# ee2 = Expression(c_select.statement, c_select.parameters)
+# print(ee2.parameters)
+
+# ee = (ee1 + ee2)
+# print(ee)
+
+# rec = Record(statement=cte, operation=Database.read)
+# # print(f"CTE result: {rec.recordset.data}")
+# for r in rec:
+# 	print(r.data)
 #==============================================================================#
 print("---------------------------------------00---------------------------------------")
 #==============================================================================#
@@ -500,20 +558,20 @@ else:
 print("---------------------------------------06---------------------------------------")
 # #==============================================================================#
 # Execute raw sql statement and get recordset of the returned rows
-records = Record(statement="SELECT * FROM Employees WHERE employee_id IN(100, 101, 102) ")
+records = Record(statement="SELECT * FROM Employees WHERE employee_id IN(100, 101, 102) ", operation=Database.read)
 assert records.recordset.count() == 3
 for record in records:
 	assert record.employee_id in [100, 101, 102]
 
 # Execute parameterized sql statement and get recordset of the returned rows
 placeholder = Record.database__.placeholder()
-records = Record(statement=f"SELECT * FROM Employees WHERE employee_id IN({placeholder}, {placeholder}, {placeholder})", parameters=(100, 101, 102))
+records = Record(statement=f"SELECT * FROM Employees WHERE employee_id IN({placeholder}, {placeholder}, {placeholder})", parameters=(100, 101, 102), operation=Database.read)
 assert records.recordset.count() == 3
 for record in records:
 	assert record.employee_id in [100, 101, 102]
 
 # instantiating Class's instance with fields' values
-employee = Employees(statement=None, parameters=None, employee_id=1000, first_name="Super", last_name="Man")
+employee = Employees(statement=None, parameters=None, employee_id=1000, first_name="Super", last_name="Man", operation=Database.read)
 employee.insert()
 
 employee = Employees()

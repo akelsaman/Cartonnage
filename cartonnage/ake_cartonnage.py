@@ -117,11 +117,11 @@ class Expression():
 		self.value = value
 		self.parameters = parameters if parameters is not None else []
 	def fltr(self, field, placeholder): return self.value
-	def parametersAppend(self, parameters): parameters.extend(self.parameters)
 	def __str__(self): return self.value
 	def __repr__(self): return self.value
 	def __and__(self, other): return Expression(f"({self.value} AND {other.value})", self.parameters + other.parameters)
 	def __or__(self, other): return Expression(f"({self.value} OR {other.value})", self.parameters + other.parameters)
+	def __add__(self, other): return Expression(f"({self.value} UNION ALL\n {other.value})", self.parameters + other.parameters)
 # #--------------------------------------#
 class Join():
 	def __init__(self, object, fields, type=' INNER JOIN ', value=None):
@@ -231,29 +231,29 @@ class Filter:
 
 	def empty(self):
 		self.__where = ''
-		self.__parameters = []
+		self.parameters = []
 	
 	def read(self, selected="*", group_by='', order_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
 	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent)
 	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent)
 
 	def fltr(self, field, placeholder): return self.where__()
-	def parametersAppend(self, parameters): parameters.extend(self.parameters__())
+	# def parameters(self, parameters): return self.parameters__()
 	def where__(self): return self.__where[:-5]
-	def parameters__(self): return self.__parameters
+	def parameters__(self): return self.parameters
 	def combine(self, filter1, filter2, operator):
 		w1 = filter1.where__()
 		w2 = filter2.where__()
 		if(w1 and w2):
 			self.__where = f"(({w1}) {operator} ({w2})) AND "
-			self.__parameters.extend(filter1.parameters__())
-			self.__parameters.extend(filter2.parameters__())
+			self.parameters.extend(filter1.parameters)
+			self.parameters.extend(filter2.parameters)
 		elif(w1):
 			self.__where = f"({w1}) AND "
-			self.__parameters.extend(filter1.parameters__())
+			self.parameters.extend(filter1.parameters)
 		elif(w2):
 			self.__where = f"({w2}) AND "
-			self.__parameters.extend(filter2.parameters__())
+			self.parameters.extend(filter2.parameters)
 
 	def __or__(self, filter2):
 		filter = Filter(self.parent)
@@ -276,10 +276,10 @@ class Filter:
 		field = f"{self.parent.alias.value()}.{field}"
 		if(type(value) in [str, int, float, datetime, bool]):
 			self.__where += f"{field} = {placeholder} AND "
-			self.__parameters.append(value)
+			self.parameters.append(value)
 		else:
 			self.__where += f"{value.fltr(field, placeholder)} AND "
-			value.parametersAppend(self.__parameters)
+			self.parameters.extend(value.parameters)
 
 	#'record' parameter to follow the same signature/interface of 'Values.where' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
@@ -448,7 +448,7 @@ class Database:
 				statement = filterStatement
 			if(statement): joiners.preparedStatement += f" AND {statement}"
 			joiners.parameters.extend(join.object.values.parameters(join.object))
-			joiners.parameters.extend(join.object.filter_.parameters(join.object))
+			joiners.parameters.extend(join.object.filter_.parameters)
 			#--------------------
 			child_joiners = Database.joining(join.object)
 			joiners.joinClause += child_joiners.joinClause
@@ -553,7 +553,7 @@ class Database:
 		record.query__.statement = statement
 		record.query__.parameters = []
 		record.query__.parameters.extend(record.set.parameters()) # if update extend with fields set values first
-		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters(record)) #state.parameters must be reset to empty list [] not None for this operation to work correctly
+		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters) #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.parameters.extend(joiners.parameters)
 		record.query__.operation = operation
 		return record.query__
@@ -586,7 +586,7 @@ class Database:
 		record.query__ = Query() # as 
 		record.query__.parent = record
 		record.query__.statement = statement
-		filterParamters = record.filter_.parameters(record)
+		filterParamters = record.filter_.parameters
 		for r in record.recordset.iterate():
 			#no problem with r.set.parameters() as it's emptied after sucessful update
 			params = []
@@ -597,9 +597,13 @@ class Database:
 		record.query__.operation = operation
 		return record.query__
 	#--------------------------------------#
+	def select(self, operation, record, selected="*", group_by='', order_by='', limit=''):
+		select = self.crud(operation=operation, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+		return select
+	#--------------------------------------#
 	def all(self, record): self.executeStatement(self.crud(operation=Database.all, record=record))
 	def insert(self, record): self.executeStatement(self.crud(operation=Database.insert, record=record))
-	def read(self, operation, record, selected="*", group_by='', order_by='', limit=''): self.executeStatement(self.crud(operation=operation, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit))
+	def read(self, operation, record, selected="*", group_by='', order_by='', limit=''): self.executeStatement(self.select(operation=operation, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit))
 	def delete(self, operation, record): self.executeStatement(self.crud(operation=operation, record=record))
 	def update(self, operation, record):
 		self.executeStatement(self.crud(operation=operation, record=record))
@@ -611,8 +615,6 @@ class Database:
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
-		# print(record.query__.parameters)
-		# print(record.query__.statement)
 	#--------------------------------------#
 	def insertMany(self, record): self.executeMany(self.crudMany(operation=Database.insert, record=record))
 	def deleteMany(self, record, onColumns): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns))
@@ -627,8 +629,6 @@ class Database:
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
-		# print(record.query__.parameters)
-		# print(record.query__.statement)
 	#--------------------------------------#
 	def paginate(self, pageNumber=1, recordsCount=1):
 		try:
@@ -678,13 +678,13 @@ class SQLite(Database):
 	def _upsert(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		record.query__.parameters = list(record.set.new.values())
-		record.query__.parameters.extend(record.filter_.parameters(record))
+		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() + record.filter_.parameters(record)
+			params = r.set.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 
@@ -763,13 +763,13 @@ class Oracle(Database):
 	def _upsert(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		record.query__.parameters = list(record.set.new.values())
-		record.query__.parameters.extend(record.filter_.parameters(record))
+		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() + record.filter_.parameters(record)
+			params = r.set.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
@@ -890,13 +890,13 @@ class Postgres(Database):
 	def _upsert(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		record.query__.parameters = list(record.set.new.values())
-		record.query__.parameters.extend(record.filter_.parameters(record))
+		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() + record.filter_.parameters(record)
+			params = r.set.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
@@ -954,13 +954,13 @@ class MicrosoftSQL(Database):
 	def _upsert(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		record.query__.parameters = list(record.set.new.values())
-		record.query__.parameters.extend(record.filter_.parameters(record))
+		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() + record.filter_.parameters(record)
+			params = r.set.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
@@ -974,7 +974,7 @@ class Record(metaclass=RecordMeta):
 	database__	= None
 	tableName__ = TableName()
 	#--------------------------------------#
-	def __init__(self, statement=None, parameters=None, alias=None, **kwargs):
+	def __init__(self, statement=None, parameters=None, alias=None, operation=None, **kwargs):
 		self.values = Database.values
 		self.set = Set(self)
 		self.filter_ = Filter(self)
@@ -997,8 +997,9 @@ class Record(metaclass=RecordMeta):
 			self.query__.statement = statement
 			if(parameters): self.query__.parameters = parameters #if prepared statement's parameters are passed
 			#self. instead of Record. #change the static field self.__database for inherited children classes
-			if(str((statement.strip())[:6]).lower()=="select"):
-				self.query__.operation = Database.read
+			if(operation): self.query__.operation = operation
+			# if(str((statement.strip())[:6]).lower()=="select"):
+			# 	self.query__.operation = Database.read
 			if(len(self.query__.parameters) and type(self.query__.parameters[0]) in (list, tuple)):
 				self.database__.executeMany(self.query__)
 			else:
@@ -1124,9 +1125,10 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
+	def select(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.database__.select(Database.read, record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
 	def insert(self): self.database__.insert(record=self)
-	# def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(Database.read, record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
-	def read(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.read(selected, group_by, order_by, limit, **kwargs)
+	def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(Database.read, record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	# def read(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.read(selected, group_by, order_by, limit)
 	def update(self): self.database__.update(Database.update, record=self)
 	def delete(self): self.database__.delete(Database.delete, record=self)
 	def all(self): self.database__.all(record=self)
