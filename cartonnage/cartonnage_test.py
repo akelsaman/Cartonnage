@@ -11,10 +11,10 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-initSQLite3Env()
+# initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
-# initPostgresEnv()
+initPostgresEnv()
 # initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
@@ -72,49 +72,87 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
 # select = emp.select()
 # print(f">>>>>>>>>>>>>>>>>>>>> {delete.statement}")
 
-# class P(Employees): pass
-# class C(Employees): pass
-# class Heirarchy(Employees): pass
-# class H(Heirarchy): pass
-# hieirarchy = H()
+class P(Employees): pass
+class C(Employees): pass
+class Hierarchy(Employees): pass
+class H(Hierarchy): pass
+hieirarchy = H()
 
-# p = P()
-# c = C()
+p = P()
+c = C()
 
-# p.filter(P.manager_id.is_null())
-# c.join(hieirarchy, (C.manager_id == Heirarchy.employee_id))
-# c.filter(C.employee_name == 'Neena')
+p_select = p.select(selected='employee_id, manager_id, first_name')
+c_select = c.select(selected='c.employee_id, c.manager_id, c.first_name')
 
-# p_select = p.select(selected='employee_id, manager_id, first_name')
-# c_select = c.select(selected='c.employee_id, c.manager_id, c.first_name')
+p.filter(P.manager_id.is_null())
+c.join(hieirarchy, (C.manager_id == Hierarchy.employee_id))
+c.filter(C.employee_name == 'Neena')
 
-# print(p_select.statement)
-# print(c_select.statement)
+print(p_select.statement)
+print(c_select.statement)
 
-# cte = """
-# WITH RECURSIVE Heirarchy AS (
-# 	SELECT employee_id, manager_id, first_name FROM Employees P
-# 	WHERE P.manager_id IS NULL
-# 	UNION ALL
-# 	SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C  INNER JOIN Heirarchy H ON C.manager_id = H.employee_id
-# 	WHERE 1=1
-# 	UNION ALL
-# 	SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C  INNER JOIN Heirarchy H ON C.manager_id = H.employee_id
+# 1. Non-Recursive CTE (all databases)
+# WITH sales_summary AS (
+#     SELECT region, SUM(amount) as total
+#     FROM sales
+#     GROUP BY region
 # )
-# SELECT * FROM Heirarchy
+# SELECT * FROM sales_summary;
+# 5. Multiple CTEs (all databases)
+# WITH 
+#     cte1 AS (SELECT ...),
+#     cte2 AS (SELECT ... FROM cte1)
+# SELECT * FROM cte2;
+
+### PostgreSQL/MySQL/SQLite
+cte = """
+WITH RECURSIVE Hierarchy AS (
+    (SELECT employee_id, manager_id, first_name FROM Employees WHERE manager_id IS NULL)
+    UNION ALL
+    SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy H ON C.manager_id = H.employee_id
+    UNION ALL
+    SELECT D.employee_id, NULL, D.first_name FROM Dependents D INNER JOIN Hierarchy H ON D.employee_id = H.employee_id
+)
+SELECT * FROM Hierarchy
+
+"""
+
+### Oracle
+# cte = """
+# WITH Hierarchy (employee_id, manager_id, first_name) AS (
+#     SELECT employee_id, manager_id, first_name FROM Employees P
+#     WHERE P.manager_id IS NULL
+#     UNION ALL
+#     SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C  
+#     INNER JOIN Hierarchy H ON C.manager_id = H.employee_id
+# )
+# SELECT * FROM Hierarchy
 # """
 
-# ee1 = Expression(p_select.statement, p_select.parameters)
-# ee2 = Expression(c_select.statement, c_select.parameters)
-# print(ee2.parameters)
+### Recursive CTE - MSSQL (no RECURSIVE keyword)
+# cte = """
+# WITH Hierarchy AS (
+#     SELECT employee_id, manager_id, first_name FROM Employees P
+#     WHERE P.manager_id IS NULL
+#     UNION ALL
+#     SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C  
+#     INNER JOIN Hierarchy H ON C.manager_id = H.employee_id
+# )
+# SELECT * FROM hierarchy
+# OPTION (MAXRECURSION 100);
+# """
 
-# ee = (ee1 + ee2)
-# print(ee)
+ee1 = Expression(p_select.statement, p_select.parameters)
+ee2 = Expression(c_select.statement, c_select.parameters)
+print(ee2.parameters)
 
-# rec = Record(statement=cte, operation=Database.read)
-# # print(f"CTE result: {rec.recordset.data}")
-# for r in rec:
-# 	print(r.data)
+ee = (ee1 + ee2)
+print(ee)
+
+rec = Record(statement=cte, operation=Database.read)
+# print(f"CTE result: {rec.recordset.data}")
+for r in rec:
+	print(r.data)
 #==============================================================================#
 print("---------------------------------------00---------------------------------------")
 #==============================================================================#
@@ -750,16 +788,18 @@ rs.add(emp1)
 rs.add(emp2)
 
 
-### SQLite3 and Postgres
-emp1.filter(
-	(EXCLUDED.salary < Employees.salary) & 
-	(Employees.last_name.in_subquery(emp, selected='last_name'))
-)
-### Oracle and MicroftSQL
-# emp1.filter(
-# 	(S.salary < T.salary) & 
-# 	(T.last_name.in_subquery(emp, selected='last_name'))
-# )
+if(emp.database__.name in ["SQLite3", "Postgres"]):
+	### SQLite3 and Postgres
+	emp1.filter(
+		(EXCLUDED.salary < Employees.salary) & 
+		(Employees.last_name.in_subquery(emp, selected='last_name'))
+	)
+if(emp.database__.name in ["Oracle", "MicrosoftAzureSQL"]):
+	## Oracle and MicroftSQL
+	emp1.filter(
+		(S.salary < T.salary) & 
+		(T.last_name.in_subquery(emp, selected='last_name'))
+	)
 
 rs.upsert(onColumns='employee_id')
 print(emp1.query__.statement)
@@ -769,12 +809,15 @@ emp = Employees()
 emp.filter(Employees.employee_id.in_([100,101]))
 emp.read()
 
-### SQLite3
-assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
-### Oracle
-# assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': datetime(1989, 9, 21, 0, 0), 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
-### MySQL | Postgres | Microsoft AzureSQL
-# assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+if(emp.database__.name == "SQLite3"):
+	### SQLite3
+	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+if(emp.database__.name == "Oracle"):
+	### Oracle
+	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': datetime(1989, 9, 21, 0, 0), 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+if(emp.database__.name in ["MySQL", "Postgres", "MicrosoftAzureSQL"]):
+	### MySQL | Postgres | Microsoft AzureSQL
+	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
 #==============================================================================#
 print("---------------------------------------09 Expression Tests---------------------------------------")
 #==============================================================================#
