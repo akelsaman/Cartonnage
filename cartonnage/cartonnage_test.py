@@ -11,11 +11,11 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-# initSQLite3Env()
+initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
-initAzureSQLEnv()
+# initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
 # initSQLite3PoolEnv()
@@ -57,190 +57,6 @@ class S(Record): pass # used for upsert
 class T(Record): pass # used for upsert
 
 employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
-
-### SQLite
-# raw_sql = """
-# INSERT INTO Employees (employee_id, first_name, salary)
-# VALUES (?, ?, ?)
-# ON CONFLICT (employee_id)
-# DO UPDATE SET 
-#     first_name = EXCLUDED.first_name,
-#     salary = EXCLUDED.salary
-# 	WHERE EXCLUDED.salary > 1000
-# """
-
-### Oracle
-# raw_sql = """
-# MERGE INTO Employees t
-# USING (SELECT :1 AS employee_id,:1 AS first_name, :1 AS salary FROM dual) s
-# ON (t.employee_id = s.employee_id)
-# WHEN MATCHED THEN
-#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
-# 	WHERE t.salary > 1000
-# WHEN NOT MATCHED THEN
-#     INSERT (employee_id, first_name, salary) VALUES (:1, :1, :1)
-# """
-
-### oracle ai23+
-# raw_sql = """
-# INSERT INTO Employees (employee_id, first_name, salary)
-# VALUES (:1, :2, :3)
-# ON CONFLICT (employee_id)
-# DO UPDATE SET 
-#     first_name = :2,
-#     salary = :3
-# """
-
-### MySQL
-# raw_sql = """
-# INSERT INTO Employees (employee_id, first_name, salary)
-# VALUES (%s, %s, %s)
-# ON DUPLICATE KEY UPDATE
-#     first_name = VALUES(first_name),
-#     salary = VALUES(salary)
-# """
-
-### Or with MySQL 8.0.19+ alias syntax:
-
-# raw_sql = """
-# INSERT INTO Employees (employee_id, first_name, salary)
-# VALUES (%s, %s, %s) AS new
-# ON DUPLICATE KEY UPDATE
-#     first_name = new.first_name,
-#     salary = new.salary
-# """
-
-### Postgres
-# raw_sql = """
-# INSERT INTO Employees (employee_id, first_name, salary)
-# VALUES (%s, %s, %s)
-# ON CONFLICT (employee_id)
-# DO UPDATE SET 
-#     first_name = EXCLUDED.first_name,
-#     salary = EXCLUDED.salary
-# """
-
-### MSSQL
-# raw_sql = """
-# MERGE INTO Employees AS t
-# USING (SELECT ? AS employee_id, ? AS first_name, ? AS salary) AS s
-# ON (t.employee_id = s.employee_id)
-# WHEN MATCHED THEN
-#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
-# WHEN NOT MATCHED THEN
-#     INSERT (employee_id, first_name, salary) VALUES (s.employee_id, s.first_name, s.salary);
-# """
-
-# rec = Record(statement=raw_sql, parameters=(100, 'Ahmed', 4000))
-
-# emp = Employees()
-# emp.employee_id = 100
-# emp.read()
-
-### SQLite3
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
-# assert emp.recordset.data == {}, emp.recordset.data
-### Oracle
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
-### MySQL | Postgres | Microsoft AzureSQL
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
-#=====
-# rs = Recordset()
-
-# emp1 = Employees()
-# emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
-
-# emp2 = Employees()
-# emp2.set.new = {'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000}
-
-# rs.add(emp1)
-# rs.add(emp2)
-
-# rs.upsert(onColumns='employee_id')
-# print(emp1.query__.statement)
-# print(emp1.query__.parameters)
-
-# emp = Employees()
-# emp.filter(Employees.employee_id.in_([100,101]))
-# emp.read()
-
-### SQLite3
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
-# assert emp.recordset.data == {}, emp.recordset.data
-### Oracle
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
-### MySQL | Postgres | Microsoft AzureSQL
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
-#=====
-# emp = Employees()
-# emp.first_name = "Steven"
-
-# emp1 = Employees()
-# emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
-
-### SQLite3 and Postgres
-# emp1.filter(
-# 	(EXCLUDED.salary < Employees.salary) & 
-# 	(Employees.last_name.in_subquery(emp, selected='last_name'))
-# )
-### Oracle and MicroftSQL
-# emp1.filter(
-# 	(S.salary < T.salary) & 
-# 	(T.last_name.in_subquery(emp, selected='last_name'))
-# )
-
-# emp1.upsert(onColumns='employee_id')
-
-# emp = Employees()
-# emp.employee_id = 100
-# emp.read()
-
-### SQLite3
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
-# assert emp.recordset.data == {}, emp.recordset.data
-### Oracle
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
-### MySQL | Postgres | Microsoft AzureSQL
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
-#=====
-emp = Employees()
-emp.filter(Employees.first_name.in_(['Steven', 'Neena']))
-
-emp1 = Employees()
-emp2 = Employees()
-emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
-emp2.set.new = {'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000}
-
-rs = Recordset()
-rs.add(emp1)
-rs.add(emp2)
-
-
-### SQLite3 and Postgres
-# emp1.filter(
-# 	(EXCLUDED.salary < Employees.salary) & 
-# 	(Employees.last_name.in_subquery(emp, selected='last_name'))
-# )
-### Oracle and MicroftSQL
-emp1.filter(
-	(S.salary < T.salary) & 
-	(T.last_name.in_subquery(emp, selected='last_name'))
-)
-
-rs.upsert(onColumns='employee_id')
-print(emp1.query__.statement)
-print(emp1.query__.parameters)
-
-emp = Employees()
-emp.filter(Employees.employee_id.in_([100,101]))
-emp.read()
-
-### SQLite3
-# assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
-### Oracle
-# assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': datetime(1989, 9, 21, 0, 0), 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
-### MySQL | Postgres | Microsoft AzureSQL
-assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
 #==============================================================================#
 print("---------------------------------------00---------------------------------------")
 #==============================================================================#
@@ -716,7 +532,193 @@ assert employees.recordset.data == [
 	{'manager_id': 108, 'count': 5}, {'manager_id': 114, 'count': 5}
 ], employees.recordset.data
 #==============================================================================#
-print("---------------------------------------08 Expression Tests---------------------------------------")
+print("---------------------------------------08---------------------------------------")
+# #==============================================================================#
+### SQLite
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (?, ?, ?)
+# ON CONFLICT (employee_id)
+# DO UPDATE SET 
+#     first_name = EXCLUDED.first_name,
+#     salary = EXCLUDED.salary
+# 	WHERE EXCLUDED.salary > 1000
+# """
+
+### Oracle
+# raw_sql = """
+# MERGE INTO Employees t
+# USING (SELECT :1 AS employee_id,:1 AS first_name, :1 AS salary FROM dual) s
+# ON (t.employee_id = s.employee_id)
+# WHEN MATCHED THEN
+#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+# 	WHERE t.salary > 1000
+# WHEN NOT MATCHED THEN
+#     INSERT (employee_id, first_name, salary) VALUES (:1, :1, :1)
+# """
+
+### oracle ai23+
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (:1, :2, :3)
+# ON CONFLICT (employee_id)
+# DO UPDATE SET 
+#     first_name = :2,
+#     salary = :3
+# """
+
+### MySQL
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (%s, %s, %s)
+# ON DUPLICATE KEY UPDATE
+#     first_name = VALUES(first_name),
+#     salary = VALUES(salary)
+# """
+
+### Or with MySQL 8.0.19+ alias syntax:
+
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (%s, %s, %s) AS new
+# ON DUPLICATE KEY UPDATE
+#     first_name = new.first_name,
+#     salary = new.salary
+# """
+
+### Postgres
+# raw_sql = """
+# INSERT INTO Employees (employee_id, first_name, salary)
+# VALUES (%s, %s, %s)
+# ON CONFLICT (employee_id)
+# DO UPDATE SET 
+#     first_name = EXCLUDED.first_name,
+#     salary = EXCLUDED.salary
+# """
+
+### MSSQL
+# raw_sql = """
+# MERGE INTO Employees AS t
+# USING (SELECT ? AS employee_id, ? AS first_name, ? AS salary) AS s
+# ON (t.employee_id = s.employee_id)
+# WHEN MATCHED THEN
+#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+# WHEN NOT MATCHED THEN
+#     INSERT (employee_id, first_name, salary) VALUES (s.employee_id, s.first_name, s.salary);
+# """
+
+# rec = Record(statement=raw_sql, parameters=(100, 'Ahmed', 4000))
+
+# emp = Employees()
+# emp.employee_id = 100
+# emp.read()
+
+### SQLite3
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+# assert emp.recordset.data == {}, emp.recordset.data
+### Oracle
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+### MySQL | Postgres | Microsoft AzureSQL
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+#=====
+# rs = Recordset()
+
+# emp1 = Employees()
+# emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
+
+# emp2 = Employees()
+# emp2.set.new = {'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000}
+
+# rs.add(emp1)
+# rs.add(emp2)
+
+# rs.upsert(onColumns='employee_id')
+# print(emp1.query__.statement)
+# print(emp1.query__.parameters)
+
+# emp = Employees()
+# emp.filter(Employees.employee_id.in_([100,101]))
+# emp.read()
+
+### SQLite3
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+# assert emp.recordset.data == {}, emp.recordset.data
+### Oracle
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+### MySQL | Postgres | Microsoft AzureSQL
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+#=====
+# emp = Employees()
+# emp.first_name = "Steven"
+
+# emp1 = Employees()
+# emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
+
+### SQLite3 and Postgres
+# emp1.filter(
+# 	(EXCLUDED.salary < Employees.salary) & 
+# 	(Employees.last_name.in_subquery(emp, selected='last_name'))
+# )
+### Oracle and MicroftSQL
+# emp1.filter(
+# 	(S.salary < T.salary) & 
+# 	(T.last_name.in_subquery(emp, selected='last_name'))
+# )
+
+# emp1.upsert(onColumns='employee_id')
+
+# emp = Employees()
+# emp.employee_id = 100
+# emp.read()
+
+### SQLite3
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+# assert emp.recordset.data == {}, emp.recordset.data
+### Oracle
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+### MySQL | Postgres | Microsoft AzureSQL
+# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+#=====
+emp = Employees()
+emp.filter(Employees.first_name.in_(['Steven', 'Neena']))
+
+emp1 = Employees()
+emp2 = Employees()
+emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
+emp2.set.new = {'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000}
+
+rs = Recordset()
+rs.add(emp1)
+rs.add(emp2)
+
+
+### SQLite3 and Postgres
+emp1.filter(
+	(EXCLUDED.salary < Employees.salary) & 
+	(Employees.last_name.in_subquery(emp, selected='last_name'))
+)
+### Oracle and MicroftSQL
+# emp1.filter(
+# 	(S.salary < T.salary) & 
+# 	(T.last_name.in_subquery(emp, selected='last_name'))
+# )
+
+rs.upsert(onColumns='employee_id')
+print(emp1.query__.statement)
+print(emp1.query__.parameters)
+
+emp = Employees()
+emp.filter(Employees.employee_id.in_([100,101]))
+emp.read()
+
+### SQLite3
+assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+### Oracle
+# assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': datetime(1989, 9, 21, 0, 0), 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+### MySQL | Postgres | Microsoft AzureSQL
+# assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+#==============================================================================#
+print("---------------------------------------09 Expression Tests---------------------------------------")
 #==============================================================================#
 # Test 1: Expression in UPDATE - Increment salary
 emp = Employees()
@@ -734,7 +736,7 @@ emp2.read()
 
 assert emp2.salary == original_salary + 100, f"Expected {original_salary + 100}, got {emp2.salary}"
 print(f"Test 1 PASSED: salary incremented from {original_salary} to {emp2.salary}")
-print("----------08A----------")
+print("----------09A----------")
 # Test 2: Expression in UPDATE - Multiply salary (percentage raise)
 emp = Employees()
 emp.employee_id = 100
@@ -750,7 +752,7 @@ emp2.read()
 # Note: SQLite may truncate to int, so we check approximately
 assert abs(float(emp2.salary) - float(before_salary) * 1.1) < 1, f"Expected ~{before_salary * 1.1}, got {emp2.salary}" # float for mysql
 print(f"Test 2 PASSED: salary multiplied from {before_salary} to {emp2.salary}")
-print("----------08B----------")
+print("----------09B----------")
 # Test 3: Expression in UPDATE - Set to NULL using Expression
 emp = Employees()
 emp.employee_id = 100
@@ -764,7 +766,7 @@ emp2.employee_id = 100
 emp2.read()
 assert emp2.commission_pct is None, f"Expected None, got {emp2.commission_pct}"
 print("Test 3 PASSED: commission_pct set to NULL")
-print("----------08C----------")
+print("----------09C----------")
 # Test 4: Expression in UPDATE - UPPER function on string field
 emp = Employees()
 emp.employee_id = 100
@@ -785,7 +787,7 @@ emp = Employees()
 emp.employee_id = 100
 emp.set.first_name = original_first
 emp.filter_.update()
-print("----------08D----------")
+print("----------09D----------")
 # Test 5: Expression in UPDATE - COALESCE (replace NULL with default)
 emp = Employees()
 emp.employee_id = 100
@@ -799,7 +801,7 @@ emp2.employee_id = 100
 emp2.read()
 assert emp2.commission_pct == 1, f"Expected 1, got {emp2.commission_pct}"
 print("Test 5 PASSED: commission_pct set via COALESCE")
-print("----------08E----------")
+print("----------09E----------")
 # Test 6: Expression in UPDATE - Subtract/decrement
 emp = Employees()
 emp.employee_id = 100
@@ -814,7 +816,7 @@ emp2.employee_id = 100
 emp2.read()
 assert emp2.salary == before_salary - 50, f"Expected {before_salary - 50}, got {emp2.salary}"
 print(f"Test 6 PASSED: salary decremented from {before_salary} to {emp2.salary}")
-print("----------08F----------")
+print("----------09F----------")
 # Test 7: Expression in UPDATE - Division
 emp = Employees()
 emp.employee_id = 100
@@ -836,7 +838,7 @@ emp.employee_id = 100
 emp.set.salary = float(original_salary) # float for mysql
 emp.filter_.update()
 print(f"Salary restored to {original_salary}")
-print("----------08G----------")
+print("----------09G----------")
 # Test 8: Expression in UPDATE - Concatenation (SQLite uses ||)
 emp = Employees()
 emp.employee_id = 100
@@ -856,7 +858,7 @@ emp = Employees()
 emp.employee_id = 100
 emp.set.email = original_email
 emp.filter_.update()
-print("----------08H----------")
+print("----------09H----------")
 # Test 9: Expression in UPDATE - LOWER function
 emp = Employees()
 emp.employee_id = 100
@@ -876,7 +878,7 @@ emp = Employees()
 emp.employee_id = 100
 emp.set.first_name = original_first
 emp.filter_.update()
-print("----------08I----------")
+print("----------09I----------")
 # Test 10: Expression in UPDATE with regular field update (mixed)
 emp = Employees()
 emp.employee_id = 100
@@ -900,22 +902,22 @@ emp.employee_id = 100
 emp.set.phone_number = original_phone
 emp.set.salary = original_salary
 emp.filter_.update()
-print("----------08J----------")
+print("----------09J----------")
 # Test 11: Expression in Filter - Compare field to computed value
 emp = Employees()
 emp.filter(Employees.employee_id == Expression('100 + 0'))  # employee_id = 100
 emp.read()
 assert emp.employee_id == 100
 print("Test 11 PASSED: Filter with Expression('100 + 0')")
-print("----------08K----------")
+print("----------09K----------")
 # Test 12: Expression in Filter - Compare to another field expression
 emp = Employees()
 emp.filter(Employees.salary == Expression('salary'))  # salary = salary (always true)
 emp.read()
 assert emp.recordset.count() > 0
 print(f"Test 12 PASSED: Found {emp.recordset.count()} employees where salary = salary")
-
 print("---------------------------------------Expression Tests Complete---------------------------------------")
+
 Record.database__.rollback() # Record.database__.commit()
 Record.database__.close()
 print("---------------------------------------ALL FEATURES TESTED---------------------------------------")
