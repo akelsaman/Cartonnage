@@ -611,6 +611,8 @@ class Database:
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
+		# print(record.query__.parameters)
+		# print(record.query__.statement)
 	#--------------------------------------#
 	def insertMany(self, record): self.executeMany(self.crudMany(operation=Database.insert, record=record))
 	def deleteMany(self, record, onColumns): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns))
@@ -625,6 +627,8 @@ class Database:
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
+		# print(record.query__.parameters)
+		# print(record.query__.statement)
 	#--------------------------------------#
 	def paginate(self, pageNumber=1, recordsCount=1):
 		try:
@@ -737,13 +741,16 @@ class Oracle(Database):
 		update_set = ', '.join(f't.{k} = s.{k}' for k in keys if k not in onColumns.split(','))
 		insert_fields = ', '.join(keys)
 		insert_values = ', '.join(f's.{k}' for k in keys)
+		# Build WHERE clause from filter_ if present
+		whereFilter = record.filter_.where(record)
+		whereClause = f"\n\t\t\tWHERE {whereFilter}" if whereFilter else ''
 
 		sql = f"""
 		MERGE INTO {record.table__()} t
 		USING (SELECT {source_fields} FROM dual) s
 		ON ({on_clause})
 		WHEN MATCHED THEN
-			UPDATE SET {update_set}
+			UPDATE SET {update_set}{whereClause}
 		WHEN NOT MATCHED THEN
 			INSERT ({insert_fields}) VALUES ({insert_values})
 		"""
@@ -756,12 +763,13 @@ class Oracle(Database):
 	def _upsert(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		record.query__.parameters = list(record.set.new.values())
+		record.query__.parameters.extend(record.filter_.parameters(record))
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		for r in record.recordset.iterate():
-			params = r.set.parameters()
+			params = r.set.parameters() + record.filter_.parameters(record)
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
@@ -806,7 +814,10 @@ class MySQL(Database):
 		keys = list(record.set.new.keys())
 		fields = ', '.join(keys)
 		values = ', '.join('%s' for _ in keys)
-		# MySQL uses VALUES(column) to reference the new values
+		# MySQL doesn't support WHERE in ON DUPLICATE KEY UPDATE
+		whereFilter = record.filter_.where(record)
+		if whereFilter:
+			raise NotImplementedError("MySQL does not support WHERE clause in upsert. Use a different approach or remove the filter.")
 		update_set = ', '.join(f'{k} = VALUES({k})' for k in keys if k not in onColumns.split(','))
 
 		sql = f"""
@@ -860,12 +871,15 @@ class Postgres(Database):
 		values = ', '.join('%s' for _ in keys)
 		# Postgres uses EXCLUDED.column to reference the new values
 		update_set = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
+		# Build WHERE clause from filter_ if present
+		whereFilter = record.filter_.where(record)
+		whereClause = f"\n\t\tWHERE {whereFilter}" if whereFilter else ''
 
 		sql = f"""
 		INSERT INTO {record.table__()} ({fields})
 		VALUES ({values})
 		ON CONFLICT ({onColumns})
-		DO UPDATE SET {update_set}
+		DO UPDATE SET {update_set}{whereClause}
 		"""
 		record.query__ = Query()
 		record.query__.parent = record
@@ -876,12 +890,13 @@ class Postgres(Database):
 	def _upsert(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		record.query__.parameters = list(record.set.new.values())
+		record.query__.parameters.extend(record.filter_.parameters(record))
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		for r in record.recordset.iterate():
-			params = r.set.parameters()
+			params = r.set.parameters() + record.filter_.parameters(record)
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
@@ -917,12 +932,15 @@ class MicrosoftSQL(Database):
 		update_set = ', '.join(f't.{k} = s.{k}' for k in keys if k not in onColumns.split(','))
 		insert_fields = ', '.join(keys)
 		insert_values = ', '.join(f's.{k}' for k in keys)
+		# Build WHERE clause from filter_ if present (MSSQL uses AND in WHEN MATCHED)
+		whereFilter = record.filter_.where(record)
+		whereClause = f" AND {whereFilter}" if whereFilter else ''
 
 		sql = f"""
 		MERGE INTO {record.table__()} AS t
 		USING (SELECT {source_fields}) AS s
 		ON ({on_clause})
-		WHEN MATCHED THEN
+		WHEN MATCHED{whereClause} THEN
 			UPDATE SET {update_set}
 		WHEN NOT MATCHED THEN
 			INSERT ({insert_fields}) VALUES ({insert_values});
@@ -936,12 +954,13 @@ class MicrosoftSQL(Database):
 	def _upsert(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		record.query__.parameters = list(record.set.new.values())
+		record.query__.parameters.extend(record.filter_.parameters(record))
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns):
 		self.upsertStatement(operation, record, onColumns)
 		for r in record.recordset.iterate():
-			params = r.set.parameters()
+			params = r.set.parameters() + record.filter_.parameters(record)
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
