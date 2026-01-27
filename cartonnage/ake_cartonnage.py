@@ -654,7 +654,7 @@ class SQLite(Database):
 	def upsertStatement(self, operation, record, onColumns):
 		keys = list(record.set.new.keys())
 		fields = ', '.join(keys)
-		updateSet = ', '.join(map(lambda k: f"{k} = EXCLUDED.{k}", keys))
+		updateSet = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
 		values = ', '.join('?' for _ in keys)
 		sql = f"""
 		INSERT INTO {record.table__()} ({fields})
@@ -719,10 +719,47 @@ class Oracle(Database):
 	# INSERT INTO Employees (employee_id, first_name, salary)
 	# VALUES (:1, :2, :3)
 	# ON CONFLICT (employee_id)
-	# DO UPDATE SET 
+	# DO UPDATE SET
 	#     first_name = :2,
 	#     salary = :3
 	# """
+
+	def upsertStatement(self, operation, record, onColumns):
+		keys = list(record.set.new.keys())
+		fields = ', '.join(keys)
+		# Oracle uses :1, :2, :3 style placeholders
+		source_fields = ', '.join(f':1 AS {k}' for k in keys)
+		on_clause = ' AND '.join(f't.{col} = s.{col}' for col in onColumns.split(','))
+		update_set = ', '.join(f't.{k} = s.{k}' for k in keys if k not in onColumns.split(','))
+		insert_fields = ', '.join(keys)
+		insert_values = ', '.join(f's.{k}' for k in keys)
+
+		sql = f"""
+		MERGE INTO {record.table__()} t
+		USING (SELECT {source_fields} FROM dual) s
+		ON ({on_clause})
+		WHEN MATCHED THEN
+			UPDATE SET {update_set}
+		WHEN NOT MATCHED THEN
+			INSERT ({insert_fields}) VALUES ({insert_values})
+		"""
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns):
+		self.upsertStatement(operation, record, onColumns)
+		record.query__.parameters = list(record.set.new.values())
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns):
+		self.upsertStatement(operation, record, onColumns)
+		for r in record.recordset.iterate():
+			params = r.set.parameters()
+			record.query__.parameters.append(tuple(params))
+		return record.query__
 #================================================================================#
 class MySQL(Database):
 	def __init__(self, connection):
@@ -760,6 +797,36 @@ class MySQL(Database):
 	#     first_name = new.first_name,
 	#     salary = new.salary
 	# """
+
+	def upsertStatement(self, operation, record, onColumns):
+		keys = list(record.set.new.keys())
+		fields = ', '.join(keys)
+		values = ', '.join('%s' for _ in keys)
+		# MySQL uses VALUES(column) to reference the new values
+		update_set = ', '.join(f'{k} = VALUES({k})' for k in keys if k not in onColumns.split(','))
+
+		sql = f"""
+		INSERT INTO {record.table__()} ({fields})
+		VALUES ({values})
+		ON DUPLICATE KEY UPDATE {update_set}
+		"""
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns):
+		self.upsertStatement(operation, record, onColumns)
+		record.query__.parameters = list(record.set.new.values())
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns):
+		self.upsertStatement(operation, record, onColumns)
+		for r in record.recordset.iterate():
+			params = r.set.parameters()
+			record.query__.parameters.append(tuple(params))
+		return record.query__
 #================================================================================#
 class Postgres(Database):
 	def __init__(self, connection):
@@ -778,10 +845,41 @@ class Postgres(Database):
 	# INSERT INTO Employees (employee_id, first_name, salary)
 	# VALUES (%s, %s, %s)
 	# ON CONFLICT (employee_id)
-	# DO UPDATE SET 
+	# DO UPDATE SET
 	#     first_name = EXCLUDED.first_name,
 	#     salary = EXCLUDED.salary
 	# """
+
+	def upsertStatement(self, operation, record, onColumns):
+		keys = list(record.set.new.keys())
+		fields = ', '.join(keys)
+		values = ', '.join('%s' for _ in keys)
+		# Postgres uses EXCLUDED.column to reference the new values
+		update_set = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
+
+		sql = f"""
+		INSERT INTO {record.table__()} ({fields})
+		VALUES ({values})
+		ON CONFLICT ({onColumns})
+		DO UPDATE SET {update_set}
+		"""
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns):
+		self.upsertStatement(operation, record, onColumns)
+		record.query__.parameters = list(record.set.new.values())
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns):
+		self.upsertStatement(operation, record, onColumns)
+		for r in record.recordset.iterate():
+			params = r.set.parameters()
+			record.query__.parameters.append(tuple(params))
+		return record.query__
 #================================================================================#
 class MicrosoftSQL(Database):
 	def __init__(self, connection):
@@ -805,6 +903,43 @@ class MicrosoftSQL(Database):
 	# WHEN NOT MATCHED THEN
 	#     INSERT (employee_id, first_name, salary) VALUES (s.employee_id, s.first_name, s.salary);
 	# """
+
+	def upsertStatement(self, operation, record, onColumns):
+		keys = list(record.set.new.keys())
+		fields = ', '.join(keys)
+		# MSSQL uses ? placeholders
+		source_fields = ', '.join(f'? AS {k}' for k in keys)
+		on_clause = ' AND '.join(f't.{col} = s.{col}' for col in onColumns.split(','))
+		update_set = ', '.join(f't.{k} = s.{k}' for k in keys if k not in onColumns.split(','))
+		insert_fields = ', '.join(keys)
+		insert_values = ', '.join(f's.{k}' for k in keys)
+
+		sql = f"""
+		MERGE INTO {record.table__()} AS t
+		USING (SELECT {source_fields}) AS s
+		ON ({on_clause})
+		WHEN MATCHED THEN
+			UPDATE SET {update_set}
+		WHEN NOT MATCHED THEN
+			INSERT ({insert_fields}) VALUES ({insert_values});
+		"""
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns):
+		self.upsertStatement(operation, record, onColumns)
+		record.query__.parameters = list(record.set.new.values())
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns):
+		self.upsertStatement(operation, record, onColumns)
+		for r in record.recordset.iterate():
+			params = r.set.parameters()
+			record.query__.parameters.append(tuple(params))
+		return record.query__
 #================================================================================#
 class RecordMeta(type):
 	def __getattr__(cls, field):

@@ -62,7 +62,7 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
 # DO UPDATE SET 
 #     first_name = EXCLUDED.first_name,
 #     salary = EXCLUDED.salary
-# 	WHERE EXCLUDED.salary > 10000
+# 	WHERE EXCLUDED.salary > 1000
 # """
 
 ### Oracle
@@ -71,7 +71,8 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
 # USING (SELECT :1 AS employee_id,:1 AS first_name, :1 AS salary FROM dual) s
 # ON (t.employee_id = s.employee_id)
 # WHEN MATCHED THEN
-#     UPDATE SET t.first_name = s.first_name, s
+#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+# 	WHERE t.salary > 1000
 # WHEN NOT MATCHED THEN
 #     INSERT (employee_id, first_name, salary) VALUES (:1, :1, :1)
 # """
@@ -141,17 +142,17 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id )
 # assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
 
 #=====
-# emp1 = Employees()
-# emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
+emp1 = Employees()
+emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
 
-# emp1.upsert(onColumns='employee_id')
+emp1.upsert(onColumns='employee_id')
 
-# emp = Employees()
-# emp.employee_id = 100
-# emp.read()
+emp = Employees()
+emp.employee_id = 100
+emp.read()
 
 ### SQLite3
-# assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
+assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
 # assert emp.recordset.data == {}, emp.recordset.data
 ### Oracle
 # assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
