@@ -128,6 +128,7 @@ class CTE():
 		self.parameters = []
 		self.alias = alias
 		self.as_keyword = ' AS '
+		self.columnsAliases = ''
 		# self.parameters = parameters if parameters is not None else []
 		if(select):
 			self.value = select.statement
@@ -143,7 +144,7 @@ class CTE():
 		elif(mode == False):
 			self.as_keyword = ' AS NOT MATERIALIZED '
 	# ALIAS AS (SELECT ...
-	def sql_endless(self): return f"{self.alias}{self.as_keyword}({self.value}"
+	def sql_endless(self): return f"{self.alias}{f' ({self.columnsAliases})' if self.columnsAliases else ''}{self.as_keyword}({self.value}"
 	# ALIAS AS (SELECT ...)
 	def sql(self): return f"{self.sql_endless()})"
 	def __add__(self, other):
@@ -959,7 +960,7 @@ class Postgres(Database):
 class MicrosoftSQL(Database):
 	def __init__(self, connection):
 		Database.__init__(self)
-		self.name = "MicrosoftAzureSQL"
+		self.name = "MicrosoftSQL"
 		self._Database__connection = connection
 		self.cursor()
 		self._Database__cursor.fast_executemany = True

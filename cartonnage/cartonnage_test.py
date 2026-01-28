@@ -58,40 +58,6 @@ class T(Record): pass # used for upsert
 
 employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
 #==============================================================================#
-# emp = Employees()
-# emp.recordset = Recordset()
-# emp.filter(
-# 	(Employees.first_name == 'Steven') & 
-# 	(Employees.last_name == 'King')
-# )
-
-# select = emp.select() # select = emp.database__.crud(Database.read, emp)
-# print(f">>>>>>>>>>>>>>>>>>>>> {select.statement}")
-
-# delete = emp.database__.crudMany(Database.delete, emp)
-# select = emp.select()
-# print(f">>>>>>>>>>>>>>>>>>>>> {delete.statement}")
-
-class P(Employees): pass
-class C(Employees): pass
-class Hierarchy(Record): pass
-hieirarchy = Hierarchy()
-# class H(Hierarchy): pass
-# hieirarchy = H()
-
-p = P()
-c = C()
-
-p.filter(P.manager_id.is_null())
-c.filter(C.first_name == 'Neena')
-c.join(hieirarchy, (C.manager_id == Hierarchy.employee_id))
-
-p_select = p.select(selected='/*+ MATERIALIZE */ employee_id, manager_id, first_name')
-c_select = c.select(selected='/*+ INLINE */ C.employee_id, C.manager_id, C.first_name')
-
-print(p_select.statement)
-print(c_select.statement)
-
 # 1. Non-Recursive CTE (all databases)
 # WITH sales_summary AS (
 #     SELECT region, SUM(amount) as total
@@ -106,16 +72,16 @@ print(c_select.statement)
 # SELECT * FROM cte2;
 
 ## PostgreSQL/MySQL/SQLite
-cte = """
-WITH RECURSIVE Hierarchy AS (
-    SELECT /*+ MATERIALIZE */ employee_id, manager_id, first_name FROM Employees WHERE manager_id IS NULL
-    UNION ALL
-    SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
-    UNION ALL
-    SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
-)
-SELECT * FROM Hierarchy
-"""
+# cte = """
+# WITH RECURSIVE Hierarchy AS (
+#     SELECT /*+ MATERIALIZE */ employee_id, manager_id, first_name FROM Employees WHERE manager_id IS NULL
+#     UNION ALL
+#     SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
+#     UNION ALL
+#     SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
+# )
+# SELECT * FROM Hierarchy
+# """
 
 # cte = """
 # WITH RECURSIVE Hierarchy AS (
@@ -155,29 +121,55 @@ SELECT * FROM Hierarchy
 # ee1 = CTE(p_select.statement, p_select.parameters)
 # ee2 = CTE(c_select.statement, c_select.parameters)
 
-"""
-+: select ... union all select ... union all select ...
-cte.alias = first.alias
+class P(Employees): pass
+class C(Employees): pass
+class Hierarchy(Record): pass
+hieirarchy = Hierarchy()
+# class H(Hierarchy): pass
+# hieirarchy = H()
 
->>: a1 AS (select ...), a2 AS (select ...), a3 AS (select ...)
+p = P()
+c = C()
 
-"""
+p.filter(P.manager_id.is_null())
+c.filter(C.first_name == 'Neena')
+c.join(hieirarchy, (C.manager_id == Hierarchy.employee_id))
 
-ee1 = CTE(p_select, materialization=None)
-ee2 = CTE(c_select, materialization=None)
-print(ee2.parameters)
+# hints used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
+p_select = p.select(selected='/*+ MATERIALIZE */ employee_id, manager_id, first_name')
+c_select = c.select(selected='/*+ INLINE */ C.employee_id, C.manager_id, C.first_name')
 
-ee = (ee1 + ee2)
-ee.alias = "Hierarchy"
-# ee.materialization(True) # No materialization with recursive
-print(ee)
+# Oracle: use hints after SELECT
+# 'MySQL': Not support 'Default Behavior'
+# 'MicrosofAzureSQL': Not supported directly, Uses temp tables instead.
 
-ee = WithCTE((ee1 >> ee >> ee2), recursive=False)
+if Hierarchy.database__.name in ['SQLite3', 'Postgres']:
+	cte1 = CTE(p_select, materialization=True)
+	cte2 = CTE(c_select, materialization=False)
+else: #  ['Oracle', 'MySQL', 'MicrosofAzureSQL']:
+	cte1 = CTE(p_select, materialization=None)
+	cte2 = CTE(c_select, materialization=None)
 
-print(f"{ee.value} SELECT * FROM Hierarchy")
+cte = (cte1 + cte2)
+cte.alias = "Hierarchy" # you have to set alias for Recursive CTE
 
-rec = Record(statement=f"{ee.value} SELECT * FROM Hierarchy", parameters=ee.parameters, operation=Database.read)
-# print(f"CTE result: {rec.recordset.data}")
+# columnsAliases used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
+cte.columnsAliases = "employee_id, manager_id, first_name"
+
+# ee.materialization(True) # Error: materialization with recursive
+
+# RECURSIVE: Required for MySQL and Postgres. Optional for SQLite3.
+# RECURSIVE: are not used by Oracle and MicrosoftSQL.
+
+if Hierarchy.database__.name in ['Oracle', 'MicrosoftSQL']:
+	with_cte = WithCTE((cte1 >> cte >> cte2), recursive=False)
+else: # ['SQLite3', 'MySQL', 'Postgres']
+	with_cte = WithCTE((cte1 >> cte >> cte2), recursive=True)
+	
+
+print(f"{with_cte.value} SELECT * FROM Hierarchy")
+
+rec = Record(statement=f"{with_cte.value} SELECT * FROM Hierarchy", parameters=with_cte.parameters, operation=Database.read)
 for r in rec:
 	print(r.data)
 #==============================================================================#
@@ -586,7 +578,7 @@ recordset.add(e2)
 
 # Recordset insert:
 recordset.insert()
-if e1.database__.name == "MicrosoftAzureSQL":
+if e1.database__.name == "MicrosoftSQL":
 	pass
 else:
 	assert recordset.rowsCount == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
@@ -598,7 +590,7 @@ e1.filter(Employees.employee_id > 4) # add general condition to all records of t
 # Recordset update:
 recordset.update()
 
-if e1.database__.name == "MicrosoftAzureSQL":
+if e1.database__.name == "MicrosoftSQL":
 	employees = Employees()
 	employees.in_(manager_id = [77, 88])
 	employees.read()
@@ -611,7 +603,7 @@ else:
 e1.filter(Employees.manager_id < 100) # add general condition to all records of the recordset
 recordset.delete()
 
-if e1.database__.name == "MicrosoftAzureSQL":
+if e1.database__.name == "MicrosoftSQL":
 	employees = Employees()
 	employees.in_(manager_id = [77, 88])
 	employees.read()
@@ -821,7 +813,7 @@ if(emp.database__.name in ["SQLite3", "Postgres"]):
 		(EXCLUDED.salary < Employees.salary) & 
 		(Employees.last_name.in_subquery(emp, selected='last_name'))
 	)
-if(emp.database__.name in ["Oracle", "MicrosoftAzureSQL"]):
+if(emp.database__.name in ["Oracle", "MicrosoftSQL"]):
 	## Oracle and MicroftSQL
 	emp1.filter(
 		(S.salary < T.salary) & 
@@ -842,7 +834,7 @@ if(emp.database__.name == "SQLite3"):
 if(emp.database__.name == "Oracle"):
 	### Oracle
 	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': datetime(1989, 9, 21, 0, 0), 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
-if(emp.database__.name in ["MySQL", "Postgres", "MicrosoftAzureSQL"]):
+if(emp.database__.name in ["MySQL", "Postgres", "MicrosoftSQL"]):
 	### MySQL | Postgres | Microsoft AzureSQL
 	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
 #==============================================================================#
