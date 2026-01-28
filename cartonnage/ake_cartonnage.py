@@ -510,10 +510,10 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			# print(f"<s|{'-'*3}")
-			# print(" > Execute statement: ", query.statement)
-			# print(" > Execute parameters: ", query.parameters)
-			# print(f"{'-'*3}|e>")
+			print(f"<s|{'-'*3}")
+			print(" > Execute statement: ", query.statement)
+			print(" > Execute parameters: ", query.parameters)
+			print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -568,7 +568,12 @@ class Database:
 	#--------------------------------------#
 	@staticmethod
 	def crud(operation, record, selected="*", group_by='', order_by='', limit=''):
-		current = []
+		with_cte = ''
+		with_cte_parameters = []
+		if(record.__dict__.get('with_cte')):
+			with_cte = f"{record.with_cte.value} "
+			with_cte_parameters = record.with_cte.parameters
+
 		whereValues = record.values.where(record)
 		whereFilter = record.filter_.where(record)
 		if whereValues and whereFilter:
@@ -584,26 +589,27 @@ class Database:
 		if(operation==Database.read):
 			group_clause = f"GROUP BY {group_by}" if group_by else ''
 			order_clause = f"ORDER BY {order_by}" if order_by else ''
-			statement = f"SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_clause} {order_clause} {limit}"
+			statement = f"{with_cte}SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_clause} {order_clause} {limit}"
 		#-----
 		elif(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
-			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
+			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set.setFields()
-			statement = f"UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"{with_cte}DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		elif(operation==Database.all):
-			statement = f"SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
+			statement = f"{with_cte}SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
 		#-----
 		record.query__ = Query()
 		record.query__.parent = record
 		record.query__.statement = statement
 		record.query__.parameters = []
+		record.query__.parameters.extend(with_cte_parameters)
 		record.query__.parameters.extend(record.set.parameters()) # if update extend with fields set values first
 		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters) #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.parameters.extend(joiners.parameters)
@@ -611,6 +617,12 @@ class Database:
 		return record.query__
 	#--------------------------------------#
 	def crudMany(self, operation, record, selected="*", onColumns=None, group_by='', limit=''):
+		with_cte = ''
+		with_cte_parameters = []
+		if(record.__dict__.get('with_cte')):
+			with_cte = f"{record.with_cte.value} "
+			with_cte_parameters = record.with_cte.parameters
+
 		joiners = Database.joining(record)
 		joinsCriteria = joiners.preparedStatement
 		#
@@ -626,14 +638,14 @@ class Database:
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
-			statement = f"INSERT INTO {record.table__()} {fieldsValuesClause}"
+			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause}"
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set.setFields()
-			statement = f"UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"{with_cte}DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		record.query__ = Query() # as 
 		record.query__.parent = record
@@ -642,6 +654,7 @@ class Database:
 		for r in record.recordset.iterate():
 			#no problem with r.set.parameters() as it's emptied after sucessful update
 			params = []
+			params.extend(with_cte_parameters)
 			params.extend(r.set.parameters())
 			params.extend(r.values.parameters(r, fieldsNames=fieldsNames) )
 			params.extend(filterParamters)
@@ -706,11 +719,6 @@ class SQLite(Database):
 	@staticmethod
 	def limit(offset=0, recordsCount=1):
 		return f"LIMIT {offset}, {recordsCount}"
-	
-	@staticmethod
-	def with_cte(cte, recursive=False, materialization=False):
-		self.value = f"WITH \n {cte.sql()}\n"
-		self.parameters = cte.parameters
 
 	def upsertStatement(self, operation, record, onColumns):
 		keys = list(record.set.new.keys())
@@ -1198,8 +1206,18 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN ')
 	#--------------------------------------#
-	def with_cte(self, cte):
-		self.with_cte = self.database__.with_cte(cte)
+	def joinCTE(self, table, fields):
+		freshTableInstanceForCTEJoining = table.__class__()
+		freshTableInstanceForCTEJoining.tableName__ = TableName(table.alias.value())
+		self.joins__[table.alias.value()] = Join(freshTableInstanceForCTEJoining, fields)
+	def rightJoinCTE(self, table, fields):
+		freshTableInstanceForCTEJoining = table.__class__()
+		freshTableInstanceForCTEJoining.tableName__ = TableName(table.alias.value())
+		self.joins__[table.alias.value()] = Join(freshTableInstanceForCTEJoining, fields, ' RIGHT JOIN ')
+	def leftJoinCTE(self, table, fields):
+		freshTableInstanceForCTEJoining = table.__class__()
+		freshTableInstanceForCTEJoining.tableName__ = TableName(table.alias.value())
+		self.joins__[table.alias.value()] = Join(freshTableInstanceForCTEJoining, fields, ' LEFT JOIN ')
 	#--------------------------------------#
 	def toDict(self): return self.data
 	#--------------------------------------#

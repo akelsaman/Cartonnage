@@ -11,11 +11,11 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-# initSQLite3Env()
+initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
-initAzureSQLEnv()
+# initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
 # initSQLite3PoolEnv()
@@ -124,37 +124,48 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
 class P(Employees): pass
 class C(Employees): pass
 class Hierarchy(Record): pass
-hieirarchy = Hierarchy()
-# class H(Hierarchy): pass
-# hieirarchy = H()
+class ExecutivesDepartment(Departments): pass
+class AdministrationJobs(Jobs): pass
 
+hieirarchy = Hierarchy()
 p = P()
 c = C()
+executives_department = ExecutivesDepartment()
+administration_jobs = AdministrationJobs()
 
 p.filter(P.manager_id.is_null())
 c.filter(C.first_name == 'Neena')
 c.join(hieirarchy, (C.manager_id == Hierarchy.employee_id))
 
+executives_department.filter(ExecutivesDepartment.department_name == 'Executive')
+administration_jobs.filter(AdministrationJobs.job_title.like('Administration'))
+
 # hints used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
 p_select = p.select(selected='/*+ MATERIALIZE */ employee_id, manager_id, first_name')
 c_select = c.select(selected='/*+ INLINE */ C.employee_id, C.manager_id, C.first_name')
+executives_department_select = executives_department.select(selected='/*+ INLINE */ ExecutivesDepartment.*')
+administration_jobs_select = administration_jobs.select(selected='/*+ MATERIALIZE */ AdministrationJobs.*')
 
 # Oracle: use hints after SELECT
 # 'MySQL': Not support 'Default Behavior'
 # 'MicrosofAzureSQL': Not supported directly, Uses temp tables instead.
 
 if Hierarchy.database__.name in ['SQLite3', 'Postgres']:
-	cte1 = CTE(p_select, materialization=True)
+	cte1 = CTE(p_select, materialization=False)
 	cte2 = CTE(c_select, materialization=False)
+	cte3 = CTE(executives_department_select, materialization=False)
+	cte4 = CTE(administration_jobs_select, materialization=True)
 else: #  ['Oracle', 'MySQL', 'MicrosofAzureSQL']:
-	cte1 = CTE(p_select, materialization=None)
-	cte2 = CTE(c_select, materialization=None)
+	cte1 = CTE(p_select)
+	cte2 = CTE(c_select)
+	cte3 = CTE(executives_department_select)
+	cte4 = CTE(administration_jobs_select)
 
-cte = (cte1 + cte2)
-cte.alias = "Hierarchy" # you have to set alias for Recursive CTE
+recursive_cte = (cte1 + cte2)
+recursive_cte.alias = "Hierarchy" # you have to set alias for Recursive CTE
 
 # columnsAliases used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
-cte.columnsAliases = "employee_id, manager_id, first_name"
+recursive_cte.columnsAliases = "employee_id, manager_id, first_name"
 
 # ee.materialization(True) # Error: materialization with recursive
 
@@ -162,16 +173,37 @@ cte.columnsAliases = "employee_id, manager_id, first_name"
 # RECURSIVE: are not used by Oracle and MicrosoftSQL.
 
 if Hierarchy.database__.name in ['Oracle', 'MicrosoftSQL']:
-	with_cte = WithCTE((cte1 >> cte >> cte2), recursive=False)
+	with_cte = WithCTE((cte1 >> recursive_cte), recursive=False)
 else: # ['SQLite3', 'MySQL', 'Postgres']
-	with_cte = WithCTE((cte1 >> cte >> cte2), recursive=True)
+	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True)
 	
 
-print(f"{with_cte.value} SELECT * FROM Hierarchy")
+sql_query = f"{with_cte.value} SELECT * FROM Hierarchy"
+print(sql_query)
 
-rec = Record(statement=f"{with_cte.value} SELECT * FROM Hierarchy", parameters=with_cte.parameters, operation=Database.read)
+print("Raw SQL:")
+rec = Record(statement=sql_query, parameters=with_cte.parameters, operation=Database.read)
 for r in rec:
 	print(r.data)
+
+
+print("Cartonnage:")
+emp = Employees()
+emp.with_cte = with_cte
+emp.joinCTE(hieirarchy, (Employees.employee_id == Hierarchy.employee_id))
+emp.joinCTE(executives_department, (Employees.department_id == ExecutivesDepartment.department_id))
+emp.joinCTE(administration_jobs, (Employees.job_id == AdministrationJobs.job_id))
+# emp.filter(Employees.employee_id == Hierarchy.employee_id)
+# emp.filter(Employees.department_id == ExecutivesDepartment.department_id)
+# emp.filter(Employees.job_id == AdministrationJobs.job_id)
+emp.read()
+
+for r in emp:
+	print(r.data)
+
+print(f"{'-'*80}")
+print(emp.query__.statement)
+print(emp.query__.parameters)
 #==============================================================================#
 print("---------------------------------------00---------------------------------------")
 #==============================================================================#
