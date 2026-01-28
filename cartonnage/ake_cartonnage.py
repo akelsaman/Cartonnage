@@ -121,39 +121,55 @@ class Expression():
 	def __repr__(self): return self.value
 	def __and__(self, other): return Expression(f"({self.value} AND {other.value})", self.parameters + other.parameters)
 	def __or__(self, other): return Expression(f"({self.value} OR {other.value})", self.parameters + other.parameters)
-# #--------------------------------------#
+#--------------------------------------#
 class CTE():
-	def __init__(self, alias, record=None):
+	def __init__(self, select=None, alias='', materialization=None):
 		self.value = ''
 		self.parameters = []
 		self.alias = alias
+		self.as_keyword = ' AS '
 		# self.parameters = parameters if parameters is not None else []
-		if(record):
-			select = record.select()
+		if(select):
 			self.value = select.statement
 			self.parameters = select.parameters
+			self.alias = select.parent.alias.value()
+		self.materialization(materialization)
 			# self.alias = record.alias.value()
 	def __str__(self): return self.value
 	def __repr__(self): return self.value
-	def sql(self): return f"{self.alias} AS ({self.value})"
+	def materialization(self, mode):
+		if(mode):
+			self.as_keyword = ' AS MATERIALIZED '
+		elif(mode == False):
+			self.as_keyword = ' AS NOT MATERIALIZED '
+	# ALIAS AS (SELECT ...
+	def sql_endless(self): return f"{self.alias}{self.as_keyword}({self.value}"
+	# ALIAS AS (SELECT ...)
+	def sql(self): return f"{self.sql_endless()})"
 	def __add__(self, other):
-		cte = CTE('')
+		cte = CTE()
+		# cte.as_keyword = self.as_keyword
 		cte.alias = self.alias
 		cte.value = f"{self.value} UNION ALL\n {other.value}"
 		cte.parameters.extend(self.parameters)
 		cte.parameters.extend(other.parameters)
 		return cte
 	def __rshift__(self, other):
-		cte = CTE('')
+		cte = CTE()
+		cte.as_keyword = self.as_keyword
 		cte.alias = self.alias
-		cte.value = f"{self.value}) ,\n {other.alias} AS ({other.value}"
+		# SELECT ..., 
+		cte.value = f"{self.value}) ,\n {other.sql_endless()}" #{other.alias}{self.as_keyword}({other.value}
 		cte.parameters.extend(self.parameters)
 		cte.parameters.extend(other.parameters)
 		return cte
 # #--------------------------------------#
 class WithCTE():
-	def __init__(self, cte):
-		self.value = f"WITH \n {cte.sql()}\n"
+	def __init__(self, cte, recursive=None):
+		self.with_keyword = "WITH"
+		if(recursive):
+			self.with_keyword = "WITH RECURSIVE"
+		self.value = f"{self.with_keyword} \n {cte.sql()}\n"
 		self.parameters = cte.parameters
 	def __str__(self): return self.value
 	def __repr__(self): return self.value
@@ -690,6 +706,11 @@ class SQLite(Database):
 	def limit(offset=0, recordsCount=1):
 		return f"LIMIT {offset}, {recordsCount}"
 	
+	@staticmethod
+	def with_cte(cte, recursive=False, materialization=False):
+		self.value = f"WITH \n {cte.sql()}\n"
+		self.parameters = cte.parameters
+
 	def upsertStatement(self, operation, record, onColumns):
 		keys = list(record.set.new.keys())
 		fields = ', '.join(keys)
@@ -1175,6 +1196,9 @@ class Record(metaclass=RecordMeta):
 	def rightJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' RIGHT JOIN ')
 	#--------------------------------------#
 	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN ')
+	#--------------------------------------#
+	def with_cte(self, cte):
+		self.with_cte = self.database__.with_cte(cte)
 	#--------------------------------------#
 	def toDict(self): return self.data
 	#--------------------------------------#

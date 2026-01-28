@@ -11,11 +11,11 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-initSQLite3Env()
+# initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
-# initAzureSQLEnv()
+initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
 # initSQLite3PoolEnv()
@@ -83,11 +83,11 @@ p = P()
 c = C()
 
 p.filter(P.manager_id.is_null())
-c.filter(C.employee_name == 'Neena')
+c.filter(C.first_name == 'Neena')
 c.join(hieirarchy, (C.manager_id == Hierarchy.employee_id))
 
-p_select = p.select(selected='employee_id, manager_id, first_name')
-c_select = c.select(selected='c.employee_id, c.manager_id, c.first_name')
+p_select = p.select(selected='/*+ MATERIALIZE */ employee_id, manager_id, first_name')
+c_select = c.select(selected='/*+ INLINE */ C.employee_id, C.manager_id, C.first_name')
 
 print(p_select.statement)
 print(c_select.statement)
@@ -108,7 +108,7 @@ print(c_select.statement)
 ## PostgreSQL/MySQL/SQLite
 cte = """
 WITH RECURSIVE Hierarchy AS (
-    SELECT employee_id, manager_id, first_name FROM Employees WHERE manager_id IS NULL
+    SELECT /*+ MATERIALIZE */ employee_id, manager_id, first_name FROM Employees WHERE manager_id IS NULL
     UNION ALL
     SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
     UNION ALL
@@ -163,18 +163,20 @@ cte.alias = first.alias
 
 """
 
-ee1 = CTE("p", p)
-ee2 = CTE("c", c)
+ee1 = CTE(p_select, materialization=None)
+ee2 = CTE(c_select, materialization=None)
 print(ee2.parameters)
 
 ee = (ee1 + ee2)
-ee.alias = "hieirarchy"
+ee.alias = "Hierarchy"
+# ee.materialization(True) # No materialization with recursive
 print(ee)
 
-ee = WithCTE(ee1 >> ee >> ee2)
-print(ee)
+ee = WithCTE((ee1 >> ee >> ee2), recursive=False)
 
-rec = Record(statement=cte, operation=Database.read)
+print(f"{ee.value} SELECT * FROM Hierarchy")
+
+rec = Record(statement=f"{ee.value} SELECT * FROM Hierarchy", parameters=ee.parameters, operation=Database.read)
 # print(f"CTE result: {rec.recordset.data}")
 for r in rec:
 	print(r.data)
