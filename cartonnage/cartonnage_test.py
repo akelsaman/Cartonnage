@@ -11,10 +11,10 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-initSQLite3Env()
+# initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
-# initPostgresEnv()
+initPostgresEnv()
 # initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
@@ -141,26 +141,28 @@ executives_department.filter(ExecutivesDepartment.department_name == 'Executive'
 administration_jobs.filter(AdministrationJobs.job_title.like('Administration%'))
 
 # hints used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
-p_select = p.select(selected='/*+ MATERIALIZE */ employee_id, manager_id, first_name')
-c_select = c.select(selected='/*+ INLINE */ C.employee_id, C.manager_id, C.first_name')
+p_select = p.select(selected='/*+ INLINE */ employee_id, manager_id, first_name')
+c_select = c.select(selected='/*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name')
 executives_department_select = executives_department.select(selected='/*+ INLINE */ ExecutivesDepartment.*')
 administration_jobs_select = administration_jobs.select(selected='/*+ MATERIALIZE */ AdministrationJobs.*')
 
 # Oracle: use hints after SELECT
 # 'MySQL': Not support 'Default Behavior'
-# 'MicrosofAzureSQL': Not supported directly, Uses temp tables instead.
+# 'MicrosoftSQL': Not supported directly, Uses temp tables instead.
 
 if Hierarchy.database__.name in ['SQLite3', 'Postgres']:
 	cte1 = CTE(p_select, materialization=False)
 	cte2 = CTE(c_select, materialization=False)
 	cte3 = CTE(executives_department_select, materialization=False)
 	cte4 = CTE(administration_jobs_select, materialization=True)
-else: #  ['Oracle', 'MySQL', 'MicrosofAzureSQL']:
+else: #  ['Oracle', 'MySQL', 'MicrosoftSQL']:
 	cte1 = CTE(p_select)
 	cte2 = CTE(c_select)
 	cte3 = CTE(executives_department_select)
 	cte4 = CTE(administration_jobs_select)
 
+# ^ union: recursive_cte = (cte1 ^ cte2)
+# Recursive CTE wit UINION only supported by: SQLite3, MySQL, Postgres.
 recursive_cte = (cte1 + cte2)
 recursive_cte.alias = "Hierarchy" # you have to set alias for Recursive CTE
 
@@ -171,13 +173,17 @@ recursive_cte.columnsAliases = "employee_id, manager_id, first_name"
 
 # RECURSIVE: Required for MySQL and Postgres. Optional for SQLite3.
 # RECURSIVE: are not used by Oracle and MicrosoftSQL.
-
 if Hierarchy.database__.name in ['Oracle', 'MicrosoftSQL']:
 	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=False)
-else: # ['SQLite3', 'MySQL', 'Postgres']
+elif Hierarchy.database__.name in ['Postgres']: # ['SQLite3', 'MySQL', 'Postgres']
+	# with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='CYCLE employee_id SET is_cycle USING path')
+	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='SEARCH DEPTH FIRST BY employee_id SET ordercol')
+else:
 	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True)
-	
 
+# CYCLE Detection (PostgreSQL 14+): CYCLE employee_id SET is_cycle USING path
+# SEARCH Clause (PostgreSQL 14+): SEARCH DEPTH FIRST BY employee_id SET ordercol
+# MSSQL MAXRECURSION Option: OPTION (MAXRECURSION 100)
 sql_query = f"{with_cte.value} SELECT * FROM Hierarchy" # build on top of generated WITH CTE
 print(sql_query)
 

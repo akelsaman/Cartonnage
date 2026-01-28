@@ -155,6 +155,14 @@ class CTE():
 		cte.parameters.extend(self.parameters)
 		cte.parameters.extend(other.parameters)
 		return cte
+	def __xor__(self, other):
+		cte = CTE()
+		# cte.as_keyword = self.as_keyword
+		cte.alias = self.alias
+		cte.value = f"{self.value} UNION\n {other.value}"
+		cte.parameters.extend(self.parameters)
+		cte.parameters.extend(other.parameters)
+		return cte
 	def __rshift__(self, other):
 		cte = CTE()
 		cte.as_keyword = self.as_keyword
@@ -166,11 +174,11 @@ class CTE():
 		return cte
 # #--------------------------------------#
 class WithCTE():
-	def __init__(self, cte, recursive=None):
+	def __init__(self, cte, recursive=None, options=''):
 		self.with_keyword = "WITH"
 		if(recursive):
 			self.with_keyword = "WITH RECURSIVE"
-		self.value = f"{self.with_keyword} \n {cte.sql()}\n"
+		self.value = f"{self.with_keyword} \n {cte.sql()} {options} \n"
 		self.parameters = cte.parameters
 	def __str__(self): return self.value
 	def __repr__(self): return self.value
