@@ -121,7 +121,42 @@ class Expression():
 	def __repr__(self): return self.value
 	def __and__(self, other): return Expression(f"({self.value} AND {other.value})", self.parameters + other.parameters)
 	def __or__(self, other): return Expression(f"({self.value} OR {other.value})", self.parameters + other.parameters)
-	def __add__(self, other): return Expression(f"({self.value} UNION ALL\n {other.value})", self.parameters + other.parameters)
+# #--------------------------------------#
+class CTE():
+	def __init__(self, alias, record=None):
+		self.value = ''
+		self.parameters = []
+		self.alias = alias
+		# self.parameters = parameters if parameters is not None else []
+		if(record):
+			select = record.select()
+			self.value = select.statement
+			self.parameters = select.parameters
+			# self.alias = record.alias.value()
+	def __str__(self): return self.value
+	def __repr__(self): return self.value
+	def sql(self): return f"{self.alias} AS ({self.value})"
+	def __add__(self, other):
+		cte = CTE('')
+		cte.alias = self.alias
+		cte.value = f"{self.value} UNION ALL\n {other.value}"
+		cte.parameters.extend(self.parameters)
+		cte.parameters.extend(other.parameters)
+		return cte
+	def __rshift__(self, other):
+		cte = CTE('')
+		cte.alias = self.alias
+		cte.value = f"{self.value}) ,\n {other.alias} AS ({other.value}"
+		cte.parameters.extend(self.parameters)
+		cte.parameters.extend(other.parameters)
+		return cte
+# #--------------------------------------#
+class WithCTE():
+	def __init__(self, cte):
+		self.value = f"WITH \n {cte.sql()}\n"
+		self.parameters = cte.parameters
+	def __str__(self): return self.value
+	def __repr__(self): return self.value
 # #--------------------------------------#
 class Join():
 	def __init__(self, object, fields, type=' INNER JOIN ', value=None):

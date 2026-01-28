@@ -11,10 +11,10 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-# initSQLite3Env()
+initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
-initPostgresEnv()
+# initPostgresEnv()
 # initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
@@ -74,19 +74,20 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
 
 class P(Employees): pass
 class C(Employees): pass
-class Hierarchy(Employees): pass
-class H(Hierarchy): pass
-hieirarchy = H()
+class Hierarchy(Record): pass
+hieirarchy = Hierarchy()
+# class H(Hierarchy): pass
+# hieirarchy = H()
 
 p = P()
 c = C()
 
+p.filter(P.manager_id.is_null())
+c.filter(C.employee_name == 'Neena')
+c.join(hieirarchy, (C.manager_id == Hierarchy.employee_id))
+
 p_select = p.select(selected='employee_id, manager_id, first_name')
 c_select = c.select(selected='c.employee_id, c.manager_id, c.first_name')
-
-p.filter(P.manager_id.is_null())
-c.join(hieirarchy, (C.manager_id == Hierarchy.employee_id))
-c.filter(C.employee_name == 'Neena')
 
 print(p_select.statement)
 print(c_select.statement)
@@ -104,27 +105,38 @@ print(c_select.statement)
 #     cte2 AS (SELECT ... FROM cte1)
 # SELECT * FROM cte2;
 
-### PostgreSQL/MySQL/SQLite
+## PostgreSQL/MySQL/SQLite
 cte = """
 WITH RECURSIVE Hierarchy AS (
-    (SELECT employee_id, manager_id, first_name FROM Employees WHERE manager_id IS NULL)
+    SELECT employee_id, manager_id, first_name FROM Employees WHERE manager_id IS NULL
     UNION ALL
-    SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy H ON C.manager_id = H.employee_id
+    SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
     UNION ALL
-    SELECT D.employee_id, NULL, D.first_name FROM Dependents D INNER JOIN Hierarchy H ON D.employee_id = H.employee_id
+    SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
 )
 SELECT * FROM Hierarchy
-
 """
+
+# cte = """
+# WITH RECURSIVE Hierarchy AS (
+#     -- Anchor 1: top-level managers (no manager)
+#     SELECT employee_id, manager_id, first_name, CAST('ROOT' AS CHAR(20)) as type FROM Employees WHERE manager_id IS NULL
+#     UNION ALL
+#     -- Anchor 2: specific department heads
+#     SELECT employee_id, manager_id, first_name, CAST('DEPT_HEAD' AS CHAR(20)) as type FROM Employees WHERE employee_id IN (108, 114, 120)
+#     UNION ALL
+#     -- Recursive: their subordinates
+#     SELECT C.employee_id, C.manager_id, C.first_name, CAST('SUBORDINATE' AS CHAR(20)) FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
+# )
+# SELECT * FROM Hierarchy
+# """
 
 ### Oracle
 # cte = """
 # WITH Hierarchy (employee_id, manager_id, first_name) AS (
-#     SELECT employee_id, manager_id, first_name FROM Employees P
-#     WHERE P.manager_id IS NULL
+#     SELECT employee_id, manager_id, first_name FROM Employees P WHERE P.manager_id IS NULL
 #     UNION ALL
-#     SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C  
-#     INNER JOIN Hierarchy H ON C.manager_id = H.employee_id
+#     SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
 # )
 # SELECT * FROM Hierarchy
 # """
@@ -132,21 +144,34 @@ SELECT * FROM Hierarchy
 ### Recursive CTE - MSSQL (no RECURSIVE keyword)
 # cte = """
 # WITH Hierarchy AS (
-#     SELECT employee_id, manager_id, first_name FROM Employees P
-#     WHERE P.manager_id IS NULL
+#     SELECT employee_id, manager_id, first_name FROM Employees P WHERE P.manager_id IS NULL
 #     UNION ALL
-#     SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C  
-#     INNER JOIN Hierarchy H ON C.manager_id = H.employee_id
+#     SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
 # )
 # SELECT * FROM hierarchy
 # OPTION (MAXRECURSION 100);
 # """
 
-ee1 = Expression(p_select.statement, p_select.parameters)
-ee2 = Expression(c_select.statement, c_select.parameters)
+# ee1 = CTE(p_select.statement, p_select.parameters)
+# ee2 = CTE(c_select.statement, c_select.parameters)
+
+"""
++: select ... union all select ... union all select ...
+cte.alias = first.alias
+
+>>: a1 AS (select ...), a2 AS (select ...), a3 AS (select ...)
+
+"""
+
+ee1 = CTE("p", p)
+ee2 = CTE("c", c)
 print(ee2.parameters)
 
 ee = (ee1 + ee2)
+ee.alias = "hieirarchy"
+print(ee)
+
+ee = WithCTE(ee1 >> ee >> ee2)
 print(ee)
 
 rec = Record(statement=cte, operation=Database.read)
