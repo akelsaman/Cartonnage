@@ -138,7 +138,7 @@ c.filter(C.first_name == 'Neena')
 c.join(hieirarchy, (C.manager_id == Hierarchy.employee_id))
 
 executives_department.filter(ExecutivesDepartment.department_name == 'Executive')
-administration_jobs.filter(AdministrationJobs.job_title.like('Administration'))
+administration_jobs.filter(AdministrationJobs.job_title.like('Administration%'))
 
 # hints used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
 p_select = p.select(selected='/*+ MATERIALIZE */ employee_id, manager_id, first_name')
@@ -173,19 +173,19 @@ recursive_cte.columnsAliases = "employee_id, manager_id, first_name"
 # RECURSIVE: are not used by Oracle and MicrosoftSQL.
 
 if Hierarchy.database__.name in ['Oracle', 'MicrosoftSQL']:
-	with_cte = WithCTE((cte1 >> recursive_cte), recursive=False)
+	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=False)
 else: # ['SQLite3', 'MySQL', 'Postgres']
 	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True)
 	
 
-sql_query = f"{with_cte.value} SELECT * FROM Hierarchy"
+sql_query = f"{with_cte.value} SELECT * FROM Hierarchy" # build on top of generated WITH CTE
 print(sql_query)
 
 print("Raw SQL:")
+# Run SELECT WITH CTE as raw/plain SQL
 rec = Record(statement=sql_query, parameters=with_cte.parameters, operation=Database.read)
 for r in rec:
 	print(r.data)
-
 
 print("Cartonnage:")
 emp = Employees()
@@ -193,9 +193,6 @@ emp.with_cte = with_cte
 emp.joinCTE(hieirarchy, (Employees.employee_id == Hierarchy.employee_id))
 emp.joinCTE(executives_department, (Employees.department_id == ExecutivesDepartment.department_id))
 emp.joinCTE(administration_jobs, (Employees.job_id == AdministrationJobs.job_id))
-# emp.filter(Employees.employee_id == Hierarchy.employee_id)
-# emp.filter(Employees.department_id == ExecutivesDepartment.department_id)
-# emp.filter(Employees.job_id == AdministrationJobs.job_id)
 emp.read()
 
 for r in emp:

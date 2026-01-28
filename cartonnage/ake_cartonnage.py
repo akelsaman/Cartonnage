@@ -510,10 +510,10 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			print(f"<s|{'-'*3}")
-			print(" > Execute statement: ", query.statement)
-			print(" > Execute parameters: ", query.parameters)
-			print(f"{'-'*3}|e>")
+			# print(f"<s|{'-'*3}")
+			# print(" > Execute statement: ", query.statement)
+			# print(" > Execute parameters: ", query.parameters)
+			# print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
