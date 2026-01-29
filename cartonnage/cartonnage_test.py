@@ -233,7 +233,7 @@ print(emp.query__.parameters)
 
 # Recursive depth column
 # Lateral
-
+# Transaction savepoints	SAVEPOINT/ROLLBACK TO support	Low
 
 # print("After delete - checking if in transaction:")
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
