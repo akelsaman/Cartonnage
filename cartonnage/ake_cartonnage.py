@@ -293,9 +293,9 @@ class Filter:
 		self.__where = ''
 		self.parameters = []
 	
-	def read(self, selected="*", group_by='', order_by='', limit=''): self.parent.database__.read(record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
-	def delete(self): self.parent.database__.delete(record=self.parent)
-	def update(self): self.parent.database__.update(record=self.parent)
+	def read(self, selected="*", group_by='', order_by='', limit='', option=''): self.parent.database__.read(record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def delete(self, option=''): self.parent.database__.delete(record=self.parent, option=option)
+	def update(self, option=''): self.parent.database__.update(record=self.parent, option=option)
 
 	def fltr(self, field, placeholder): return self.where__()
 	# def parameters(self, parameters): return self.parameters__()
@@ -576,7 +576,7 @@ class Database:
 		return self.__cursor.executescript(sql)
 	#--------------------------------------#
 	@staticmethod
-	def crud(operation, record, selected="*", group_by='', order_by='', limit=''):
+	def crud(operation, record, selected="*", group_by='', order_by='', limit='', option=''):
 		with_cte = ''
 		with_cte_parameters = []
 		if(record.__dict__.get('with_cte')):
@@ -598,21 +598,21 @@ class Database:
 		if(operation==Database.read):
 			group_clause = f"GROUP BY {group_by}" if group_by else ''
 			order_clause = f"ORDER BY {order_by}" if order_by else ''
-			statement = f"{with_cte}SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_clause} {order_clause} {limit}"
+			statement = f"{with_cte}SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_clause} {order_clause} {limit} {option}"
 		#-----
 		elif(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
-			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause}"
+			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause} {option}"
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set.setFields()
-			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"{with_cte}DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"{with_cte}DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		elif(operation==Database.all):
-			statement = f"{with_cte}SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause}"
+			statement = f"{with_cte}SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause} {option}"
 		#-----
 		record.query__ = Query()
 		record.query__.parent = record
@@ -625,7 +625,7 @@ class Database:
 		record.query__.operation = operation
 		return record.query__
 	#--------------------------------------#
-	def crudMany(self, operation, record, selected="*", onColumns=None, group_by='', limit=''):
+	def crudMany(self, operation, record, selected="*", onColumns=None, group_by='', limit='', option=''):
 		with_cte = ''
 		with_cte_parameters = []
 		if(record.__dict__.get('with_cte')):
@@ -647,14 +647,14 @@ class Database:
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
-			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause}"
+			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause} {option}"
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set.setFields()
-			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"{with_cte}DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"{with_cte}DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		record.query__ = Query() # as 
 		record.query__.parent = record
@@ -671,35 +671,35 @@ class Database:
 		record.query__.operation = operation
 		return record.query__
 	#--------------------------------------#
-	def select(self, record, selected="*", group_by='', order_by='', limit=''):
-		return self.crud(operation=Database.read, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
-	def operation_statement(self, operation, record): return self.crud(operation=operation, record=record)
+	def select(self, record, selected="*", group_by='', order_by='', limit='', option=''):
+		return self.crud(operation=Database.read, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def operation_statement(self, operation, record, option=''): return self.crud(operation=operation, record=record, option=option)
 	#--------------------------------------#
-	def all(self, record): self.executeStatement(self.crud(operation=Database.all, record=record))
-	def read(self, record, selected="*", group_by='', order_by='', limit=''): self.executeStatement(self.select(record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit))
-	def insert(self, record): self.executeStatement(self.crud(operation=Database.insert, record=record))
-	def delete(self, record): self.executeStatement(self.crud(operation=Database.delete, record=record))
-	def update(self, record):
-		self.executeStatement(self.crud(operation=Database.update, record=record))
+	def all(self, record, option=''): self.executeStatement(self.crud(operation=Database.all, record=record, option=option))
+	def read(self, record, selected="*", group_by='', order_by='', limit='', option=''): self.executeStatement(self.select(record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option))
+	def insert(self, record, option=''): self.executeStatement(self.crud(operation=Database.insert, record=record, option=option))
+	def delete(self, record, option=''): self.executeStatement(self.crud(operation=Database.delete, record=record, option=option))
+	def update(self, record, option=''):
+		self.executeStatement(self.crud(operation=Database.update, record=record, option=option))
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
-	def upsert(self, record, onColumns):
-		self.executeStatement(self._upsert(operation=Database.upsert, record=record, onColumns=onColumns))
+	def upsert(self, record, onColumns, option=''):
+		self.executeStatement(self._upsert(operation=Database.upsert, record=record, onColumns=onColumns, option=option))
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
 	#--------------------------------------#
-	def insertMany(self, record): self.executeMany(self.crudMany(operation=Database.insert, record=record))
-	def deleteMany(self, record, onColumns): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns))
-	def updateMany(self, record, onColumns):
-		self.executeMany(self.crudMany(operation=Database.update, record=record, onColumns=onColumns))
+	def insertMany(self, record, option=''): self.executeMany(self.crudMany(operation=Database.insert, record=record, option=option))
+	def deleteMany(self, record, onColumns, option=''): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns, option=option))
+	def updateMany(self, record, onColumns, option=''):
+		self.executeMany(self.crudMany(operation=Database.update, record=record, onColumns=onColumns, option=option))
 		for r in record.recordset.iterate():
 			for field, value in r.set.new.items():
 				r.setField(field, value)
 				r.set.empty()
-	def upsertMany(self, record, onColumns):
-		self.executeMany(self._upsertMany(operation=Database.upsert, record=record, onColumns=onColumns))
+	def upsertMany(self, record, onColumns, option=''):
+		self.executeMany(self._upsertMany(operation=Database.upsert, record=record, onColumns=onColumns, option=option))
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
@@ -729,7 +729,7 @@ class SQLite(Database):
 	def limit(offset=0, recordsCount=1):
 		return f"LIMIT {offset}, {recordsCount}"
 
-	def upsertStatement(self, operation, record, onColumns):
+	def upsertStatement(self, operation, record, onColumns, option=''):
 		keys = list(record.set.new.keys())
 		fields = ', '.join(keys)
 		updateSet = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
@@ -741,7 +741,7 @@ class SQLite(Database):
 		INSERT INTO {record.table__()} ({fields})
 		VALUES ({values})
 		ON CONFLICT ({onColumns})
-		DO UPDATE SET {updateSet}{whereClause}
+		DO UPDATE SET {updateSet}{whereClause} {option}
 		"""
 		record.query__ = Query()
 		record.query__.parent = record
@@ -749,14 +749,14 @@ class SQLite(Database):
 		record.query__.operation = operation
 		return record
 
-	def _upsert(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		record.query__.parameters = list(record.set.new.values())
 		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
-	def _upsertMany(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
 			params = r.set.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
@@ -806,7 +806,7 @@ class Oracle(Database):
 	#     salary = :3
 	# """
 
-	def upsertStatement(self, operation, record, onColumns):
+	def upsertStatement(self, operation, record, onColumns, option=''):
 		keys = list(record.set.new.keys())
 		fields = ', '.join(keys)
 		# Oracle uses :1, :2, :3 style placeholders
@@ -826,7 +826,7 @@ class Oracle(Database):
 		WHEN MATCHED THEN
 			UPDATE SET {update_set}{whereClause}
 		WHEN NOT MATCHED THEN
-			INSERT ({insert_fields}) VALUES ({insert_values})
+			INSERT ({insert_fields}) VALUES ({insert_values}) {option}
 		"""
 		record.query__ = Query()
 		record.query__.parent = record
@@ -834,14 +834,14 @@ class Oracle(Database):
 		record.query__.operation = operation
 		return record
 
-	def _upsert(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		record.query__.parameters = list(record.set.new.values())
 		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
-	def _upsertMany(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
 			params = r.set.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
@@ -884,7 +884,7 @@ class MySQL(Database):
 	#     salary = new.salary
 	# """
 
-	def upsertStatement(self, operation, record, onColumns):
+	def upsertStatement(self, operation, record, onColumns, option=''):
 		keys = list(record.set.new.keys())
 		fields = ', '.join(keys)
 		values = ', '.join('%s' for _ in keys)
@@ -897,7 +897,7 @@ class MySQL(Database):
 		sql = f"""
 		INSERT INTO {record.table__()} ({fields})
 		VALUES ({values})
-		ON DUPLICATE KEY UPDATE {update_set}
+		ON DUPLICATE KEY UPDATE {update_set} {option}
 		"""
 		record.query__ = Query()
 		record.query__.parent = record
@@ -905,13 +905,13 @@ class MySQL(Database):
 		record.query__.operation = operation
 		return record
 
-	def _upsert(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		record.query__.parameters = list(record.set.new.values())
 		return record.query__
 
-	def _upsertMany(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
 			params = r.set.parameters()
 			record.query__.parameters.append(tuple(params))
@@ -939,7 +939,7 @@ class Postgres(Database):
 	#     salary = EXCLUDED.salary
 	# """
 
-	def upsertStatement(self, operation, record, onColumns):
+	def upsertStatement(self, operation, record, onColumns, option=''):
 		keys = list(record.set.new.keys())
 		fields = ', '.join(keys)
 		values = ', '.join('%s' for _ in keys)
@@ -953,7 +953,7 @@ class Postgres(Database):
 		INSERT INTO {record.table__()} ({fields})
 		VALUES ({values})
 		ON CONFLICT ({onColumns})
-		DO UPDATE SET {update_set}{whereClause}
+		DO UPDATE SET {update_set}{whereClause} {option}
 		"""
 		record.query__ = Query()
 		record.query__.parent = record
@@ -961,14 +961,14 @@ class Postgres(Database):
 		record.query__.operation = operation
 		return record
 
-	def _upsert(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		record.query__.parameters = list(record.set.new.values())
 		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
-	def _upsertMany(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
 			params = r.set.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
@@ -997,7 +997,7 @@ class MicrosoftSQL(Database):
 	#     INSERT (employee_id, first_name, salary) VALUES (s.employee_id, s.first_name, s.salary);
 	# """
 
-	def upsertStatement(self, operation, record, onColumns):
+	def upsertStatement(self, operation, record, onColumns, option=''):
 		keys = list(record.set.new.keys())
 		fields = ', '.join(keys)
 		# MSSQL uses ? placeholders
@@ -1017,7 +1017,7 @@ class MicrosoftSQL(Database):
 		WHEN MATCHED{whereClause} THEN
 			UPDATE SET {update_set}
 		WHEN NOT MATCHED THEN
-			INSERT ({insert_fields}) VALUES ({insert_values});
+			INSERT ({insert_fields}) VALUES ({insert_values}) {option};
 		"""
 		record.query__ = Query()
 		record.query__.parent = record
@@ -1025,14 +1025,14 @@ class MicrosoftSQL(Database):
 		record.query__.operation = operation
 		return record
 
-	def _upsert(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		record.query__.parameters = list(record.set.new.values())
 		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
-	def _upsertMany(self, operation, record, onColumns):
-		self.upsertStatement(operation, record, onColumns)
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
 			params = r.set.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
@@ -1197,18 +1197,18 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
-	def select(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.database__.select(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
-	def ins_st(self): self.database__.operation_statement(Database.insert, record=self)
-	def upd_st(self): self.database__.operation_statement(Database.update, record=self)
-	def del_st(self): self.database__.operation_statement(Database.delete, record=self)
+	def select(self, selected="*", group_by='', order_by='', limit='', option='', **kwargs): return self.database__.select(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def ins_st(self, option=''): self.database__.operation_statement(Database.insert, record=self, option=option)
+	def upd_st(self, option=''): self.database__.operation_statement(Database.update, record=self, option=option)
+	def del_st(self, option=''): self.database__.operation_statement(Database.delete, record=self, option=option)
 
-	def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	def read(self, selected="*", group_by='', order_by='', limit='', option=''): self.database__.read(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
 	# def read(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.read(selected, group_by, order_by, limit)
-	def insert(self): self.database__.insert(record=self)
-	def update(self): self.database__.update(record=self)
-	def delete(self): self.database__.delete(record=self)
-	def all(self): self.database__.all(record=self)
-	def upsert(self, onColumns): self.database__.upsert(record=self, onColumns=onColumns)
+	def insert(self, option=''): self.database__.insert(record=self, option=option)
+	def update(self, option=''): self.database__.update(record=self, option=option)
+	def delete(self, option=''): self.database__.delete(record=self, option=option)
+	def all(self, option=''): self.database__.all(record=self, option=option)
+	def upsert(self, onColumns, option=''): self.database__.upsert(record=self, onColumns=onColumns, option=option)
 	def commit(self): self.database__.commit()
 	#--------------------------------------#
 	def join(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields)
@@ -1258,14 +1258,14 @@ class Recordset:
 		for record in self.__records: record.__dict__[fieldName] = fieldValue
 	def affectedRowsCount(self): return self.rowsCount
 	#--------------------------------------#
-	def insert(self):
-		if(self.firstRecord()): self.firstRecord().database__.insertMany(self.firstRecord())
-	def update(self, onColumns=None):
-		if(self.firstRecord()):  self.firstRecord().database__.updateMany(self.firstRecord(), onColumns=onColumns)
-	def delete(self, onColumns=None):
-		if(self.firstRecord()):  self.firstRecord().database__.deleteMany(self.firstRecord(), onColumns=onColumns)
-	def upsert(self, onColumns=None):
-		if(self.firstRecord()):  self.firstRecord().database__.upsertMany(self.firstRecord(), onColumns=onColumns)
+	def insert(self, option=''):
+		if(self.firstRecord()): self.firstRecord().database__.insertMany(self.firstRecord(), option=option)
+	def update(self, onColumns=None, option=''):
+		if(self.firstRecord()):  self.firstRecord().database__.updateMany(self.firstRecord(), onColumns=onColumns, option=option)
+	def delete(self, onColumns=None, option=''):
+		if(self.firstRecord()):  self.firstRecord().database__.deleteMany(self.firstRecord(), onColumns=onColumns, option=option)
+	def upsert(self, onColumns=None, option=''):
+		if(self.firstRecord()):  self.firstRecord().database__.upsertMany(self.firstRecord(), onColumns=onColumns, option=option)
 	def commit(self):
 		if(self.firstRecord()):  self.firstRecord().database__.commit()
 	#--------------------------------------#

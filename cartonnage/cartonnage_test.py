@@ -11,11 +11,11 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-initSQLite3Env()
+# initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
-# initAzureSQLEnv()
+initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
 # initSQLite3PoolEnv()
@@ -150,7 +150,7 @@ administration_jobs_select = administration_jobs.select(selected='/*+ MATERIALIZ
 # 'MySQL': Not support 'Default Behavior'
 # 'MicrosoftSQL': Not supported directly, Uses temp tables instead.
 
-if Hierarchy.database__.name in ['SQLite3', 'Postgres']:
+if Record.database__.name in ['SQLite3', 'Postgres']:
 	cte1 = CTE(p_select, materialization=False)
 	cte2 = CTE(c_select, materialization=False)
 	cte3 = CTE(executives_department_select, materialization=False)
@@ -173,17 +173,18 @@ recursive_cte.columnsAliases = "employee_id, manager_id, first_name"
 
 # RECURSIVE: Required for MySQL and Postgres. Optional for SQLite3.
 # RECURSIVE: are not used by Oracle and MicrosoftSQL.
-if Hierarchy.database__.name in ['Oracle', 'MicrosoftSQL']:
+if Record.database__.name in ['Oracle', 'MicrosoftSQL']:
 	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=False)
-elif Hierarchy.database__.name in ['Postgres']: # ['SQLite3', 'MySQL', 'Postgres']
+elif Record.database__.name in ['Postgres']:
+	"""
+	CYCLE Detection (PostgreSQL 14+): CYCLE employee_id SET is_cycle USING path
+	SEARCH Clause (PostgreSQL 14+): SEARCH DEPTH FIRST BY employee_id SET ordercol
+	"""
 	# with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='CYCLE employee_id SET is_cycle USING path')
 	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='SEARCH DEPTH FIRST BY employee_id SET ordercol')
-else:
+else:# ['SQLite3', 'MySQL']
 	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True)
 
-# CYCLE Detection (PostgreSQL 14+): CYCLE employee_id SET is_cycle USING path
-# SEARCH Clause (PostgreSQL 14+): SEARCH DEPTH FIRST BY employee_id SET ordercol
-# MSSQL MAXRECURSION Option: OPTION (MAXRECURSION 100)
 sql_query = f"{with_cte.value} SELECT * FROM Hierarchy" # build on top of generated WITH CTE
 print(sql_query)
 
@@ -216,7 +217,11 @@ emp.with_cte = with_cte
 emp.joinCTE(hieirarchy, (Employees.employee_id == Hierarchy.employee_id))
 emp.joinCTE(executives_department, (Employees.department_id == ExecutivesDepartment.department_id))
 emp.joinCTE(administration_jobs, (Employees.job_id == AdministrationJobs.job_id))
-emp.read()
+if Record.database__.name in ['MicrosoftSQL']:
+	# MSSQL MAXRECURSION Option: OPTION (MAXRECURSION 100)
+	emp.read(option='OPTION (MAXRECURSION 100)')
+else:
+	emp.read()
 
 for r in emp:
 	print(r.data)
@@ -276,7 +281,7 @@ Record.database__.rollback()  # Force rollback
 # delete_statement = old_job_history.del_st()
 
 # # For PostgreSQL: DELETE ... RETURNING *
-# if Job_History.database__.name == 'Postgres':
+# Record.database__.name == 'Postgres':
 #     # Build the CTE with DELETE RETURNING
 #     delete_cte_value = f"{delete_statement.statement} RETURNING *"
 #     delete_cte = CTE()
@@ -293,7 +298,7 @@ Record.database__.rollback()  # Force rollback
 #     print(insert_sql)
 
 # # For MSSQL: Uses OUTPUT clause instead of RETURNING
-# elif Job_History.database__.name == 'MicrosoftSQL':
+# Record.database__.name == 'MicrosoftSQL':
 #     # MSSQL uses OUTPUT INTO for capturing deleted rows
 #     # DELETE FROM Job_History OUTPUT DELETED.* INTO Job_History_Archive WHERE end_date < '2000-01-01'
 #     delete_cte_value = f"DELETE FROM Job_History OUTPUT DELETED.* INTO @deleted_rows WHERE end_date < ?"
@@ -308,7 +313,7 @@ Record.database__.rollback()  # Force rollback
 #     print(insert_sql)
 
 # else:
-#     print(f"Data-modifying CTEs not supported on {Job_History.database__.name}")
+# Record.database__.name}")
 #     print("Only PostgreSQL and MSSQL support this feature")
 
 # # Alternative: UPDATE with RETURNING (PostgreSQL)
@@ -317,7 +322,7 @@ Record.database__.rollback()  # Force rollback
 # # )
 # # SELECT * FROM updated_employees;
 
-# if Job_History.database__.name == 'Postgres':
+# Record.database__.name == 'Postgres':
 #     emp_to_update = Employees()
 #     emp_to_update.filter(Employees.department_id == 10)
 #     emp_to_update.set(salary = Expression('salary * 1.1', []))
@@ -745,7 +750,7 @@ recordset.add(e2)
 
 # Recordset insert:
 recordset.insert()
-if e1.database__.name == "MicrosoftSQL":
+if Record.database__.name == "MicrosoftSQL":
 	pass
 else:
 	assert recordset.rowsCount == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
@@ -757,7 +762,7 @@ e1.filter(Employees.employee_id > 4) # add general condition to all records of t
 # Recordset update:
 recordset.update()
 
-if e1.database__.name == "MicrosoftSQL":
+if Record.database__.name == "MicrosoftSQL":
 	employees = Employees()
 	employees.in_(manager_id = [77, 88])
 	employees.read()
@@ -770,7 +775,7 @@ else:
 e1.filter(Employees.manager_id < 100) # add general condition to all records of the recordset
 recordset.delete()
 
-if e1.database__.name == "MicrosoftSQL":
+if Record.database__.name == "MicrosoftSQL":
 	employees = Employees()
 	employees.in_(manager_id = [77, 88])
 	employees.read()
@@ -976,13 +981,13 @@ rs.add(emp1)
 rs.add(emp2)
 
 
-if(emp.database__.name in ["SQLite3", "Postgres"]):
+if(Record.database__.name in ["SQLite3", "Postgres"]):
 	### SQLite3 and Postgres
 	emp1.filter(
 		(EXCLUDED.salary < Employees.salary) & 
 		(Employees.last_name.in_subquery(emp, selected='last_name'))
 	)
-if(emp.database__.name in ["Oracle", "MicrosoftSQL"]):
+if(Record.database__.name in ["Oracle", "MicrosoftSQL"]):
 	## Oracle and MicroftSQL
 	emp1.filter(
 		(S.salary < T.salary) & 
@@ -997,13 +1002,13 @@ emp = Employees()
 emp.filter(Employees.employee_id.in_([100,101]))
 emp.read()
 
-if(emp.database__.name == "SQLite3"):
+if(Record.database__.name == "SQLite3"):
 	### SQLite3
 	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
-if(emp.database__.name == "Oracle"):
+if(Record.database__.name == "Oracle"):
 	### Oracle
 	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': datetime(1989, 9, 21, 0, 0), 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
-if(emp.database__.name in ["MySQL", "Postgres", "MicrosoftSQL"]):
+if(Record.database__.name in ["MySQL", "Postgres", "MicrosoftSQL"]):
 	### MySQL | Postgres | Microsoft AzureSQL
 	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
 #==============================================================================#
