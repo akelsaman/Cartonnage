@@ -11,10 +11,10 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-# initSQLite3Env()
+initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
-initPostgresEnv()
+# initPostgresEnv()
 # initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
@@ -207,6 +207,8 @@ for r in emp:
 print(f"{'-'*80}")
 print(emp.query__.statement)
 print(emp.query__.parameters)
+
+# Recursive depth column
 #==============================================================================#
 print("---------------------------------------00---------------------------------------")
 #==============================================================================#

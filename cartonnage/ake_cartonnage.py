@@ -123,17 +123,17 @@ class Expression():
 	def __or__(self, other): return Expression(f"({self.value} OR {other.value})", self.parameters + other.parameters)
 #--------------------------------------#
 class CTE():
-	def __init__(self, select=None, alias='', materialization=None):
+	def __init__(self, statement=None, alias='', materialization=None):
 		self.value = ''
 		self.parameters = []
 		self.alias = alias
 		self.as_keyword = ' AS '
 		self.columnsAliases = ''
 		# self.parameters = parameters if parameters is not None else []
-		if(select):
-			self.value = select.statement
-			self.parameters = select.parameters
-			self.alias = select.parent.alias.value()
+		if(statement):
+			self.value = statement.statement
+			self.parameters = statement.parameters
+			self.alias = statement.parent.alias.value()
 		self.materialization(materialization)
 			# self.alias = record.alias.value()
 	def __str__(self): return self.value
@@ -293,9 +293,9 @@ class Filter:
 		self.__where = ''
 		self.parameters = []
 	
-	def read(self, selected="*", group_by='', order_by='', limit=''): self.parent.database__.read(operation=Database.read,  record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
-	def delete(self): self.parent.database__.delete(operation=Database.delete, record=self.parent)
-	def update(self): self.parent.database__.update(operation=Database.update, record=self.parent)
+	def read(self, selected="*", group_by='', order_by='', limit=''): self.parent.database__.read(record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	def delete(self): self.parent.database__.delete(record=self.parent)
+	def update(self): self.parent.database__.update(record=self.parent)
 
 	def fltr(self, field, placeholder): return self.where__()
 	# def parameters(self, parameters): return self.parameters__()
@@ -670,16 +670,16 @@ class Database:
 		record.query__.operation = operation
 		return record.query__
 	#--------------------------------------#
-	def select(self, operation, record, selected="*", group_by='', order_by='', limit=''):
-		select = self.crud(operation=operation, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
-		return select
+	def select(self, record, selected="*", group_by='', order_by='', limit=''):
+		return self.crud(operation=Database.read, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	def operation_statement(self, operation, record): return self.crud(operation=operation, record=record)
 	#--------------------------------------#
 	def all(self, record): self.executeStatement(self.crud(operation=Database.all, record=record))
+	def read(self, record, selected="*", group_by='', order_by='', limit=''): self.executeStatement(self.select(record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit))
 	def insert(self, record): self.executeStatement(self.crud(operation=Database.insert, record=record))
-	def read(self, operation, record, selected="*", group_by='', order_by='', limit=''): self.executeStatement(self.select(operation=operation, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit))
-	def delete(self, operation, record): self.executeStatement(self.crud(operation=operation, record=record))
-	def update(self, operation, record):
-		self.executeStatement(self.crud(operation=operation, record=record))
+	def delete(self, record): self.executeStatement(self.crud(operation=Database.delete, record=record))
+	def update(self, record):
+		self.executeStatement(self.crud(operation=Database.update, record=record))
 		for field, value in record.set.new.items():
 			record.setField(field, value)
 			record.set.empty()
@@ -1198,20 +1198,22 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
-	def select(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.database__.select(Database.read, record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
-	def insert(self): self.database__.insert(record=self)
-	def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(Database.read, record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	def select(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.database__.select(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+	def ins_st(self): self.database__.operation_statement(Database.insert, record=self)
+	def upd_st(self): self.database__.operation_statement(Database.update, record=self)
+	def del_st(self): self.database__.operation_statement(Database.delete, record=self)
+
+	def read(self, selected="*", group_by='', order_by='', limit=''): self.database__.read(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit)
 	# def read(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.read(selected, group_by, order_by, limit)
-	def update(self): self.database__.update(Database.update, record=self)
-	def delete(self): self.database__.delete(Database.delete, record=self)
+	def insert(self): self.database__.insert(record=self)
+	def update(self): self.database__.update(record=self)
+	def delete(self): self.database__.delete(record=self)
 	def all(self): self.database__.all(record=self)
 	def upsert(self, onColumns): self.database__.upsert(record=self, onColumns=onColumns)
 	def commit(self): self.database__.commit()
 	#--------------------------------------#
 	def join(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields)
-	#--------------------------------------#
 	def rightJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' RIGHT JOIN ')
-	#--------------------------------------#
 	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN ')
 	#--------------------------------------#
 	def joinCTE(self, table, fields):
