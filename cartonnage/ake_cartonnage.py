@@ -1198,9 +1198,9 @@ class Record(metaclass=RecordMeta):
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
 	def select(self, selected="*", group_by='', order_by='', limit='', option='', **kwargs): return self.database__.select(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
-	def ins_st(self, option=''): self.database__.operation_statement(Database.insert, record=self, option=option)
-	def upd_st(self, option=''): self.database__.operation_statement(Database.update, record=self, option=option)
-	def del_st(self, option=''): self.database__.operation_statement(Database.delete, record=self, option=option)
+	def ins_st(self, option=''): return self.database__.operation_statement(Database.insert, record=self, option=option)
+	def upd_st(self, option=''): return  self.database__.operation_statement(Database.update, record=self, option=option)
+	def del_st(self, option=''): return self.database__.operation_statement(Database.delete, record=self, option=option)
 
 	def read(self, selected="*", group_by='', order_by='', limit='', option=''): self.database__.read(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
 	# def read(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.read(selected, group_by, order_by, limit)
