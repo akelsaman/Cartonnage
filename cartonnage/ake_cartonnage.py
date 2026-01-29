@@ -518,10 +518,10 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			print(f"<s|{'-'*3}")
-			print(" > Execute statement: ", query.statement)
-			print(" > Execute parameters: ", query.parameters)
-			print(f"{'-'*3}|e>")
+			# print(f"<s|{'-'*3}")
+			# print(" > Execute statement: ", query.statement)
+			# print(" > Execute parameters: ", query.parameters)
+			# print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -546,6 +546,7 @@ class Database:
 						break
 			else:
 				count = self.__cursor.rowcount
+				
 			#rowcount is readonly attribute and it contains the count/number of the inserted/updated/deleted records/rows.
 			#rowcount is -1 in case of rows/records select.
 

@@ -194,6 +194,21 @@ for r in rec:
 	print(r.data)
 
 print("Cartonnage:")
+
+emp = Employees()
+emp.with_cte = with_cte
+emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
+emp.set.salary = 2000
+emp.update()
+
+# sqlite3 returns -1 for complex operations not the real affected rows count
+assert emp.rowsCount() == -1, emp.rowsCount()
+# assert emp.rowsCount() == 2, emp.rowsCount()
+
+print(f"{'-'*80}")
+print(emp.query__.statement)
+print(emp.query__.parameters)
+
 emp = Employees()
 emp.with_cte = with_cte
 emp.joinCTE(hieirarchy, (Employees.employee_id == Hierarchy.employee_id))
@@ -211,16 +226,26 @@ print(emp.query__.parameters)
 # Recursive depth column
 # Lateral
 
+
+# print("After delete - checking if in transaction:")
+# print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
+
 emp = Employees()
 emp.with_cte = with_cte
 emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
 emp.delete()
 
+# sqlite3 returns -1 for complex operations not the real affected rows count
+assert emp.rowsCount() == -1, emp.rowsCount()
+# assert emp.rowsCount() == 2, emp.rowsCount()
+
+print(f"{'-'*80}")
+print(emp.query__.statement)
+print(emp.query__.parameters)
+
 # print("After delete - checking if in transaction:")
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
-emp.database__.rollback()  # Force rollback
-
-assert emp.recordset.rowsCount == 2, emp.recordset.rowsCount
+Record.database__.rollback()  # Force rollback
 
 # emp.database__.rollback()
 # #==============================================================================#
@@ -650,6 +675,8 @@ assert dep1.rowsCount() == 1
 dep1 = Dependents()
 dep1.filter(Dependents.employee_id == 206).read()
 assert dep1.data == {}
+
+Record.database__.rollback()  # Force rollback
 #==============================================================================#
 print("---------------------------------------04---------------------------------------")
 # #==============================================================================#
@@ -687,6 +714,8 @@ jobs = Jobs()
 jobs.filter(Jobs.job_title.like('%Accountant%')).read()
 
 assert jobs.recordset.toLists() == []  # confirm recordset delete
+
+Record.database__.rollback()  # Force rollback
 #==============================================================================#
 print("---------------------------------------05---------------------------------------")
 #==============================================================================#
@@ -745,6 +774,8 @@ if e1.database__.name == "MicrosoftSQL":
 	assert employees.recordset.toLists() == []
 else:
 	assert recordset.rowsCount == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+
+Record.database__.rollback()  # Force rollback
 #==============================================================================#
 print("---------------------------------------06---------------------------------------")
 # #==============================================================================#
