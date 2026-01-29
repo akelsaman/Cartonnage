@@ -209,6 +209,103 @@ print(emp.query__.statement)
 print(emp.query__.parameters)
 
 # Recursive depth column
+# Lateral
+
+emp = Employees()
+emp.with_cte = with_cte
+emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
+emp.delete()
+
+# print("After delete - checking if in transaction:")
+# print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
+emp.database__.rollback()  # Force rollback
+
+assert emp.recordset.rowsCount == 2, emp.recordset.rowsCount
+
+# emp.database__.rollback()
+# #==============================================================================#
+# print("---------------------------------------Data-Modifying CTE---------------------------------------")
+# #==============================================================================#
+# # Data-modifying CTEs (PostgreSQL and MSSQL only)
+# # WITH deleted_rows AS (
+# #     DELETE FROM old_orders WHERE order_date < '2020-01-01'
+# #     RETURNING *
+# # )
+# # INSERT INTO archived_orders SELECT * FROM deleted_rows;
+
+# # Example using Employees table - archive old job history records
+# from datetime import datetime
+
+# class Job_History_Archive(Job_History): pass  # Archive table (same structure)
+# class DeletedJobHistory(Job_History): pass    # CTE alias for deleted rows
+
+# # Scenario: Move old job history records to archive
+# old_job_history = Job_History()
+# old_job_history.filter(Job_History.end_date < datetime.strptime('2000-01-01', '%Y-%m-%d'))
+
+# # Generate DELETE statement with RETURNING
+# delete_statement = old_job_history.del_st()
+
+# # For PostgreSQL: DELETE ... RETURNING *
+# if Job_History.database__.name == 'Postgres':
+#     # Build the CTE with DELETE RETURNING
+#     delete_cte_value = f"{delete_statement.statement} RETURNING *"
+#     delete_cte = CTE()
+#     delete_cte.value = delete_cte_value
+#     delete_cte.parameters = delete_statement.parameters
+#     delete_cte.alias = 'DeletedJobHistory'
+    
+#     # Build WITH CTE for data-modifying operation
+#     with_delete = WithCTE(delete_cte, recursive=False)
+    
+#     # Final INSERT from CTE
+#     insert_sql = f"{with_delete.value} INSERT INTO Job_History_Archive SELECT * FROM DeletedJobHistory"
+#     print("PostgreSQL Data-Modifying CTE:")
+#     print(insert_sql)
+
+# # For MSSQL: Uses OUTPUT clause instead of RETURNING
+# elif Job_History.database__.name == 'MicrosoftSQL':
+#     # MSSQL uses OUTPUT INTO for capturing deleted rows
+#     # DELETE FROM Job_History OUTPUT DELETED.* INTO Job_History_Archive WHERE end_date < '2000-01-01'
+#     delete_cte_value = f"DELETE FROM Job_History OUTPUT DELETED.* INTO @deleted_rows WHERE end_date < ?"
+#     delete_cte = CTE()
+#     delete_cte.value = delete_cte_value
+#     delete_cte.parameters = delete_statement.parameters
+#     delete_cte.alias = 'DeletedJobHistory'
+    
+#     with_delete = WithCTE(delete_cte, recursive=False)
+#     insert_sql = f"{with_delete.value} INSERT INTO Job_History_Archive SELECT * FROM DeletedJobHistory"
+#     print("MSSQL Data-Modifying CTE:")
+#     print(insert_sql)
+
+# else:
+#     print(f"Data-modifying CTEs not supported on {Job_History.database__.name}")
+#     print("Only PostgreSQL and MSSQL support this feature")
+
+# # Alternative: UPDATE with RETURNING (PostgreSQL)
+# # WITH updated_employees AS (
+# #     UPDATE Employees SET salary = salary * 1.1 WHERE department_id = 10 RETURNING *
+# # )
+# # SELECT * FROM updated_employees;
+
+# if Job_History.database__.name == 'Postgres':
+#     emp_to_update = Employees()
+#     emp_to_update.filter(Employees.department_id == 10)
+#     emp_to_update.set(salary = Expression('salary * 1.1', []))
+    
+#     update_statement = emp_to_update.upd_st()
+    
+#     update_cte = CTE()
+#     update_cte.value = f"{update_statement.statement} RETURNING *"
+#     update_cte.parameters = update_statement.parameters
+#     update_cte.alias = 'UpdatedEmployees'
+    
+#     with_update = WithCTE(update_cte, recursive=False)
+#     select_updated = f"{with_update.value} SELECT * FROM UpdatedEmployees"
+    
+#     print("\nPostgreSQL UPDATE with RETURNING CTE:")
+#     print(select_updated)
+
 #==============================================================================#
 print("---------------------------------------00---------------------------------------")
 #==============================================================================#

@@ -518,10 +518,10 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			# print(f"<s|{'-'*3}")
-			# print(" > Execute statement: ", query.statement)
-			# print(" > Execute parameters: ", query.parameters)
-			# print(f"{'-'*3}|e>")
+			print(f"<s|{'-'*3}")
+			print(" > Execute statement: ", query.statement)
+			print(" > Execute parameters: ", query.parameters)
+			print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -1058,8 +1058,6 @@ class Record(metaclass=RecordMeta):
 		self.setupTableNameAndAlias()
 		# self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
 
-		self.table__ = self.__table
-
 		if(kwargs):
 			for key, value in kwargs.items():
 				setattr(self, key, value)
@@ -1112,7 +1110,7 @@ class Record(metaclass=RecordMeta):
 			self.tableName__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
 		self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
 	#--------------------------------------#
-	def __table(self):
+	def table__(self):
 		quoteChar = '' #self.database__.escapeChar()
 		return f"{quoteChar}{self.tableName__.value()}{quoteChar}"
 	#--------------------------------------#
