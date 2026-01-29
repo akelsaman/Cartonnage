@@ -558,11 +558,12 @@ class Database:
 			return query
 	#--------------------------------------#
 	def executeMany(self, query):
-		# print(f"<s|{'-'*3}")
-		# print(" > Execute statement: ", query.statement)
-		# print(" > Execute parameters: ", query.parameters)
-		# print(f"{'-'*3}|e>")
+		print(f"<s|{'-'*3}")
+		print(" > Execute statement: ", query.statement)
+		print(" > Execute parameters: ", query.parameters)
+		print(f"{'-'*3}|e>")
 		rowcount = 0
+		query.parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
 		if(query.statement):
 			self.__cursor.executemany(query.statement, query.parameters)
 			self.operationsCount +=1
@@ -1076,7 +1077,7 @@ class Record(metaclass=RecordMeta):
 				self.database__.executeMany(self.query__)
 			else:
 				self.database__.executeStatement(self.query__)
-			Database.orm.map(self)
+				Database.orm.map(self)
 	#--------------------------------------#
 	def __getattr__(self, name):
 		# if(name=="custom"): return self.__dict__["custom"]

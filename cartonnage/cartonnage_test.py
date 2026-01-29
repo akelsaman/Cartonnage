@@ -258,229 +258,278 @@ if(Record.database__.name not in ['Oracle']):
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
 Record.database__.rollback()  # Force rollback
 
-# emp.database__.rollback()
+employees = Recordset()
+emp1 = Employees()
+emp2 = Employees()
+emp1.employee_id = 100
+emp2.employee_id = 101
+emp1.read()
+emp2.read()
+emp1.set.last_name = 'Ahmed'
+emp2.set.last_name = 'kamal'
+employees.add(emp1)
+employees.add(emp2)
+
+emp1.with_cte = with_cte
+emp1.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
+
+employees.update(onColumns=["employee_id"])
+# employees.delete(onColumns=["employee_id"])
+
+
+# ExecutivesDepartment AS NOT MATERIALIZED (SELECT /*+ INLINE */ ExecutivesDepartment.* FROM Departments ExecutivesDepartment WHERE ExecutivesDepartment.department_name = ?) ,
+# AdministrationJobs AS MATERIALIZED (SELECT /*+ MATERIALIZE */ AdministrationJobs.* FROM Jobs AdministrationJobs WHERE AdministrationJobs.job_title LIKE ?) ,
+# pp = [('Executive', 'Administration%', 'Neena', 100), ('Executive', 'Administration%', 'Neena', 101)]
+
+ss = """
+WITH RECURSIVE 
+	Hierarchy (employee_id, manager_id, first_name) AS (
+		SELECT /*+ INLINE */ employee_id, manager_id, first_name FROM Employees P WHERE P.manager_id IS NULL  
+		UNION ALL
+		SELECT /*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name FROM Employees C  INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id WHERE C.first_name = ?
+	)
+DELETE FROM Employees  
+WHERE Employees.employee_id = ? AND Employees.employee_id IN (
+	SELECT employee_id FROM Hierarchy Hierarchy
+)
+"""
+pp = [('Neena', 100), ('Neena', 101)]
+
+rec = Record(statement=ss,parameters=pp,operation=Database.delete)
+check = Record(statement="SELECT employee_id FROM Employees WHERE employee_id in (?, ?)", parameters=[100, 101], operation=Database.read)
+print(f"{'<'*80}\n{check.recordset.data}")
+
+assert employees.rowsCount == -1, employees.rowsCount
+
+Record.database__._Database__cursor.execute("SELECT employee_id FROM Employees WHERE employee_id IN (100, 101)")
+print("RAW CHECK:", Record.database__._Database__cursor.fetchall())
+
+employees.insert()
+assert employees.rowsCount == -1, employees.rowsCount
+
+Record.database__.rollback()  # Force rollback
 #==============================================================================#
 print("---------------------------------------Data-Modifying CTE---------------------------------------")
 #==============================================================================#
-# Data-modifying CTEs (PostgreSQL and MSSQL only)
-# PostgreSQL: WITH deleted_rows AS (DELETE ... RETURNING *) SELECT * FROM deleted_rows
-# MSSQL: DELETE ... OUTPUT DELETED.* (no CTE wrapper needed for OUTPUT)
+# # Data-modifying CTEs (PostgreSQL and MSSQL only)
+# # PostgreSQL: WITH deleted_rows AS (DELETE ... RETURNING *) SELECT * FROM deleted_rows
+# # MSSQL: DELETE ... OUTPUT DELETED.* (no CTE wrapper needed for OUTPUT)
 
-if Record.database__.name == 'Postgres':
-    # ===== Test 1: UPDATE with RETURNING via CTE =====
-    print("\n--- PostgreSQL: UPDATE with RETURNING (CTE) ---")
+# if Record.database__.name == 'Postgres':
+#     # ===== Test 1: UPDATE with RETURNING via CTE =====
+#     print("\n--- PostgreSQL: UPDATE with RETURNING (CTE) ---")
 
-    # Check original salary before update
-    emp_before = Employees()
-    emp_before.filter(Employees.department_id == 9)
-    emp_before.read(selected='employee_id, first_name, salary')
-    original_salaries = {r.employee_id: r.salary for r in emp_before}
-    print(f"Original salaries: {original_salaries}")
+#     # Check original salary before update
+#     emp_before = Employees()
+#     emp_before.filter(Employees.department_id == 9)
+#     emp_before.read(selected='employee_id, first_name, salary')
+#     original_salaries = {r.employee_id: r.salary for r in emp_before}
+#     print(f"Original salaries: {original_salaries}")
 
-    # Build UPDATE ... RETURNING as CTE using ORM
-    emp_to_update = Employees()
-    emp_to_update.filter(Employees.department_id == 9)
-    emp_to_update.set.salary = Expression('salary * 1.1', [])
+#     # Build UPDATE ... RETURNING as CTE using ORM
+#     emp_to_update = Employees()
+#     emp_to_update.filter(Employees.department_id == 9)
+#     emp_to_update.set.salary = Expression('salary * 1.1', [])
 
-    # Use upd_st() return value directly with CTE
-    update_cte = CTE(emp_to_update.upd_st(option='RETURNING employee_id, first_name, salary'))
-    update_cte.alias = 'UpdatedEmployees'
+#     # Use upd_st() return value directly with CTE
+#     update_cte = CTE(emp_to_update.upd_st(option='RETURNING employee_id, first_name, salary'))
+#     update_cte.alias = 'UpdatedEmployees'
 
-    with_update = WithCTE(update_cte, recursive=False)
+#     with_update = WithCTE(update_cte, recursive=False)
 
-    # PostgreSQL Data-Modifying CTE: SELECT directly FROM the CTE result
-    # Pattern: WITH cte AS (UPDATE ... RETURNING *) SELECT * FROM cte
-    select_updated_sql = f"{with_update.value} SELECT * FROM UpdatedEmployees"
-    print(f"SQL: {select_updated_sql}")
+#     # PostgreSQL Data-Modifying CTE: SELECT directly FROM the CTE result
+#     # Pattern: WITH cte AS (UPDATE ... RETURNING *) SELECT * FROM cte
+#     select_updated_sql = f"{with_update.value} SELECT * FROM UpdatedEmployees"
+#     print(f"SQL: {select_updated_sql}")
 
-    # operation=Database.read because we SELECT from the CTE result
-    updated_records = Record(statement=select_updated_sql, parameters=with_update.parameters, operation=Database.read)
-    print(f"Updated {updated_records.recordset.count()} employees:")
-    for r in updated_records:
-        print(f"  {r.data}")
+#     # operation=Database.read because we SELECT from the CTE result
+#     updated_records = Record(statement=select_updated_sql, parameters=with_update.parameters, operation=Database.read)
+#     print(f"Updated {updated_records.recordset.count()} employees:")
+#     for r in updated_records:
+#         print(f"  {r.data}")
 
-    assert updated_records.recordset.count() > 0, "Expected updated rows to be returned"
+#     assert updated_records.recordset.count() > 0, "Expected updated rows to be returned"
 
-    # ===== Test 2: DELETE with RETURNING via CTE =====
-    print("\n--- PostgreSQL: DELETE with RETURNING (CTE) ---")
+#     # ===== Test 2: DELETE with RETURNING via CTE =====
+#     print("\n--- PostgreSQL: DELETE with RETURNING (CTE) ---")
 
-    # Insert test data to delete
-    test_dep = Dependents()
-    test_dep.dependent_id = 999
-    test_dep.first_name = 'Test'
-    test_dep.last_name = 'Delete'
-    test_dep.relationship = 'Test'
-    test_dep.employee_id = 100
-    test_dep.insert()
+#     # Insert test data to delete
+#     test_dep = Dependents()
+#     test_dep.dependent_id = 999
+#     test_dep.first_name = 'Test'
+#     test_dep.last_name = 'Delete'
+#     test_dep.relationship = 'Test'
+#     test_dep.employee_id = 100
+#     test_dep.insert()
 
-    # Build DELETE ... RETURNING as CTE using ORM
-    dep_to_delete = Dependents()
-    dep_to_delete.filter(Dependents.dependent_id == 999)
+#     # Build DELETE ... RETURNING as CTE using ORM
+#     dep_to_delete = Dependents()
+#     dep_to_delete.filter(Dependents.dependent_id == 999)
 
-    # Use del_st() return value directly with CTE
-    delete_cte = CTE(dep_to_delete.del_st(option='RETURNING *'))
-    delete_cte.alias = 'DeletedDependents'
+#     # Use del_st() return value directly with CTE
+#     delete_cte = CTE(dep_to_delete.del_st(option='RETURNING *'))
+#     delete_cte.alias = 'DeletedDependents'
 
-    with_delete = WithCTE(delete_cte, recursive=False)
+#     with_delete = WithCTE(delete_cte, recursive=False)
 
-    # PostgreSQL Data-Modifying CTE: SELECT directly FROM the CTE result
-    select_deleted_sql = f"{with_delete.value} SELECT * FROM DeletedDependents"
-    print(f"SQL: {select_deleted_sql}")
+#     # PostgreSQL Data-Modifying CTE: SELECT directly FROM the CTE result
+#     select_deleted_sql = f"{with_delete.value} SELECT * FROM DeletedDependents"
+#     print(f"SQL: {select_deleted_sql}")
 
-    # operation=Database.read because we SELECT from the CTE result
-    deleted_records = Record(statement=select_deleted_sql, parameters=with_delete.parameters, operation=Database.read)
-    print(f"Deleted {deleted_records.recordset.count()} dependents:")
-    for r in deleted_records:
-        print(f"  {r.data}")
+#     # operation=Database.read because we SELECT from the CTE result
+#     deleted_records = Record(statement=select_deleted_sql, parameters=with_delete.parameters, operation=Database.read)
+#     print(f"Deleted {deleted_records.recordset.count()} dependents:")
+#     for r in deleted_records:
+#         print(f"  {r.data}")
 
-    assert deleted_records.recordset.count() == 1, f"Expected 1 deleted row, got {deleted_records.recordset.count()}"
+#     assert deleted_records.recordset.count() == 1, f"Expected 1 deleted row, got {deleted_records.recordset.count()}"
 
-    # Verify record is actually deleted
-    verify_del = Dependents()
-    verify_del.filter(Dependents.dependent_id == 999)
-    verify_del.read()
-    assert verify_del.data == {}, "Record should be deleted"
-    print("Verified: Record deleted successfully")
+#     # Verify record is actually deleted
+#     verify_del = Dependents()
+#     verify_del.filter(Dependents.dependent_id == 999)
+#     verify_del.read()
+#     assert verify_del.data == {}, "Record should be deleted"
+#     print("Verified: Record deleted successfully")
 
-    # ===== Test 3: DELETE using ORM .delete() with CTE =====
-    print("\n--- PostgreSQL: DELETE using ORM with CTE ---")
+#     # ===== Test 3: DELETE using ORM .delete() with CTE =====
+#     print("\n--- PostgreSQL: DELETE using ORM with CTE ---")
 
-    # Insert more test data
-    test_dep2 = Dependents()
-    test_dep2.dependent_id = 998
-    test_dep2.first_name = 'Test2'
-    test_dep2.last_name = 'ORM'
-    test_dep2.relationship = 'Test'
-    test_dep2.employee_id = 100
-    test_dep2.insert()
+#     # Insert more test data
+#     test_dep2 = Dependents()
+#     test_dep2.dependent_id = 998
+#     test_dep2.first_name = 'Test2'
+#     test_dep2.last_name = 'ORM'
+#     test_dep2.relationship = 'Test'
+#     test_dep2.employee_id = 100
+#     test_dep2.insert()
 
-    # Build a CTE that selects the dependent_id to delete
-    # IMPORTANT: CTE alias must differ from target table name to avoid confusion
-    class DependentsToDelete(Dependents): pass
-    select_to_delete = DependentsToDelete()
-    select_to_delete.filter(DependentsToDelete.dependent_id == 998)
-    select_cte = CTE(select_to_delete.select(selected='dependent_id'))
+#     # Build a CTE that selects the dependent_id to delete
+#     # IMPORTANT: CTE alias must differ from target table name to avoid confusion
+#     class DependentsToDelete(Dependents): pass
+#     select_to_delete = DependentsToDelete()
+#     select_to_delete.filter(DependentsToDelete.dependent_id == 998)
+#     select_cte = CTE(select_to_delete.select(selected='dependent_id'))
 
-    with_select = WithCTE(select_cte, recursive=False)
+#     with_select = WithCTE(select_cte, recursive=False)
 
-    # Use ORM .delete() with CTE and subquery filter
-    dep_orm_delete = Dependents()
-    dep_orm_delete.with_cte = with_select
-    dep_orm_delete.filter(Dependents.dependent_id.in_subquery(select_to_delete, selected='dependent_id'))
-    dep_orm_delete.delete()
+#     # Use ORM .delete() with CTE and subquery filter
+#     dep_orm_delete = Dependents()
+#     dep_orm_delete.with_cte = with_select
+#     dep_orm_delete.filter(Dependents.dependent_id.in_subquery(select_to_delete, selected='dependent_id'))
+#     dep_orm_delete.delete()
 
-    print(f"SQL: {dep_orm_delete.query__.statement}")
-    print(f"Rows affected: {dep_orm_delete.rowsCount()}")
+#     print(f"SQL: {dep_orm_delete.query__.statement}")
+#     print(f"Rows affected: {dep_orm_delete.rowsCount()}")
 
-    # Verify deletion
-    verify_orm = Dependents()
-    verify_orm.filter(Dependents.dependent_id == 998)
-    verify_orm.read()
-    assert verify_orm.data == {}, "Record should be deleted via ORM"
-    print("Verified: ORM delete with CTE successful")
+#     # Verify deletion
+#     verify_orm = Dependents()
+#     verify_orm.filter(Dependents.dependent_id == 998)
+#     verify_orm.read()
+#     assert verify_orm.data == {}, "Record should be deleted via ORM"
+#     print("Verified: ORM delete with CTE successful")
 
-elif Record.database__.name == 'MicrosoftSQL':
-    # MSSQL: OUTPUT clause returns results directly (NOT via CTE wrapper like PostgreSQL)
-    # MSSQL does NOT support data-modifying statements inside CTEs
-    # PostgreSQL: WITH cte AS (UPDATE ... RETURNING *) SELECT * FROM cte  -- supported
-    # MSSQL: UPDATE ... OUTPUT INSERTED.* -- returns result set directly, no CTE wrapper
+# elif Record.database__.name == 'MicrosoftSQL':
+#     # MSSQL: OUTPUT clause returns results directly (NOT via CTE wrapper like PostgreSQL)
+#     # MSSQL does NOT support data-modifying statements inside CTEs
+#     # PostgreSQL: WITH cte AS (UPDATE ... RETURNING *) SELECT * FROM cte  -- supported
+#     # MSSQL: UPDATE ... OUTPUT INSERTED.* -- returns result set directly, no CTE wrapper
 
-    # ===== Test 1: UPDATE with OUTPUT (direct, no CTE) =====
-    print("\n--- MSSQL: UPDATE with OUTPUT (direct) ---")
+#     # ===== Test 1: UPDATE with OUTPUT (direct, no CTE) =====
+#     print("\n--- MSSQL: UPDATE with OUTPUT (direct) ---")
 
-    # Check original salary before update
-    emp_before = Employees()
-    emp_before.filter(Employees.department_id == 9)
-    emp_before.read(selected='employee_id, first_name, salary')
-    original_salaries = {r.employee_id: r.salary for r in emp_before}
-    print(f"Original salaries: {original_salaries}")
+#     # Check original salary before update
+#     emp_before = Employees()
+#     emp_before.filter(Employees.department_id == 9)
+#     emp_before.read(selected='employee_id, first_name, salary')
+#     original_salaries = {r.employee_id: r.salary for r in emp_before}
+#     print(f"Original salaries: {original_salaries}")
 
-    # MSSQL: UPDATE ... OUTPUT returns result set directly
-    # OUTPUT must be between SET and WHERE
-    update_sql = "UPDATE Employees SET salary = salary * 1.1 OUTPUT INSERTED.employee_id, INSERTED.first_name, INSERTED.salary WHERE department_id = ?"
-    print(f"SQL: {update_sql}")
+#     # MSSQL: UPDATE ... OUTPUT returns result set directly
+#     # OUTPUT must be between SET and WHERE
+#     update_sql = "UPDATE Employees SET salary = salary * 1.1 OUTPUT INSERTED.employee_id, INSERTED.first_name, INSERTED.salary WHERE department_id = ?"
+#     print(f"SQL: {update_sql}")
 
-    # operation=Database.read because OUTPUT returns a result set
-    updated_records = Record(statement=update_sql, parameters=[9], operation=Database.read)
-    print(f"Updated {updated_records.recordset.count()} employees:")
-    for r in updated_records:
-        print(f"  {r.data}")
+#     # operation=Database.read because OUTPUT returns a result set
+#     updated_records = Record(statement=update_sql, parameters=[9], operation=Database.read)
+#     print(f"Updated {updated_records.recordset.count()} employees:")
+#     for r in updated_records:
+#         print(f"  {r.data}")
 
-    assert updated_records.recordset.count() > 0, "Expected updated rows to be returned"
+#     assert updated_records.recordset.count() > 0, "Expected updated rows to be returned"
 
-    # ===== Test 2: DELETE with OUTPUT (direct, no CTE) =====
-    print("\n--- MSSQL: DELETE with OUTPUT (direct) ---")
+#     # ===== Test 2: DELETE with OUTPUT (direct, no CTE) =====
+#     print("\n--- MSSQL: DELETE with OUTPUT (direct) ---")
 
-    # Insert test data to delete
-    test_dep = Dependents()
-    test_dep.dependent_id = 999
-    test_dep.first_name = 'Test'
-    test_dep.last_name = 'Delete'
-    test_dep.relationship = 'Test'
-    test_dep.employee_id = 100
-    test_dep.insert()
+#     # Insert test data to delete
+#     test_dep = Dependents()
+#     test_dep.dependent_id = 999
+#     test_dep.first_name = 'Test'
+#     test_dep.last_name = 'Delete'
+#     test_dep.relationship = 'Test'
+#     test_dep.employee_id = 100
+#     test_dep.insert()
 
-    # MSSQL: DELETE ... OUTPUT returns deleted rows directly
-    delete_sql = "DELETE FROM Dependents OUTPUT DELETED.* WHERE dependent_id = ?"
-    print(f"SQL: {delete_sql}")
+#     # MSSQL: DELETE ... OUTPUT returns deleted rows directly
+#     delete_sql = "DELETE FROM Dependents OUTPUT DELETED.* WHERE dependent_id = ?"
+#     print(f"SQL: {delete_sql}")
 
-    # operation=Database.read because OUTPUT returns a result set
-    deleted_records = Record(statement=delete_sql, parameters=[999], operation=Database.read)
-    print(f"Deleted {deleted_records.recordset.count()} dependents:")
-    for r in deleted_records:
-        print(f"  {r.data}")
+#     # operation=Database.read because OUTPUT returns a result set
+#     deleted_records = Record(statement=delete_sql, parameters=[999], operation=Database.read)
+#     print(f"Deleted {deleted_records.recordset.count()} dependents:")
+#     for r in deleted_records:
+#         print(f"  {r.data}")
 
-    assert deleted_records.recordset.count() == 1, f"Expected 1 deleted row, got {deleted_records.recordset.count()}"
+#     assert deleted_records.recordset.count() == 1, f"Expected 1 deleted row, got {deleted_records.recordset.count()}"
 
-    # Verify record is actually deleted
-    verify_del = Dependents()
-    verify_del.filter(Dependents.dependent_id == 999)
-    verify_del.read()
-    assert verify_del.data == {}, "Record should be deleted"
-    print("Verified: Record deleted successfully")
+#     # Verify record is actually deleted
+#     verify_del = Dependents()
+#     verify_del.filter(Dependents.dependent_id == 999)
+#     verify_del.read()
+#     assert verify_del.data == {}, "Record should be deleted"
+#     print("Verified: Record deleted successfully")
 
-    # ===== Test 3: DELETE using ORM .delete() with CTE (SELECT CTE for filtering) =====
-    print("\n--- MSSQL: DELETE using ORM with CTE ---")
+#     # ===== Test 3: DELETE using ORM .delete() with CTE (SELECT CTE for filtering) =====
+#     print("\n--- MSSQL: DELETE using ORM with CTE ---")
 
-    # Insert more test data
-    test_dep2 = Dependents()
-    test_dep2.dependent_id = 998
-    test_dep2.first_name = 'Test2'
-    test_dep2.last_name = 'ORM'
-    test_dep2.relationship = 'Test'
-    test_dep2.employee_id = 100
-    test_dep2.insert()
+#     # Insert more test data
+#     test_dep2 = Dependents()
+#     test_dep2.dependent_id = 998
+#     test_dep2.first_name = 'Test2'
+#     test_dep2.last_name = 'ORM'
+#     test_dep2.relationship = 'Test'
+#     test_dep2.employee_id = 100
+#     test_dep2.insert()
 
-    # Build a CTE that selects the dependent_id to delete (SELECT CTE is supported)
-    # IMPORTANT: CTE alias must differ from target table name to avoid MSSQL confusion
-    class DependentsToDelete(Dependents): pass
-    select_to_delete = DependentsToDelete()
-    select_to_delete.filter(DependentsToDelete.dependent_id == 998)
-    select_cte = CTE(select_to_delete.select(selected='dependent_id'))
+#     # Build a CTE that selects the dependent_id to delete (SELECT CTE is supported)
+#     # IMPORTANT: CTE alias must differ from target table name to avoid MSSQL confusion
+#     class DependentsToDelete(Dependents): pass
+#     select_to_delete = DependentsToDelete()
+#     select_to_delete.filter(DependentsToDelete.dependent_id == 998)
+#     select_cte = CTE(select_to_delete.select(selected='dependent_id'))
 
-    with_select = WithCTE(select_cte, recursive=False)
+#     with_select = WithCTE(select_cte, recursive=False)
 
-    # Use ORM .delete() with CTE and subquery filter
-    dep_orm_delete = Dependents()
-    dep_orm_delete.with_cte = with_select
-    dep_orm_delete.filter(Dependents.dependent_id.in_subquery(select_to_delete, selected='dependent_id'))
-    dep_orm_delete.delete()
+#     # Use ORM .delete() with CTE and subquery filter
+#     dep_orm_delete = Dependents()
+#     dep_orm_delete.with_cte = with_select
+#     dep_orm_delete.filter(Dependents.dependent_id.in_subquery(select_to_delete, selected='dependent_id'))
+#     dep_orm_delete.delete()
 
-    print(f"SQL: {dep_orm_delete.query__.statement}")
-    print(f"Rows affected: {dep_orm_delete.rowsCount()}")
+#     print(f"SQL: {dep_orm_delete.query__.statement}")
+#     print(f"Rows affected: {dep_orm_delete.rowsCount()}")
 
-    # Verify deletion
-    verify_orm = Dependents()
-    verify_orm.filter(Dependents.dependent_id == 998)
-    verify_orm.read()
-    assert verify_orm.data == {}, "Record should be deleted via ORM"
-    print("Verified: ORM delete with CTE successful")
+#     # Verify deletion
+#     verify_orm = Dependents()
+#     verify_orm.filter(Dependents.dependent_id == 998)
+#     verify_orm.read()
+#     assert verify_orm.data == {}, "Record should be deleted via ORM"
+#     print("Verified: ORM delete with CTE successful")
 
-else:
-    print(f"Data-Modifying CTEs with RETURNING/OUTPUT not supported by {Record.database__.name}")
-    print("Only PostgreSQL (RETURNING) and MSSQL (OUTPUT) support this feature")
+# else:
+#     print(f"Data-Modifying CTEs with RETURNING/OUTPUT not supported by {Record.database__.name}")
+#     print("Only PostgreSQL (RETURNING) and MSSQL (OUTPUT) support this feature")
 
-Record.database__.rollback()
+# Record.database__.rollback()
 #==============================================================================#
 print("---------------------------------------00---------------------------------------")
 #==============================================================================#
