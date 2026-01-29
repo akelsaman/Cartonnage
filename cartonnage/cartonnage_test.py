@@ -202,8 +202,10 @@ emp.set.salary = 2000
 emp.update()
 
 # sqlite3 returns -1 for complex operations not the real affected rows count
-assert emp.rowsCount() == -1, emp.rowsCount()
-# assert emp.rowsCount() == 2, emp.rowsCount()
+if(Record.database__.name in ['SQLite3']):
+	assert emp.rowsCount() == -1, emp.rowsCount()
+else:
+	assert emp.rowsCount() == 2, emp.rowsCount()
 
 print(f"{'-'*80}")
 print(emp.query__.statement)
@@ -236,8 +238,10 @@ emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id')
 emp.delete()
 
 # sqlite3 returns -1 for complex operations not the real affected rows count
-assert emp.rowsCount() == -1, emp.rowsCount()
-# assert emp.rowsCount() == 2, emp.rowsCount()
+if(Record.database__.name in ['SQLite3']):
+	assert emp.rowsCount() == -1, emp.rowsCount()
+else:
+	assert emp.rowsCount() == 2, emp.rowsCount()
 
 print(f"{'-'*80}")
 print(emp.query__.statement)
