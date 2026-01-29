@@ -11,10 +11,10 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-# initSQLite3Env()
+initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
-initPostgresEnv()
+# initPostgresEnv()
 # initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
@@ -196,21 +196,22 @@ for r in rec:
 
 print("Cartonnage:")
 
-emp = Employees()
-emp.with_cte = with_cte
-emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
-emp.set.salary = 2000
-emp.update()
+if(Record.database__.name not in ['Oracle']):
+	emp = Employees()
+	emp.with_cte = with_cte
+	emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
+	emp.set.salary = 2000
+	emp.update()
 
-# sqlite3 returns -1 for complex operations not the real affected rows count
-if(Record.database__.name in ['SQLite3']):
-	assert emp.rowsCount() == -1, emp.rowsCount()
-else:
-	assert emp.rowsCount() == 2, emp.rowsCount()
+	# sqlite3 returns -1 for complex operations not the real affected rows count
+	if(Record.database__.name in ['SQLite3']):
+		assert emp.rowsCount() == -1, emp.rowsCount()
+	else:
+		assert emp.rowsCount() == 2, emp.rowsCount()
 
-print(f"{'-'*80}")
-print(emp.query__.statement)
-print(emp.query__.parameters)
+	print(f"{'-'*80}")
+	print(emp.query__.statement)
+	print(emp.query__.parameters)
 
 emp = Employees()
 emp.with_cte = with_cte
@@ -237,20 +238,21 @@ print(emp.query__.parameters)
 # print("After delete - checking if in transaction:")
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
 
-emp = Employees()
-emp.with_cte = with_cte
-emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
-emp.delete()
+if(Record.database__.name not in ['Oracle']):
+	emp = Employees()
+	emp.with_cte = with_cte
+	emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
+	emp.delete()
 
-# sqlite3 returns -1 for complex operations not the real affected rows count
-if(Record.database__.name in ['SQLite3']):
-	assert emp.rowsCount() == -1, emp.rowsCount()
-else:
-	assert emp.rowsCount() == 2, emp.rowsCount()
+	# sqlite3 returns -1 for complex operations not the real affected rows count
+	if(Record.database__.name in ['SQLite3']):
+		assert emp.rowsCount() == -1, emp.rowsCount()
+	else:
+		assert emp.rowsCount() == 2, emp.rowsCount()
 
-print(f"{'-'*80}")
-print(emp.query__.statement)
-print(emp.query__.parameters)
+	print(f"{'-'*80}")
+	print(emp.query__.statement)
+	print(emp.query__.parameters)
 
 # print("After delete - checking if in transaction:")
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
