@@ -353,24 +353,11 @@ class Filter:
 	#'record' parameter to follow the same signature/interface of 'Values.where' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
 	def where(self, record=None):
-		#because this is where so any NULL | NOT_NULL values will be evaluated to "IS NULL" | "IS NOT NULL"
-		where = ''
-		# where = self.parent.values.where(self.parent)
-		# where = f"{where} AND " if (where) else ""
-		# Return combined where without modifying self.__where
-		# combined_where = where + self.__where
-		# print(">>>>>>>>>>>>>>>>>>>>", combined_where)
-		# return combined_where[:-5]
-		return self.__where[:-5]
+		return self.where__()
 	
 	#This 'Filter.parameters' function follow the same signature/interface of 'Values.parameters' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
 	def parameters(self, record=None):
-		# parameters = []
-		# parameters = self.parent.values.parameters(self.parent)
-		# Return combined parameters without modifying self.__parameters
-		# print(">>>>>>>>>>>>>>>>>>>>", parameters + self.__parameters)
-		# return parameters + self.__parameters
 		return self.__parameters
 	#--------------------------------------#
 	def in_subquery(self, selected="*", **kwargs):
@@ -1259,6 +1246,10 @@ class Record(metaclass=RecordMeta):
 	def with_cte(self, with_cte):
 		self.with_cte__ = with_cte
 		return self
+	#--------------------------------------#
+	def cte(self, selected="*", group_by='', order_by='', limit='', materialization=None):
+		query = self.select(selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+		return CTE(statement=query, materialization=materialization)
 	#--------------------------------------#
 	def toDict(self): return self.data
 	#--------------------------------------#

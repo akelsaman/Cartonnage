@@ -121,60 +121,53 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
 # ee1 = CTE(p_select.statement, p_select.parameters)
 # ee2 = CTE(c_select.statement, c_select.parameters)
 
+# ================================================================================
+# Recursive depth column
+# Lateral
+# Transaction savepoints	SAVEPOINT/ROLLBACK TO support	Low
+# =============== SELECT, INSERT, UPDATE, and DELETE Record WithCTE ===============
+class Hierarchy(Record): pass # for recursive CTE
 class P(Employees): pass
 class C(Employees): pass
-class Hierarchy(Record): pass
 class ExecutivesDepartment(Departments): pass
 class AdministrationJobs(Jobs): pass
 
-st = (
-	Employees()
-	.filter(Employees.employee_id < 101)
-)
-a = (
-	Employees()
-	.filter(Employees.employee_id.in_subquery(st, selected="employee_id"))
-	.join(Dependents, (Dependents.employee_id == Employees.employee_id))
-	.select()
-)
-# assert st.statement == "", st.statement
-# assert a.statement == "", a.statement
-
-
-
-hierarchy = Hierarchy()
-p = P()
-c = C()
-executives_department = ExecutivesDepartment()
-administration_jobs = AdministrationJobs()
-
-p.filter(P.manager_id.is_null())
-c.filter(C.first_name == 'Neena')
-c.join(Hierarchy, (C.manager_id == Hierarchy.employee_id))
-
-executives_department.filter(ExecutivesDepartment.department_name == 'Executive')
-administration_jobs.filter(AdministrationJobs.job_title.like('Administration%'))
-
-# hints used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
-p_select = p.select(selected='/*+ INLINE */ employee_id, manager_id, first_name')
-c_select = c.select(selected='/*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name')
-executives_department_select = executives_department.select(selected='/*+ INLINE */ ExecutivesDepartment.*')
-administration_jobs_select = administration_jobs.select(selected='/*+ MATERIALIZE */ AdministrationJobs.*')
+hierarchy = Hierarchy() # used as subquery ... IN (SELECT * FROM Hierarchy) # Hierarchy is Recursive CTE
 
 # Oracle: use hints after SELECT
 # 'MySQL': Not support 'Default Behavior'
 # 'MicrosoftSQL': Not supported directly, Uses temp tables instead.
 
+
+#  ['Oracle', 'MySQL', 'MicrosoftSQL']:
+cte1 = (
+	P()
+	.filter(P.manager_id.is_null())
+	.cte(selected='/*+ INLINE */ employee_id, manager_id, first_name', materialization=None)
+)
+cte2 = (
+	C()
+	.join(Hierarchy, (C.manager_id == Hierarchy.employee_id))
+	.filter(C.first_name == 'Neena')
+	.cte(selected='/*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name', materialization=None)
+)
+cte3 = (
+	ExecutivesDepartment()
+	.filter(ExecutivesDepartment.department_name == 'Executive')
+	.cte(selected='/*+ INLINE */ ExecutivesDepartment.*', materialization=None)
+)
+cte4 = (
+	AdministrationJobs()
+	.filter(AdministrationJobs.job_title.like('Administration%'))
+	.cte(selected='/*+ MATERIALIZE */ AdministrationJobs.*', materialization=None)
+)
+
 if Record.database__.name in ['SQLite3', 'Postgres']:
-	cte1 = CTE(p_select, materialization=False)
-	cte2 = CTE(c_select, materialization=False)
-	cte3 = CTE(executives_department_select, materialization=False)
-	cte4 = CTE(administration_jobs_select, materialization=True)
-else: #  ['Oracle', 'MySQL', 'MicrosoftSQL']:
-	cte1 = CTE(p_select)
-	cte2 = CTE(c_select)
-	cte3 = CTE(executives_department_select)
-	cte4 = CTE(administration_jobs_select)
+	cte1.materialization=False
+	cte2.materialization=True
+	cte3.materialization=False
+	cte4.materialization=True
+
 
 # ^ union: recursive_cte = (cte1 ^ cte2)
 # Recursive CTE wit UINION only supported by: SQLite3, MySQL, Postgres.
@@ -250,13 +243,6 @@ print(f"{'-'*80}")
 print(emp.query__.statement)
 print(emp.query__.parameters)
 
-# Recursive depth column
-# Lateral
-# Transaction savepoints	SAVEPOINT/ROLLBACK TO support	Low
-
-# print("After delete - checking if in transaction:")
-# print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
-
 if(Record.database__.name not in ['Oracle']):
 	emp = (
 		Employees()
@@ -278,7 +264,7 @@ if(Record.database__.name not in ['Oracle']):
 # print("After delete - checking if in transaction:")
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
 Record.database__.rollback()  # Force rollback
-# ===== Recordset WithCTE =====
+# =============================== Recordset WithCTE ===============================
 employees = Recordset()
 emp1 = (
 	Employees()
@@ -293,36 +279,52 @@ emp2 = (
 
 employees.add(emp1, emp2)
 
-# add with_cte and filters to Recordset through it's first Record instance
-emp1.with_cte(with_cte).filter(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
-employees.update(onColumns=["employee_id"])
+if not (Record.database__.name == "Oracle"):
+	# add with_cte and filters to Recordset through it's first Record instance
+	emp1.with_cte(with_cte).filter(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
+	# use onColumns if you are not sure all columns are null free
+	employees.update(onColumns=["employee_id"])
 
-# This will delete only 100, But 101 will not be deleted ? why because database will evaluate CTE after each deletion !
-# after deleteing 100 which is the only parent with manager_id=null will be no parent qualified with manager_id=null
-# so when no parent then no childs ! so 101 will not available with the second iteration to be deleted.
-employees.delete(onColumns=["employee_id"])
+	# Insert, Update, and Delete with Recursive CTE is not tracked on SQLite3 and MicrosoftSQL
+	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
+		assert employees.rowsCount == -1, employees.rowsCount
+	else:
+		assert employees.rowsCount == 2, employees.rowsCount
 
-availableEmployeesAfterDeletion = (
-	Employees()
-	.filter(Employees.employee_id.in_([100,101]))
-	.read()
-)
-availableEmployees = [{'employee_id': 101, 'first_name': 'Neena', 'last_name': 'kamal', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}]
-assert availableEmployeesAfterDeletion.recordset.data == availableEmployees, availableEmployeesAfterDeletion.recordset.data
+	# This will delete only 100, But 101 will not be deleted ? why because database will evaluate CTE after each deletion !
+	# after deleteing 100 which is the only parent with manager_id=null will be no parent qualified with manager_id=null
+	# so when no parent then no childs ! so 101 will not available with the second iteration to be deleted.
+	employees.delete(onColumns=["employee_id"])
 
-# now I will delete 101 to test Recordset insertion WithCTE
-availableEmployeesAfterDeletion.delete()
 
-check = Record(statement="SELECT employee_id FROM Employees WHERE employee_id in (?, ?)", parameters=[100, 101], operation=Database.read)
-print(f"{'<'*80}\n{check.recordset.data}")
+	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
+		assert employees.rowsCount == -1, employees.rowsCount
+	else:
+		assert employees.rowsCount == 1, employees.rowsCount
 
-assert employees.rowsCount == -1, employees.rowsCount
+	availableEmployeesAfterDeletion = (
+		Employees()
+		.filter(Employees.employee_id.in_([100,101]))
+		.read(selected="employee_id")
+	)
+	availableEmployees = [{'employee_id': 101}]
+	assert availableEmployeesAfterDeletion.recordset.data == availableEmployees, availableEmployeesAfterDeletion.recordset.data
 
-Record.database__._Database__cursor.execute("SELECT employee_id FROM Employees WHERE employee_id IN (100, 101)")
-print("RAW CHECK:", Record.database__._Database__cursor.fetchall())
+	# now I will delete 101 to test Recordset insertion WithCTE
+	# use onColumns if you are not sure all columns are null free
+	availableEmployeesAfterDeletion.delete()
 
-employees.insert()
-assert employees.rowsCount == -1, employees.rowsCount
+# Record.database__._Database__cursor.execute("SELECT employee_id FROM Employees WHERE employee_id IN (100, 101)")
+# print("RAW CHECK:", Record.database__._Database__cursor.fetchall())
+
+if (Record.database__.name not in ["Oracle", "MySQL"]):
+
+	employees.insert()
+
+	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
+		assert employees.rowsCount == -1, employees.rowsCount
+	else:
+		assert employees.rowsCount == 2, employees.rowsCount
 
 Record.database__.rollback()  # Force rollback
 #==============================================================================#
