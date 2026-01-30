@@ -278,7 +278,7 @@ if(Record.database__.name not in ['Oracle']):
 # print("After delete - checking if in transaction:")
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
 Record.database__.rollback()  # Force rollback
-
+# ===== Recordset WithCTE =====
 employees = Recordset()
 emp1 = (
 	Employees()
@@ -291,35 +291,28 @@ emp2 = (
 	.read()
 ).set(last_name='kamal')
 
-employees.add(emp1)
-employees.add(emp2)
+employees.add(emp1, emp2)
 
-emp1.with_cte(with_cte)
-emp1.filter(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
-
+# add with_cte and filters to Recordset through it's first Record instance
+emp1.with_cte(with_cte).filter(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
 employees.update(onColumns=["employee_id"])
-# employees.delete(onColumns=["employee_id"])
 
+# This will delete only 100, But 101 will not be deleted ? why because database will evaluate CTE after each deletion !
+# after deleteing 100 which is the only parent with manager_id=null will be no parent qualified with manager_id=null
+# so when no parent then no childs ! so 101 will not available with the second iteration to be deleted.
+employees.delete(onColumns=["employee_id"])
 
-# ExecutivesDepartment AS NOT MATERIALIZED (SELECT /*+ INLINE */ ExecutivesDepartment.* FROM Departments ExecutivesDepartment WHERE ExecutivesDepartment.department_name = ?) ,
-# AdministrationJobs AS MATERIALIZED (SELECT /*+ MATERIALIZE */ AdministrationJobs.* FROM Jobs AdministrationJobs WHERE AdministrationJobs.job_title LIKE ?) ,
-# pp = [('Executive', 'Administration%', 'Neena', 100), ('Executive', 'Administration%', 'Neena', 101)]
-
-ss = """
-WITH RECURSIVE 
-	Hierarchy (employee_id, manager_id, first_name) AS (
-		SELECT /*+ INLINE */ employee_id, manager_id, first_name FROM Employees P WHERE P.manager_id IS NULL  
-		UNION ALL
-		SELECT /*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name FROM Employees C  INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id WHERE C.first_name = ?
-	)
-DELETE FROM Employees  
-WHERE Employees.employee_id = ? AND Employees.employee_id IN (
-	SELECT employee_id FROM Hierarchy Hierarchy
+availableEmployeesAfterDeletion = (
+	Employees()
+	.filter(Employees.employee_id.in_([100,101]))
+	.read()
 )
-"""
-pp = [('Neena', 100), ('Neena', 101)]
+availableEmployees = [{'employee_id': 101, 'first_name': 'Neena', 'last_name': 'kamal', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}]
+assert availableEmployeesAfterDeletion.recordset.data == availableEmployees, availableEmployeesAfterDeletion.recordset.data
 
-rec = Record(statement=ss,parameters=pp,operation=Database.delete)
+# now I will delete 101 to test Recordset insertion WithCTE
+availableEmployeesAfterDeletion.delete()
+
 check = Record(statement="SELECT employee_id FROM Employees WHERE employee_id in (?, ?)", parameters=[100, 101], operation=Database.read)
 print(f"{'<'*80}\n{check.recordset.data}")
 
@@ -1262,15 +1255,11 @@ print("---------------------------------------08--------------------------------
 #=====
 emp = Employees().filter(Employees.first_name.in_(['Steven', 'Neena']))
 
-emp1 = Employees()
-emp2 = Employees()
-emp1.set.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
-emp2.set.new = {'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000}
+emp1 = Employees().set(**{'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000})
+emp2 = Employees().set(**{'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000})
 
 rs = Recordset()
-rs.add(emp1)
-rs.add(emp2)
-
+rs.add(emp1, emp2)
 
 if(Record.database__.name in ["SQLite3", "Postgres"]):
 	### SQLite3 and Postgres

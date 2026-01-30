@@ -1229,7 +1229,7 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def select(self, selected="*", group_by='', order_by='', limit='', option='', **kwargs): return self.database__.select(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
 	def ins_st(self, option=''): return self.database__.operation_statement(Database.insert, record=self, option=option)
-	def upd_st(self, option=''): return  self.database__.operation_statement(Database.update, record=self, option=option)
+	def upd_st(self, option=''): return self.database__.operation_statement(Database.update, record=self, option=option)
 	def del_st(self, option=''): return self.database__.operation_statement(Database.delete, record=self, option=option)
 
 	def read(self, selected="*", group_by='', order_by='', limit='', option=''):
@@ -1275,7 +1275,40 @@ class Recordset:
 	def table(self):
 		if(self.firstRecord()): return  self.firstRecord().table__()
 	def empty(self): self.__records = []
-	def add(self, recordObject): self.__records.append(recordObject)
+
+	@staticmethod
+	def fromDicts(record_cls, dicts):
+		"""Create a Recordset from a list of dictionaries.
+
+		Usage:
+			rs = Recordset.from_dicts(Employees, [
+				{'employee_id': 1, 'first_name': 'John'},
+				{'employee_id': 2, 'first_name': 'Jane'}
+			])
+		"""
+		rs = Recordset()
+		for d in dicts:
+			record = record_cls()
+			for field, value in d.items():
+				setattr(record, field, value)
+			rs.add(record)
+		return rs
+
+	@staticmethod
+	def fromRecords(*records):
+		"""Create a Recordset from Record instances.
+
+		Usage:
+			rs = Recordset.from_records(emp1, emp2, emp3)
+		"""
+		rs = Recordset()
+		for record in records:
+			rs.add(record)
+		return rs
+		
+	def add(self, *args):
+		self.__records.extend(args)
+		return self
 	def iterate(self): return self.__records
 	def firstRecord(self):
 		if(len(self.__records)):
@@ -1284,11 +1317,40 @@ class Recordset:
 			return self.__records[0]
 		else:
 			return None
+	def lastRecord(self):
+		"""Return the last record in the recordset."""
+		if len(self.__records):
+			return self.__records[-1]
+		return None
 	def count(self): return len(self.__records)
 	def columns(self): return self.firstRecord().columns
 	def setField(self, fieldName, fieldValue):
 		for record in self.__records: record.__dict__[fieldName] = fieldValue
 	def affectedRowsCount(self): return self.rowsCount
+	def set(self, **kwargs):
+		"""Set the same values on all records for update operations.
+
+		Usage:
+			rs.set_all(manager_id=100, department_id=5).update(onColumns=['employee_id'])
+		"""
+		for record in self.__records:
+			for field, value in kwargs.items():
+				setattr(record.set, field, value)
+		return self
+
+	def filter(self, *args, **kwargs):
+		"""Add filter conditions to the first record (applies to all in bulk operations).
+
+		Usage:
+			rs.filter_all(Employees.department_id == 5)
+		"""
+		if self.firstRecord():
+			self.firstRecord().filter_.filter(*args, **kwargs)
+		return self
+
+	def where(self, *args, **kwargs):
+		"""Alias for filter_all()."""
+		return self.filter_all(*args, **kwargs)
 	#--------------------------------------#
 	def insert(self, option=''):
 		if(self.firstRecord()): self.firstRecord().database__.insertMany(self.firstRecord(), option=option)
