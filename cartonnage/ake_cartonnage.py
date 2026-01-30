@@ -569,7 +569,7 @@ class Database:
 		print(" > Execute parameters: ", query.parameters)
 		print(f"{'-'*3}|e>")
 		rowcount = 0
-		query.parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
+		# query.parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
 		if(query.statement):
 			self.__cursor.executemany(query.statement, query.parameters)
 			self.operationsCount +=1

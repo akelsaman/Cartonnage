@@ -1061,10 +1061,7 @@ e1.filter(Employees.employee_id > 4) # add general condition to all records of t
 recordset.update()
 
 if Record.database__.name == "MicrosoftSQL":
-	employees = Employees()
-	employees.in_(manager_id = [77, 88])
-	employees.read()
-
+	employees = Employees().in_(manager_id = [77, 88]).read()
 	assert employees.recordset.toLists() == [[5, 'Mickey', 'Mouse', None, None, None, None, None, None, 77, None], [6, 'Donald', 'Duck', None, None, None, None, None, None, 88, None]]
 else:
 	assert recordset.rowsCount == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
@@ -1074,10 +1071,7 @@ e1.filter(Employees.manager_id < 100) # add general condition to all records of 
 recordset.delete()
 
 if Record.database__.name == "MicrosoftSQL":
-	employees = Employees()
-	employees.in_(manager_id = [77, 88])
-	employees.read()
-
+	employees = Employees().in_(manager_id = [77, 88]).read()
 	assert employees.recordset.toLists() == []
 else:
 	assert recordset.rowsCount == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
@@ -1111,8 +1105,7 @@ assert employee.data == {'employee_id': 1000, 'first_name': 'Super', 'last_name'
 print("---------------------------------------07---------------------------------------")
 # #==============================================================================#
 # group_by with HAVING clause
-employees = Employees()
-employees.read(selected='manager_id, count(1) AS "count"', group_by='manager_id HAVING count(1) > 4', order_by='manager_id ASC')
+employees = Employees().read(selected='manager_id, count(1) AS "count"', group_by='manager_id HAVING count(1) > 4', order_by='manager_id ASC')
 
 assert employees.recordset.data == [
 	{'manager_id': 100, 'count': 14}, {'manager_id': 101, 'count': 5}, 
@@ -1266,8 +1259,7 @@ print("---------------------------------------08--------------------------------
 ### MySQL | Postgres | Microsoft AzureSQL
 # assert emp.data == {'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, emp.data
 #=====
-emp = Employees()
-emp.filter(Employees.first_name.in_(['Steven', 'Neena']))
+emp = Employees().filter(Employees.first_name.in_(['Steven', 'Neena']))
 
 emp1 = Employees()
 emp2 = Employees()
@@ -1296,9 +1288,7 @@ rs.upsert(onColumns='employee_id')
 print(emp1.query__.statement)
 print(emp1.query__.parameters)
 
-emp = Employees()
-emp.filter(Employees.employee_id.in_([100,101]))
-emp.read()
+emp = Employees().filter(Employees.employee_id.in_([100,101])).read()
 
 if(Record.database__.name == "SQLite3"):
 	### SQLite3
