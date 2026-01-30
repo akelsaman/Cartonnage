@@ -293,9 +293,15 @@ class Filter:
 		self.__where = ''
 		self.parameters = []
 	
-	def read(self, selected="*", group_by='', order_by='', limit='', option=''): self.parent.database__.read(record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
-	def delete(self, option=''): self.parent.database__.delete(record=self.parent, option=option)
-	def update(self, option=''): self.parent.database__.update(record=self.parent, option=option)
+	def read(self, selected="*", group_by='', order_by='', limit='', option=''): 
+		self.parent.database__.read(record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+		return self.parent
+	def delete(self, option=''): 
+		self.parent.database__.delete(record=self.parent, option=option)
+		return self.parent
+	def update(self, option=''): 
+		self.parent.database__.update(record=self.parent, option=option)
+		return self.parent
 
 	def fltr(self, field, placeholder): return self.where__()
 	# def parameters(self, parameters): return self.parameters__()
@@ -329,7 +335,7 @@ class Filter:
 			self.addCondition('_', exp)
 		for field, value in kwargs.items():
 			self.addCondition(field, value)
-		return self
+		return self.parent
 		
 	def addCondition(self, field, value):
 		placeholder = self.parent.database__.placeholder()
@@ -367,55 +373,55 @@ class Filter:
 	def in_subquery(self, selected="*", **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None).in_subquery(value, selected=selected))
-		return self
+		return self.parent
 	def exists(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field.exists(value))
-		return self
+		return self.parent
 	def not_exists(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field.not_exists(value))
-		return self
+		return self.parent
 	def in_(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None).in_(value))
-		return self
+		return self.parent
 	def not_in(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None).not_in(value))
-		return self
+		return self.parent
 	def like(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None).like(value))
-		return self
+		return self.parent
 	def is_null(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None).is_null())
-		return self
+		return self.parent
 	def is_not_null(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None).is_not_null())
-		return self
+		return self.parent
 	def between(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None).between(value[0], value[1]))
-		return self
+		return self.parent
 	def gt(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None) > value)
-		return self
+		return self.parent
 	def ge(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None) >= value)
-		return self
+		return self.parent
 	def lt(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None) < value)
-		return self
+		return self.parent
 	def le(self, **kwargs):
 		for field, value in kwargs.items():
 			self.filter(Field(self.parent.__class__, field, None) <= value)
-		return self
+		return self.parent
 	#--------------------------------------#
 #================================================================================#
 # fieldValue = fieldValue.decode('utf-8') # mysql python connector returns bytearray instead of string
@@ -497,31 +503,31 @@ class Database:
 			#" INNER JOIN Persons pp ON "
 			joiners.joinClause += f"{join.type}{join.object.table__()} {join.object.alias.value()} ON {join.predicates.value}"
 			#--------------------
-			# Include both values (exact field matches) and filter conditions from joined object
-			valuesStatement = join.object.values.where(join.object)
-			filterStatement = join.object.filter_.where(join.object)
-			if valuesStatement and filterStatement:
-				statement = f"{valuesStatement} AND {filterStatement}"
-			elif valuesStatement:
-				statement = valuesStatement
-			else:
-				statement = filterStatement
-			if(statement): joiners.preparedStatement += f" AND {statement}"
-			joiners.parameters.extend(join.object.values.parameters(join.object))
-			joiners.parameters.extend(join.object.filter_.parameters)
-			#--------------------
-			child_joiners = Database.joining(join.object)
-			joiners.joinClause += child_joiners.joinClause
-			joiners.preparedStatement += child_joiners.preparedStatement
-			joiners.parameters.extend(child_joiners.parameters)
+			# # Include both values (exact field matches) and filter conditions from joined object
+			# valuesStatement = join.object.values.where(join.object)
+			# filterStatement = join.object.filter_.where(join.object)
+			# if valuesStatement and filterStatement:
+			# 	statement = f"{valuesStatement} AND {filterStatement}"
+			# elif valuesStatement:
+			# 	statement = valuesStatement
+			# else:
+			# 	statement = filterStatement
+			# if(statement): joiners.preparedStatement += f" AND {statement}"
+			# joiners.parameters.extend(join.object.values.parameters(join.object))
+			# joiners.parameters.extend(join.object.filter_.parameters)
+			# #--------------------
+			# child_joiners = Database.joining(join.object)
+			# joiners.joinClause += child_joiners.joinClause
+			# joiners.preparedStatement += child_joiners.preparedStatement
+			# joiners.parameters.extend(child_joiners.parameters)
 		return joiners
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			# print(f"<s|{'-'*3}")
-			# print(" > Execute statement: ", query.statement)
-			# print(" > Execute parameters: ", query.parameters)
-			# print(f"{'-'*3}|e>")
+			print(f"<s|{'-'*3}")
+			print(" > Execute statement: ", query.statement)
+			print(" > Execute parameters: ", query.parameters)
+			print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -1040,6 +1046,18 @@ class MicrosoftSQL(Database):
 		return record.query__
 #================================================================================#
 class RecordMeta(type):
+	def __new__(mcs, name, bases, namespace):
+		quoteChar = ''
+		cls = super().__new__(mcs, name, bases, namespace)
+		if bases:
+			parentClassName = bases[0].__name__
+			if(parentClassName == "Record" or parentClassName.startswith('__')):
+				cls.tableName__ = TableName(name)
+			else:
+				cls.tableName__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
+			cls.alias = Alias(f"{quoteChar}{name}{quoteChar}")
+		return cls
+
 	def __getattr__(cls, field):
 		# Don't cache Field on class - return new Field each time
 		# This prevents Field objects from shadowing instance data attributes
@@ -1057,7 +1075,7 @@ class Record(metaclass=RecordMeta):
 		self.joins__ = {}
 		self.data = {}
 		
-		self.setupTableNameAndAlias()
+		# self.setupTableNameAndAlias()
 		# self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
 
 		if(kwargs):
@@ -1112,9 +1130,10 @@ class Record(metaclass=RecordMeta):
 			self.tableName__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
 		self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
 	#--------------------------------------#
-	def table__(self):
+	@classmethod
+	def table__(cls):
 		quoteChar = '' #self.database__.escapeChar()
-		return f"{quoteChar}{self.tableName__.value()}{quoteChar}"
+		return f"{quoteChar}{cls.tableName__.value()}{quoteChar}"
 	#--------------------------------------#
 	def __repr__(self):
 		items = list(self.data.items())[:5]  # Show first 5 fields
@@ -1203,31 +1222,46 @@ class Record(metaclass=RecordMeta):
 	def upd_st(self, option=''): return  self.database__.operation_statement(Database.update, record=self, option=option)
 	def del_st(self, option=''): return self.database__.operation_statement(Database.delete, record=self, option=option)
 
-	def read(self, selected="*", group_by='', order_by='', limit='', option=''): self.database__.read(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def read(self, selected="*", group_by='', order_by='', limit='', option=''):
+		self.database__.read(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+		return self
 	# def read(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.read(selected, group_by, order_by, limit)
-	def insert(self, option=''): self.database__.insert(record=self, option=option)
-	def update(self, option=''): self.database__.update(record=self, option=option)
-	def delete(self, option=''): self.database__.delete(record=self, option=option)
-	def all(self, option=''): self.database__.all(record=self, option=option)
-	def upsert(self, onColumns, option=''): self.database__.upsert(record=self, onColumns=onColumns, option=option)
+	def insert(self, option=''): 
+		self.database__.insert(record=self, option=option)
+		return self
+	def update(self, option=''): 
+		self.database__.update(record=self, option=option)
+		return self
+	def delete(self, option=''): 
+		self.database__.delete(record=self, option=option)
+		return self
+	def all(self, option=''): 
+		self.database__.all(record=self, option=option)
+		return self
+	def upsert(self, onColumns, option=''): 
+		self.database__.upsert(record=self, onColumns=onColumns, option=option)
+		return self
 	def commit(self): self.database__.commit()
 	#--------------------------------------#
-	def join(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields)
-	def rightJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' RIGHT JOIN ')
-	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN ')
+	def join(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields); return self
+	def rightJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' RIGHT JOIN '); return self
+	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN '); return self
 	#--------------------------------------#
 	def joinCTE(self, table, fields):
 		freshTableInstanceForCTEJoining = table.__class__()
 		freshTableInstanceForCTEJoining.tableName__ = TableName(table.alias.value())
 		self.joins__[table.alias.value()] = Join(freshTableInstanceForCTEJoining, fields)
+		return self
 	def rightJoinCTE(self, table, fields):
 		freshTableInstanceForCTEJoining = table.__class__()
 		freshTableInstanceForCTEJoining.tableName__ = TableName(table.alias.value())
 		self.joins__[table.alias.value()] = Join(freshTableInstanceForCTEJoining, fields, ' RIGHT JOIN ')
+		return self
 	def leftJoinCTE(self, table, fields):
 		freshTableInstanceForCTEJoining = table.__class__()
 		freshTableInstanceForCTEJoining.tableName__ = TableName(table.alias.value())
 		self.joins__[table.alias.value()] = Join(freshTableInstanceForCTEJoining, fields, ' LEFT JOIN ')
+		return self
 	#--------------------------------------#
 	def toDict(self): return self.data
 	#--------------------------------------#

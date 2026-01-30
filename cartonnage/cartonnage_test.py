@@ -127,7 +127,22 @@ class Hierarchy(Record): pass
 class ExecutivesDepartment(Departments): pass
 class AdministrationJobs(Jobs): pass
 
-hieirarchy = Hierarchy()
+st = (
+	Employees()
+	.filter(Employees.employee_id < 101)
+)
+a = (
+	Employees()
+	.filter(Employees.employee_id.in_subquery(st, selected="employee_id"))
+	.join(Dependents, (Dependents.employee_id == Employees.employee_id))
+	.select()
+)
+# assert st.statement == "", st.statement
+# assert a.statement == "", a.statement
+
+
+
+hierarchy = Hierarchy()
 p = P()
 c = C()
 executives_department = ExecutivesDepartment()
@@ -135,7 +150,7 @@ administration_jobs = AdministrationJobs()
 
 p.filter(P.manager_id.is_null())
 c.filter(C.first_name == 'Neena')
-c.join(hieirarchy, (C.manager_id == Hierarchy.employee_id))
+c.join(Hierarchy, (C.manager_id == Hierarchy.employee_id))
 
 executives_department.filter(ExecutivesDepartment.department_name == 'Executive')
 administration_jobs.filter(AdministrationJobs.job_title.like('Administration%'))
@@ -199,7 +214,7 @@ print("Cartonnage:")
 if(Record.database__.name not in ['Oracle']):
 	emp = Employees()
 	emp.with_cte = with_cte
-	emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
+	emp.filter(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
 	emp.set.salary = 2000
 	emp.update()
 
@@ -215,9 +230,9 @@ if(Record.database__.name not in ['Oracle']):
 
 emp = Employees()
 emp.with_cte = with_cte
-emp.joinCTE(hieirarchy, (Employees.employee_id == Hierarchy.employee_id))
-emp.joinCTE(executives_department, (Employees.department_id == ExecutivesDepartment.department_id))
-emp.joinCTE(administration_jobs, (Employees.job_id == AdministrationJobs.job_id))
+emp.join(Hierarchy, (Employees.employee_id == Hierarchy.employee_id))
+emp.join(ExecutivesDepartment, (Employees.department_id == ExecutivesDepartment.department_id))
+emp.join(AdministrationJobs, (Employees.job_id == AdministrationJobs.job_id))
 if Record.database__.name in ['MicrosoftSQL']:
 	# MSSQL MAXRECURSION Option: OPTION (MAXRECURSION 100)
 	emp.read(option='OPTION (MAXRECURSION 100)')
@@ -241,7 +256,7 @@ print(emp.query__.parameters)
 if(Record.database__.name not in ['Oracle']):
 	emp = Employees()
 	emp.with_cte = with_cte
-	emp.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
+	emp.filter(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
 	emp.delete()
 
 	# sqlite3 returns -1 for complex operations not the real affected rows count
@@ -258,56 +273,56 @@ if(Record.database__.name not in ['Oracle']):
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
 Record.database__.rollback()  # Force rollback
 
-employees = Recordset()
-emp1 = Employees()
-emp2 = Employees()
-emp1.employee_id = 100
-emp2.employee_id = 101
-emp1.read()
-emp2.read()
-emp1.set.last_name = 'Ahmed'
-emp2.set.last_name = 'kamal'
-employees.add(emp1)
-employees.add(emp2)
+# employees = Recordset()
+# emp1 = Employees()
+# emp2 = Employees()
+# emp1.employee_id = 100
+# emp2.employee_id = 101
+# emp1.read()
+# emp2.read()
+# emp1.set.last_name = 'Ahmed'
+# emp2.set.last_name = 'kamal'
+# employees.add(emp1)
+# employees.add(emp2)
 
-emp1.with_cte = with_cte
-emp1.filter(Employees.employee_id.in_subquery(hieirarchy, selected='employee_id'))
+# emp1.with_cte = with_cte
+# emp1.filter(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
 
-employees.update(onColumns=["employee_id"])
-# employees.delete(onColumns=["employee_id"])
+# employees.update(onColumns=["employee_id"])
+# # employees.delete(onColumns=["employee_id"])
 
 
-# ExecutivesDepartment AS NOT MATERIALIZED (SELECT /*+ INLINE */ ExecutivesDepartment.* FROM Departments ExecutivesDepartment WHERE ExecutivesDepartment.department_name = ?) ,
-# AdministrationJobs AS MATERIALIZED (SELECT /*+ MATERIALIZE */ AdministrationJobs.* FROM Jobs AdministrationJobs WHERE AdministrationJobs.job_title LIKE ?) ,
-# pp = [('Executive', 'Administration%', 'Neena', 100), ('Executive', 'Administration%', 'Neena', 101)]
+# # ExecutivesDepartment AS NOT MATERIALIZED (SELECT /*+ INLINE */ ExecutivesDepartment.* FROM Departments ExecutivesDepartment WHERE ExecutivesDepartment.department_name = ?) ,
+# # AdministrationJobs AS MATERIALIZED (SELECT /*+ MATERIALIZE */ AdministrationJobs.* FROM Jobs AdministrationJobs WHERE AdministrationJobs.job_title LIKE ?) ,
+# # pp = [('Executive', 'Administration%', 'Neena', 100), ('Executive', 'Administration%', 'Neena', 101)]
 
-ss = """
-WITH RECURSIVE 
-	Hierarchy (employee_id, manager_id, first_name) AS (
-		SELECT /*+ INLINE */ employee_id, manager_id, first_name FROM Employees P WHERE P.manager_id IS NULL  
-		UNION ALL
-		SELECT /*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name FROM Employees C  INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id WHERE C.first_name = ?
-	)
-DELETE FROM Employees  
-WHERE Employees.employee_id = ? AND Employees.employee_id IN (
-	SELECT employee_id FROM Hierarchy Hierarchy
-)
-"""
-pp = [('Neena', 100), ('Neena', 101)]
+# ss = """
+# WITH RECURSIVE 
+# 	Hierarchy (employee_id, manager_id, first_name) AS (
+# 		SELECT /*+ INLINE */ employee_id, manager_id, first_name FROM Employees P WHERE P.manager_id IS NULL  
+# 		UNION ALL
+# 		SELECT /*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name FROM Employees C  INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id WHERE C.first_name = ?
+# 	)
+# DELETE FROM Employees  
+# WHERE Employees.employee_id = ? AND Employees.employee_id IN (
+# 	SELECT employee_id FROM Hierarchy Hierarchy
+# )
+# """
+# pp = [('Neena', 100), ('Neena', 101)]
 
-rec = Record(statement=ss,parameters=pp,operation=Database.delete)
-check = Record(statement="SELECT employee_id FROM Employees WHERE employee_id in (?, ?)", parameters=[100, 101], operation=Database.read)
-print(f"{'<'*80}\n{check.recordset.data}")
+# rec = Record(statement=ss,parameters=pp,operation=Database.delete)
+# check = Record(statement="SELECT employee_id FROM Employees WHERE employee_id in (?, ?)", parameters=[100, 101], operation=Database.read)
+# print(f"{'<'*80}\n{check.recordset.data}")
 
-assert employees.rowsCount == -1, employees.rowsCount
+# assert employees.rowsCount == -1, employees.rowsCount
 
-Record.database__._Database__cursor.execute("SELECT employee_id FROM Employees WHERE employee_id IN (100, 101)")
-print("RAW CHECK:", Record.database__._Database__cursor.fetchall())
+# Record.database__._Database__cursor.execute("SELECT employee_id FROM Employees WHERE employee_id IN (100, 101)")
+# print("RAW CHECK:", Record.database__._Database__cursor.fetchall())
 
-employees.insert()
-assert employees.rowsCount == -1, employees.rowsCount
+# employees.insert()
+# assert employees.rowsCount == -1, employees.rowsCount
 
-Record.database__.rollback()  # Force rollback
+# Record.database__.rollback()  # Force rollback
 #==============================================================================#
 print("---------------------------------------Data-Modifying CTE---------------------------------------")
 #==============================================================================#
@@ -533,100 +548,177 @@ print("---------------------------------------Data-Modifying CTE----------------
 #==============================================================================#
 print("---------------------------------------00---------------------------------------")
 #==============================================================================#
-employee = Employees()
-manager = Managers()
-job = Jobs()
-jobSubQuery = Jobs()
-department = Departments()
-departmentExistsQuery = Departments()
-location = Locations()
-country = Countries()
-region = Regions()
+# employee = Employees()
+# manager = Managers()
+# job = Jobs()
+# jobSubQuery = Jobs()
+# department = Departments()
+# departmentExistsQuery = Departments()
+# location = Locations()
+# country = Countries()
+# region = Regions()
 
-employee.join(manager, employeeManagerRelation)
-employee.join(job, (Employees.job_id == Jobs.job_id))
-employee.join(department, (Employees.department_id == Departments.department_id))
-department.join(location, (Departments.location_id == Locations.location_id))
-location.join(country, (Locations.country_id == Countries.country_id))
-country.join(region, (Countries.region_id == Regions.region_id))
+jobSubQuery = (Jobs().filter(Jobs.job_title.in_(['Programmer', 'Purchasing Clerk'])))
+departmentExistsQuery = (
+	Departments().filter(
+		(Employees.department_id == Departments.department_id) &
+		Departments.department_name.in_(['IT', 'Purchasing'])
+	)
+)
+
+EmployeesConditions = (
+	(Employees.employee_id.in_([115, 103])) &
+	(Employees.last_name.in_(['Khoo', 'Hunold'])) &
+	(Employees.department_id.not_in([12])) &
+	(Employees.commission_pct.is_null()) &
+	(Employees.phone_number.is_not_null()) &
+	(Employees.email.like('alexander%')) &
+	(Employees.employee_id.between(103, 116)) &
+	(Employees.employee_id > 102) &
+	(Employees.employee_id >= 103) &
+	(Employees.employee_id <= 115) &
+	(Employees.employee_id < 116) &
+	(Employees.hire_date.between(datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d'))) &
+	(Employees.hire_date > datetime.strptime('1990-01-02', '%Y-%m-%d')) &
+	(Employees.hire_date >= datetime.strptime('1990-01-02', '%Y-%m-%d')) &
+	(Employees.hire_date <= datetime.strptime('1995-05-18', '%Y-%m-%d')) &
+	(Employees.hire_date < datetime.strptime('1995-05-19', '%Y-%m-%d')) &
+	(Employees.job_id.in_subquery(jobSubQuery, selected="job_id")) &
+	(Employees._.exists(departmentExistsQuery))
+)
+
+employee = (
+	Employees().join(Managers, employeeManagerRelation)
+	.join(Jobs, (Employees.job_id == Jobs.job_id))
+	.join(Departments, (Employees.department_id == Departments.department_id))
+	.join(Locations, (Departments.location_id == Locations.location_id))
+	.join(Countries, (Locations.country_id == Countries.country_id))
+	.join(Regions, (Countries.region_id == Regions.region_id))
+
+	.filter(Jobs.job_title.in_(['Programmer', 'Purchasing Clerk']))
+	.filter(Departments.department_name.in_(['IT', 'Purchasing']))
+
+	.filter(EmployeesConditions | EmployeesConditions).filter(EmployeesConditions & EmployeesConditions)
+	.filter_.filter(EmployeesConditions | EmployeesConditions).filter(EmployeesConditions & EmployeesConditions)
+	
+	.in_(employee_id = [115, 103], last_name = ['Khoo', 'Hunold'])
+	.not_in(department_id = [12])
+	.is_null(commission_pct = None)
+	.is_not_null(phone_number = None)
+	.like(email = 'alexander%')
+	.gt(employee_id = 102)
+	.ge(employee_id = 103)
+	.le(employee_id = 115)
+	.lt(employee_id = 116)
+	.between(employee_id = (103, 116))
+	.between(hire_date = (datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d')))
+	.gt(hire_date = datetime.strptime('1990-01-01', '%Y-%m-%d'))
+	.ge(hire_date = datetime.strptime('1990-01-02', '%Y-%m-%d'))
+	.le(hire_date = datetime.strptime('1995-05-18', '%Y-%m-%d'))
+	.lt(hire_date = datetime.strptime('1995-05-19', '%Y-%m-%d'))
+	.in_subquery(job_id = jobSubQuery, selected="job_id")
+	.exists(_=departmentExistsQuery)
+
+	.filter_.in_(employee_id = [115, 103], last_name = ['Khoo', 'Hunold'])
+	.not_in(department_id = [12])
+	.is_null(commission_pct = None)
+	.is_not_null(phone_number = None)
+	.like(email = 'alexander%')
+	.between(employee_id = (103, 116))
+	.gt(employee_id = 102)
+	.ge(employee_id = 103)
+	.le(employee_id = 115)
+	.lt(employee_id = 116)
+	.between(hire_date = (datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d')))
+	.gt(hire_date = datetime.strptime('1990-01-01', '%Y-%m-%d'))
+	.ge(hire_date = datetime.strptime('1990-01-02', '%Y-%m-%d'))
+	.le(hire_date = datetime.strptime('1995-05-18', '%Y-%m-%d'))
+	.lt(hire_date = datetime.strptime('1995-05-19', '%Y-%m-%d'))
+	.in_subquery(job_id = jobSubQuery, selected="job_id")
+	.exists(_=departmentExistsQuery)
+
+
+)
+
+
 
 employee.first_name = 'Alex' # set the first_name field/column exact value to search by.
 employee.first_name = 'Alexander' # override first_name field/column exact value to search by.
 
 # '%Y-%m-%d %H:%M:%S'
 
-job.filter(Jobs.job_title.in_(['Programmer', 'Purchasing Clerk']))
-jobSubQuery.filter(Jobs.job_title.in_(['Programmer', 'Purchasing Clerk']))
-department.filter(Departments.department_name.in_(['IT', 'Purchasing']))
-departmentExistsQuery.filter(
-	(Employees.department_id == Departments.department_id) &
-	Departments.department_name.in_(['IT', 'Purchasing'])
-)
+# job.filter(Jobs.job_title.in_(['Programmer', 'Purchasing Clerk']))
+# jobSubQuery.filter(Jobs.job_title.in_(['Programmer', 'Purchasing Clerk']))
+# department.filter(Departments.department_name.in_(['IT', 'Purchasing']))
+# departmentExistsQuery.filter(
+# 	(Employees.department_id == Departments.department_id) &
+# 	Departments.department_name.in_(['IT', 'Purchasing'])
+# )
 
 # Dependents._.exists(emp1)
 # filter using direct Record functions # calls Record.Filter.xyz_filter()
-employee.in_(employee_id = [115, 103], last_name = ['Khoo', 'Hunold']) \
-	.not_in(department_id = [12]) \
-	.is_null(commission_pct = None) \
-	.is_not_null(phone_number = None) \
-	.like(email = 'alexander%') \
-	.gt(employee_id = 102) \
-	.ge(employee_id = 103) \
-	.le(employee_id = 115) \
-	.lt(employee_id = 116) \
-	.between(employee_id = (103, 116)) \
-	.between(hire_date = (datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d'))) \
-	.gt(hire_date = datetime.strptime('1990-01-01', '%Y-%m-%d')) \
-	.ge(hire_date = datetime.strptime('1990-01-02', '%Y-%m-%d')) \
-	.le(hire_date = datetime.strptime('1995-05-18', '%Y-%m-%d')) \
-	.lt(hire_date = datetime.strptime('1995-05-19', '%Y-%m-%d')) \
-	.in_subquery(job_id = jobSubQuery, selected="job_id") \
-	.exists(_=departmentExistsQuery)
+# employee.in_(employee_id = [115, 103], last_name = ['Khoo', 'Hunold']) \
+# 	.not_in(department_id = [12]) \
+# 	.is_null(commission_pct = None) \
+# 	.is_not_null(phone_number = None) \
+# 	.like(email = 'alexander%') \
+# 	.gt(employee_id = 102) \
+# 	.ge(employee_id = 103) \
+# 	.le(employee_id = 115) \
+# 	.lt(employee_id = 116) \
+# 	.between(employee_id = (103, 116)) \
+# 	.between(hire_date = (datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d'))) \
+# 	.gt(hire_date = datetime.strptime('1990-01-01', '%Y-%m-%d')) \
+# 	.ge(hire_date = datetime.strptime('1990-01-02', '%Y-%m-%d')) \
+# 	.le(hire_date = datetime.strptime('1995-05-18', '%Y-%m-%d')) \
+# 	.lt(hire_date = datetime.strptime('1995-05-19', '%Y-%m-%d')) \
+# 	.in_subquery(job_id = jobSubQuery, selected="job_id") \
+# 	.exists(_=departmentExistsQuery)
 
 # filter using direct Record.Filter functions
-employee.filter_.in_(employee_id = [115, 103], last_name = ['Khoo', 'Hunold']) \
-	.not_in(department_id = [12]) \
-	.is_null(commission_pct = None) \
-	.is_not_null(phone_number = None) \
-	.like(email = 'alexander%') \
-	.between(employee_id = (103, 116)) \
-	.gt(employee_id = 102) \
-	.ge(employee_id = 103) \
-	.le(employee_id = 115) \
-	.lt(employee_id = 116) \
-	.between(hire_date = (datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d'))) \
-	.gt(hire_date = datetime.strptime('1990-01-01', '%Y-%m-%d')) \
-	.ge(hire_date = datetime.strptime('1990-01-02', '%Y-%m-%d')) \
-	.le(hire_date = datetime.strptime('1995-05-18', '%Y-%m-%d')) \
-	.lt(hire_date = datetime.strptime('1995-05-19', '%Y-%m-%d')) \
-	.in_subquery(job_id = jobSubQuery, selected="job_id") \
-	.exists(_=departmentExistsQuery)
+# employee.filter_.in_(employee_id = [115, 103], last_name = ['Khoo', 'Hunold']) \
+# 	.not_in(department_id = [12]) \
+# 	.is_null(commission_pct = None) \
+# 	.is_not_null(phone_number = None) \
+# 	.like(email = 'alexander%') \
+# 	.between(employee_id = (103, 116)) \
+# 	.gt(employee_id = 102) \
+# 	.ge(employee_id = 103) \
+# 	.le(employee_id = 115) \
+# 	.lt(employee_id = 116) \
+# 	.between(hire_date = (datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d'))) \
+# 	.gt(hire_date = datetime.strptime('1990-01-01', '%Y-%m-%d')) \
+# 	.ge(hire_date = datetime.strptime('1990-01-02', '%Y-%m-%d')) \
+# 	.le(hire_date = datetime.strptime('1995-05-18', '%Y-%m-%d')) \
+# 	.lt(hire_date = datetime.strptime('1995-05-19', '%Y-%m-%d')) \
+# 	.in_subquery(job_id = jobSubQuery, selected="job_id") \
+# 	.exists(_=departmentExistsQuery)
 
-EmployeesConditions = (
-       (Employees.employee_id.in_([115, 103])) &
-        (Employees.last_name.in_(['Khoo', 'Hunold'])) &
-        (Employees.department_id.not_in([12])) &
-        (Employees.commission_pct.is_null()) &
-        (Employees.phone_number.is_not_null()) &
-        (Employees.email.like('alexander%')) &
-        (Employees.employee_id.between(103, 116)) &
-        (Employees.employee_id > 102) &
-        (Employees.employee_id >= 103) &
-        (Employees.employee_id <= 115) &
-        (Employees.employee_id < 116) &
-		(Employees.hire_date.between(datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d'))) &
-		(Employees.hire_date > datetime.strptime('1990-01-02', '%Y-%m-%d')) &
-		(Employees.hire_date >= datetime.strptime('1990-01-02', '%Y-%m-%d')) &
-		(Employees.hire_date <= datetime.strptime('1995-05-18', '%Y-%m-%d')) &
-		(Employees.hire_date < datetime.strptime('1995-05-19', '%Y-%m-%d')) &
-		(Employees.job_id.in_subquery(jobSubQuery, selected="job_id")) &
-		(Employees._.exists(departmentExistsQuery))
-    )
+# EmployeesConditions = (
+#        (Employees.employee_id.in_([115, 103])) &
+#         (Employees.last_name.in_(['Khoo', 'Hunold'])) &
+#         (Employees.department_id.not_in([12])) &
+#         (Employees.commission_pct.is_null()) &
+#         (Employees.phone_number.is_not_null()) &
+#         (Employees.email.like('alexander%')) &
+#         (Employees.employee_id.between(103, 116)) &
+#         (Employees.employee_id > 102) &
+#         (Employees.employee_id >= 103) &
+#         (Employees.employee_id <= 115) &
+#         (Employees.employee_id < 116) &
+# 		(Employees.hire_date.between(datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d'))) &
+# 		(Employees.hire_date > datetime.strptime('1990-01-02', '%Y-%m-%d')) &
+# 		(Employees.hire_date >= datetime.strptime('1990-01-02', '%Y-%m-%d')) &
+# 		(Employees.hire_date <= datetime.strptime('1995-05-18', '%Y-%m-%d')) &
+# 		(Employees.hire_date < datetime.strptime('1995-05-19', '%Y-%m-%d')) &
+# 		(Employees.job_id.in_subquery(jobSubQuery, selected="job_id")) &
+# 		(Employees._.exists(departmentExistsQuery))
+#     )
 # filter using direct Filter.filter function chaining
-employee.filter_.filter(EmployeesConditions | EmployeesConditions).filter(EmployeesConditions & EmployeesConditions)
+# employee.filter_.filter(EmployeesConditions | EmployeesConditions).filter(EmployeesConditions & EmployeesConditions)
 
 # filter using direct Record.filter function chaining # calls Record.Filter.filter()
-employee.filter(EmployeesConditions | EmployeesConditions).filter(EmployeesConditions & EmployeesConditions)
+# employee.filter(EmployeesConditions | EmployeesConditions).filter(EmployeesConditions & EmployeesConditions)
 
 # employee.filter_.read(selected='Employees.job_id AS "employee.job_id", Jobs.job_id AS "job.job_id"')
 employee.filter_.read(selected='Employees.*, Jobs.*, Departments.*, Locations.*, Countries.*, Regions.*, Managers.employee_id AS "manager_employee_id"', order_by="Employees.employee_id", limit=employee.limit(1,2)) # page_number, records_per_page
@@ -678,85 +770,97 @@ employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
 
 # filter using Record.filter(expression)
-employee = Employees()
-employee.filter(Employees.employee_id == 100)
-employee.read()
+employee = (Employees().filter(Employees.employee_id == 100).read())
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
 
 # join two tables
-employee = Employees()
-dependent = Dependents()
-dependent.first_name = "Jennifer"
-employee.join(dependent, (Employees.employee_id == Dependents.employee_id))
-employee.read(selected="Employees.*") # selected columns
+employee = (
+	Employees()
+	.join(Dependents, (Employees.employee_id == Dependents.employee_id))
+	.filter(Dependents.first_name == "Jennifer")
+	.read(selected="Employees.*")
+)
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
 
 # join same table
-employee = Employees()
-manager = Managers()
-manager.first_name = "Lex"
-employee.join(manager, (Employees.manager_id == Managers.employee_id))
-employee.read(selected='Employees.*, Managers.employee_id AS "manager_employee_id", Managers.email AS "manager_email"') # selected columns
+employee = (
+	Employees()
+	.join(Managers, (Employees.manager_id == Managers.employee_id))
+	.filter(Managers.first_name == 'Lex')
+	.read(selected='Employees.*, Managers.employee_id AS "manager_employee_id", Managers.email AS "manager_email"') # selected columns
+)
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6, 'manager_employee_id': 102, 'manager_email': 'lex.de haan@sqltutorial.org'}
 
 # filter using like() # use two diffent filteration methods
-employee = Employees()
-employee.like(first_name = 'Stev%') # calls internally Record.filter_.like()
-employee.filter(Employees.first_name.like('Stev%')) # calls internally Record.filter_.like()
-employee.read()
+employee = (
+	Employees()
+	.like(first_name = 'Stev%') # calls internally Record.filter_.like()
+	.filter(Employees.first_name.like('Stev%')) # calls internally Record.filter_.like()
+	.read()
+)
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
 
 # filter using is_null() # use two diffent filteration methods
-employee = Employees()
-employee.is_null(manager_id = None) # calls internally Record.filter_.is_null()
-employee.filter(Employees.manager_id.is_null()) # calls internally Record.filter_.filter()
-employee.read()
+employee = (
+	Employees()
+	.is_null(manager_id = None) # calls internally Record.filter_.is_null()
+	.filter(Employees.manager_id.is_null()) # calls internally Record.filter_.filter()
+	.read()
+)
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
 
 # filter using is_not_null() # use two diffent filteration methods
-employee = Employees()
-employee.employee_id = 101
-employee.is_not_null(manager_id = None) # calls internally Record.filter_.is_not_null()
-employee.filter(Employees.manager_id.is_not_null()) # calls internally Record.filter_.filter()
-employee.read()
+employee = (
+	Employees()
+	.filter(employee_id = 101)
+	.is_not_null(manager_id = None) # calls internally Record.filter_.is_not_null()
+	.filter(Employees.manager_id.is_not_null()) # calls internally Record.filter_.filter()
+	.read()
+)
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}
 
 # filter using in_() # use two diffent filteration methods
-employee = Employees()
-employee.in_(employee_id = [100]) # calls internally Record.filter_.in_()
-employee.filter(Employees.employee_id.in_([100])) # calls internally Record.filter_.filter()
-employee.read()
+employee = (
+	Employees()
+	.in_(employee_id = [100]) # calls internally Record.filter_.in_()
+	.filter(Employees.employee_id.in_([100])) # calls internally Record.filter_.filter()
+	.read()
+)
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
 
 # filter using not_in() # use two diffent filteration methods
-employee = Employees()
-employee.filter(Employees.first_name.like('Alex%'))
-employee.not_in(employee_id = [115]) # calls internally Record.filter_.like()
-employee.filter(Employees.employee_id.not_in([115])) # calls internally Record.filter_.filter()
-employee.read()
+employee = (
+	Employees()
+	.filter(Employees.first_name.like('Alex%'))
+	.not_in(employee_id = [115]) # calls internally Record.filter_.like()
+	.filter(Employees.employee_id.not_in([115])) # calls internally Record.filter_.filter()
+	.read()
+)
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6}
 
 # filter using between() # use two diffent filteration methods
-employee = Employees()
-employee.between(employee_id = (100, 101)) # calls internally Record.filter_.between()
-employee.filter(Employees.employee_id.between(100, 101)) # calls internally Record.filter_.filter()
-employee.read()
+employee = (
+	Employees()
+	.between(employee_id = (100, 101)) # calls internally Record.filter_.between()
+	.filter(Employees.employee_id.between(100, 101)) # calls internally Record.filter_.filter()
+	.read()
+)
 for e in employee:
 	e.hire_date = str(e.hire_date)[:10] # convert datetime to str
 	e.salary = float(e.salary)
@@ -767,15 +871,17 @@ assert employee.recordset.data == [
 
 # filter using gt(), ge(), le(), and lt() # use two diffent filteration methods
 # use filter chaining # use & expressions
-employee = Employees()
-employee.gt(employee_id = 99).ge(employee_id = 100).le(employee_id = 101).lt(employee_id = 102) # calls internally Record.filter_.XY()
-employee.filter(
-	(Employees.employee_id > 99) &
-	(Employees.employee_id >= 100) &
-	(Employees.employee_id <= 101) &
-	(Employees.employee_id < 102)
-) # calls internally Record.filter_.filter()
-employee.read()
+employee = (
+	Employees()
+	.gt(employee_id = 99).ge(employee_id = 100).le(employee_id = 101).lt(employee_id = 102) # calls internally Record.filter_.XY()
+	.filter(
+		(Employees.employee_id > 99) &
+		(Employees.employee_id >= 100) &
+		(Employees.employee_id <= 101) &
+		(Employees.employee_id < 102)
+	) # calls internally Record.filter_.filter()
+	.read()
+)
 for e in employee:
 	e.hire_date = str(e.hire_date)[:10] # convert datetime to str
 	e.salary = float(e.salary)
@@ -795,9 +901,11 @@ f2 = (
 	((Employees.employee_id == 103) & (Employees.first_name == "Alexander"))
 )
 
-employee = Employees()
-employee.filter(f1 | f2)
-employee.read()
+employee = (
+	Employees()
+	.filter(f1 | f2)
+	.read()
+)
 for e in employee:
 	e.hire_date = str(e.hire_date)[:10] # convert datetime to str
 	e.salary = float(e.salary)
@@ -809,9 +917,11 @@ assert employee.recordset.data == [
 ]
 
 # filter using multiple kwargs # use two diffent filteration methods
-employee = Employees()
-employee.like(first_name = 'Stev%', last_name = 'Ki%') # calls internally Record.filter_.like()
-employee.read()
+employee = (
+	Employees()
+	.like(first_name = 'Stev%', last_name = 'Ki%') # calls internally Record.filter_.like()
+	.read()
+)
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
@@ -819,8 +929,7 @@ assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name'
 print("---------------------------------------02---------------------------------------")
 #==============================================================================#
 # select all and get recordset [all records] count, convert them to list of Dictionaries/lists
-reg = Regions()
-reg.all()
+reg = Regions().all()
 
 assert reg.recordset.count() == 4
 assert reg.columns == ['region_id', 'region_name']
@@ -852,22 +961,25 @@ employee.salary = float(employee.salary)
 assert emp1.data == {'employee_id': 19950519, 'first_name': 'William', 'last_name': 'Wallace', 'email': 'william.wallace@sqltutorial.org', 'phone_number': None, 'hire_date': None, 'job_id': None, 'salary': None, 'commission_pct': None, 'manager_id': None, 'department_id': None}
 
 # delete by exists and subquery
-emp1 = EmployeesAlias()
-emp1.filter(
-	(Dependents.employee_id == EmployeesAlias.employee_id) &
-	(EmployeesAlias.email == 'william.gietz@sqltutorial.org') &
-	(EmployeesAlias.employee_id.in_([206]))
+emp1 = (
+	EmployeesAlias()
+	.filter(
+		(Dependents.employee_id == EmployeesAlias.employee_id) &
+		(EmployeesAlias.email == 'william.gietz@sqltutorial.org') &
+		(EmployeesAlias.employee_id.in_([206]))
+	)
 )
 
-emp2 = Employees()
-emp2.filter(Employees.manager_id == 205)
+emp2 = Employees().filter(Employees.manager_id == 205)
 
-dep1 = Dependents()
-dep1.exists( _ = emp1)
-dep1.in_subquery(employee_id = emp2, selected="employee_id")
-dep1.filter(Dependents._.exists(emp1))
-dep1.filter(Dependents.employee_id.in_subquery(emp2, selected="employee_id"))
-dep1.filter_.delete()
+dep1 = (
+	Dependents()
+	.exists( _ = emp1)
+	.in_subquery(employee_id = emp2, selected="employee_id")
+	.filter(Dependents._.exists(emp1))
+	.filter(Dependents.employee_id.in_subquery(emp2, selected="employee_id"))
+	.filter_.delete()
+)
 
 assert dep1.rowsCount() == 1
 
@@ -880,9 +992,7 @@ Record.database__.rollback()  # Force rollback
 print("---------------------------------------04---------------------------------------")
 # #==============================================================================#
 # filter and fetchmany records into recordset
-jobs = Jobs()
-jobs.filter(Jobs.job_title.like('%Accountant%'))
-jobs.read()
+jobs = Jobs().filter(Jobs.job_title.like('%Accountant%')).read()
 
 assert jobs.recordset.count() == 2
 assert jobs.columns == ['job_id', 'job_title', 'min_salary', 'max_salary']
@@ -898,8 +1008,7 @@ jobs.recordset.update()
 ### but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter.
 # jobs.recordset.update(onColumns=['job_id'])
 
-jobs = Jobs()
-jobs.filter(Jobs.job_title.like('%Accountant%')).read()
+jobs = Jobs().filter(Jobs.job_title.like('%Accountant%')).read()
 assert jobs.recordset.toLists() == [[1, 'Public Accountant', 5000, 9000], [6, 'Accountant', 5000, 9000]], jobs.recordset.toLists() # confirm recordset update
 print("----------02B----------")
 jobs.recordset.delete()
@@ -909,8 +1018,7 @@ jobs.recordset.delete()
 # jobs.recordset.delete(onColumns=['job_id'])
 
 print("----------02C----------")
-jobs = Jobs()
-jobs.filter(Jobs.job_title.like('%Accountant%')).read()
+jobs = Jobs().filter(Jobs.job_title.like('%Accountant%')).read()
 
 assert jobs.recordset.toLists() == []  # confirm recordset delete
 
@@ -943,7 +1051,7 @@ recordset.insert()
 if Record.database__.name == "MicrosoftSQL":
 	pass
 else:
-	assert recordset.rowsCount == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+	assert recordset.rowsCount == 2, recordset.rowsCount # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
 
 e1.set.manager_id = 77
 e2.set.manager_id = 88
