@@ -242,7 +242,10 @@ class Set:
 				parameters.append(value) #	if type(value) != Expression:
 		return parameters
 
-	def __setattr__(self, name, value):
+	# def __setattr__(self, name, value):
+	# 	self.setFieldValue(name, value)
+
+	def setFieldValue(self, name, value):
 		# if(name=="custom"): self.__dict__["custom"] = value
 		if(type(value) in [NoneType, str, int, float, datetime, bool] or isinstance(value, Expression)):
 			self.__dict__["new"][name] = value
@@ -569,7 +572,8 @@ class Database:
 		print(" > Execute parameters: ", query.parameters)
 		print(f"{'-'*3}|e>")
 		rowcount = 0
-		# query.parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
+		if not hasattr(query.parent, 'recordset') or not isinstance(query.parent.recordset, Recordset):
+			query.parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
 		if(query.statement):
 			self.__cursor.executemany(query.statement, query.parameters)
 			self.operationsCount +=1
@@ -586,9 +590,9 @@ class Database:
 	def crud(operation, record, selected="*", group_by='', order_by='', limit='', option=''):
 		with_cte = ''
 		with_cte_parameters = []
-		if(record.__dict__.get('with_cte')):
-			with_cte = f"{record.with_cte.value} "
-			with_cte_parameters = record.with_cte.parameters
+		if(record.__dict__.get('with_cte__')):
+			with_cte = f"{record.with_cte__.value} "
+			with_cte_parameters = record.with_cte__.parameters
 
 		whereValues = record.values.where(record)
 		whereFilter = record.filter_.where(record)
@@ -612,7 +616,7 @@ class Database:
 			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause} {option}"
 		#-----
 		elif(operation==Database.update):
-			setFields = record.set.setFields()
+			setFields = record.set__.setFields()
 			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
@@ -626,7 +630,7 @@ class Database:
 		record.query__.statement = statement
 		record.query__.parameters = []
 		record.query__.parameters.extend(with_cte_parameters)
-		record.query__.parameters.extend(record.set.parameters()) # if update extend with fields set values first
+		record.query__.parameters.extend(record.set__.parameters()) # if update extend with fields set values first
 		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters) #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.parameters.extend(joiners.parameters)
 		record.query__.operation = operation
@@ -635,9 +639,9 @@ class Database:
 	def crudMany(self, operation, record, selected="*", onColumns=None, group_by='', limit='', option=''):
 		with_cte = ''
 		with_cte_parameters = []
-		if(record.__dict__.get('with_cte')):
-			with_cte = f"{record.with_cte.value} "
-			with_cte_parameters = record.with_cte.parameters
+		if(record.__dict__.get('with_cte__')):
+			with_cte = f"{record.with_cte__.value} "
+			with_cte_parameters = record.with_cte__.parameters
 
 		joiners = Database.joining(record)
 		joinsCriteria = joiners.preparedStatement
@@ -657,7 +661,7 @@ class Database:
 			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause} {option}"
 		#-----
 		elif(operation==Database.update):
-			setFields = record.set.setFields()
+			setFields = record.set__.setFields()
 			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
@@ -668,10 +672,10 @@ class Database:
 		record.query__.statement = statement
 		filterParamters = record.filter_.parameters
 		for r in record.recordset.iterate():
-			#no problem with r.set.parameters() as it's emptied after sucessful update
+			#no problem with r.set__.parameters() as it's emptied after sucessful update
 			params = []
 			params.extend(with_cte_parameters)
-			params.extend(r.set.parameters())
+			params.extend(r.set__.parameters())
 			params.extend(r.values.parameters(r, fieldsNames=fieldsNames) )
 			params.extend(filterParamters)
 			record.query__.parameters.append(tuple(params))
@@ -688,28 +692,28 @@ class Database:
 	def delete(self, record, option=''): self.executeStatement(self.crud(operation=Database.delete, record=record, option=option))
 	def update(self, record, option=''):
 		self.executeStatement(self.crud(operation=Database.update, record=record, option=option))
-		for field, value in record.set.new.items():
+		for field, value in record.set__.new.items():
 			record.setField(field, value)
-			record.set.empty()
+			record.set__.empty()
 	def upsert(self, record, onColumns, option=''):
 		self.executeStatement(self._upsert(operation=Database.upsert, record=record, onColumns=onColumns, option=option))
-		for field, value in record.set.new.items():
+		for field, value in record.set__.new.items():
 			record.setField(field, value)
-			record.set.empty()
+			record.set__.empty()
 	#--------------------------------------#
 	def insertMany(self, record, option=''): self.executeMany(self.crudMany(operation=Database.insert, record=record, option=option))
 	def deleteMany(self, record, onColumns, option=''): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns, option=option))
 	def updateMany(self, record, onColumns, option=''):
 		self.executeMany(self.crudMany(operation=Database.update, record=record, onColumns=onColumns, option=option))
 		for r in record.recordset.iterate():
-			for field, value in r.set.new.items():
+			for field, value in r.set__.new.items():
 				r.setField(field, value)
-				r.set.empty()
+				r.set__.empty()
 	def upsertMany(self, record, onColumns, option=''):
 		self.executeMany(self._upsertMany(operation=Database.upsert, record=record, onColumns=onColumns, option=option))
-		for field, value in record.set.new.items():
+		for field, value in record.set__.new.items():
 			record.setField(field, value)
-			record.set.empty()
+			record.set__.empty()
 	#--------------------------------------#
 	def paginate(self, pageNumber=1, recordsCount=1):
 		try:
@@ -737,7 +741,7 @@ class SQLite(Database):
 		return f"LIMIT {offset}, {recordsCount}"
 
 	def upsertStatement(self, operation, record, onColumns, option=''):
-		keys = list(record.set.new.keys())
+		keys = list(record.set__.new.keys())
 		fields = ', '.join(keys)
 		updateSet = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
 		values = ', '.join('?' for _ in keys)
@@ -758,14 +762,14 @@ class SQLite(Database):
 
 	def _upsert(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
-		record.query__.parameters = list(record.set.new.values())
+		record.query__.parameters = list(record.set__.new.values())
 		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() + record.filter_.parameters
+			params = r.set__.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 
@@ -814,7 +818,7 @@ class Oracle(Database):
 	# """
 
 	def upsertStatement(self, operation, record, onColumns, option=''):
-		keys = list(record.set.new.keys())
+		keys = list(record.set__.new.keys())
 		fields = ', '.join(keys)
 		# Oracle uses :1, :2, :3 style placeholders
 		source_fields = ', '.join(f':1 AS {k}' for k in keys)
@@ -843,14 +847,14 @@ class Oracle(Database):
 
 	def _upsert(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
-		record.query__.parameters = list(record.set.new.values())
+		record.query__.parameters = list(record.set__.new.values())
 		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() + record.filter_.parameters
+			params = r.set__.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
@@ -892,7 +896,7 @@ class MySQL(Database):
 	# """
 
 	def upsertStatement(self, operation, record, onColumns, option=''):
-		keys = list(record.set.new.keys())
+		keys = list(record.set__.new.keys())
 		fields = ', '.join(keys)
 		values = ', '.join('%s' for _ in keys)
 		# MySQL doesn't support WHERE in ON DUPLICATE KEY UPDATE
@@ -914,13 +918,13 @@ class MySQL(Database):
 
 	def _upsert(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
-		record.query__.parameters = list(record.set.new.values())
+		record.query__.parameters = list(record.set__.new.values())
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
-			params = r.set.parameters()
+			params = r.set__.parameters()
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
@@ -947,7 +951,7 @@ class Postgres(Database):
 	# """
 
 	def upsertStatement(self, operation, record, onColumns, option=''):
-		keys = list(record.set.new.keys())
+		keys = list(record.set__.new.keys())
 		fields = ', '.join(keys)
 		values = ', '.join('%s' for _ in keys)
 		# Postgres uses EXCLUDED.column to reference the new values
@@ -970,14 +974,14 @@ class Postgres(Database):
 
 	def _upsert(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
-		record.query__.parameters = list(record.set.new.values())
+		record.query__.parameters = list(record.set__.new.values())
 		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() + record.filter_.parameters
+			params = r.set__.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
@@ -1005,7 +1009,7 @@ class MicrosoftSQL(Database):
 	# """
 
 	def upsertStatement(self, operation, record, onColumns, option=''):
-		keys = list(record.set.new.keys())
+		keys = list(record.set__.new.keys())
 		fields = ', '.join(keys)
 		# MSSQL uses ? placeholders
 		source_fields = ', '.join(f'? AS {k}' for k in keys)
@@ -1034,14 +1038,14 @@ class MicrosoftSQL(Database):
 
 	def _upsert(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
-		record.query__.parameters = list(record.set.new.values())
+		record.query__.parameters = list(record.set__.new.values())
 		record.query__.parameters.extend(record.filter_.parameters)
 		return record.query__
 
 	def _upsertMany(self, operation, record, onColumns, option=''):
 		self.upsertStatement(operation, record, onColumns, option)
 		for r in record.recordset.iterate():
-			params = r.set.parameters() + record.filter_.parameters
+			params = r.set__.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
 #================================================================================#
@@ -1068,11 +1072,12 @@ class Record(metaclass=RecordMeta):
 	tableName__ = TableName()
 	#--------------------------------------#
 	def __init__(self, statement=None, parameters=None, alias=None, operation=None, **kwargs):
+		self.with_cte__ = None
 		self.values = Database.values
-		self.set = Set(self)
+		self.set__ = Set(self)
+		self.joins__ = {}
 		self.filter_ = Filter(self)
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
-		self.joins__ = {}
 		self.data = {}
 		
 		# self.setupTableNameAndAlias()
@@ -1119,16 +1124,22 @@ class Record(metaclass=RecordMeta):
 		if(type(value) in [str, int, float, datetime, bool]):
 			self.__dict__["data"][name] = value
 		else:
-			object.__setattr__(self, name, value)
+			object.__setattr__(self, name, value)		
+
+	def value(self, **kwargs):
+		for name, value in kwargs.items():
+			if(type(value) in [str, int, float, datetime, bool]):
+				self.__dict__["data"][name] = value
+		return self
 	#--------------------------------------#
-	def setupTableNameAndAlias(self):
-		quoteChar = '' #self.database__.escapeChar()
-		parentClassName = self.__class__.__bases__[0].__name__
-		if(parentClassName == "Record" or parentClassName.startswith('__')):
-			self.tableName__ = TableName(self.__class__.__name__)
-		else:
-			self.tableName__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
-		self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
+	# def setupTableNameAndAlias(self):
+	# 	quoteChar = '' #self.database__.escapeChar()
+	# 	parentClassName = self.__class__.__bases__[0].__name__
+	# 	if(parentClassName == "Record" or parentClassName.startswith('__')):
+	# 		self.tableName__ = TableName(self.__class__.__name__)
+	# 	else:
+	# 		self.tableName__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
+	# 	self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
 	#--------------------------------------#
 	@classmethod
 	def table__(cls):
@@ -1141,13 +1152,17 @@ class Record(metaclass=RecordMeta):
 		if len(self.data) > 5:
 			fields += ', ...'
 		return f"<{self.__class__.__name__} {fields}>"
-	#--------------------------------------#	
+	#--------------------------------------#
 	def id(self): return self.query__.result.lastrowid
 	#--------------------------------------#
 	def rowsCount(self): return self.query__.result.count
 	#--------------------------------------#
 	# def getField(self, fieldName): return self.__dict__[fieldName] #get field without invoke __getattr__
 	# def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue #set field without invoke __setattr__
+	def set(self, **kwargs):
+		for key, value in kwargs.items():
+			self.set__.setFieldValue(key, value)
+		return self
 	def getField(self, fieldName): return self.data[fieldName] #get field without invoke __getattr__
 	def setField(self, fieldName, fieldValue): self.data[fieldName]=fieldValue #set field without invoke __setattr__
 	#--------------------------------------#
@@ -1191,11 +1206,6 @@ class Record(metaclass=RecordMeta):
 		return self
 	def le(self, **kwargs):
 		self.filter_.le(**kwargs)
-		return self
-	#--------------------------------------#
-	def set_(self, **kwargs):
-		for field, value in kwargs.items():
-			setattr(self.set, field, value)
 		return self
 	#--------------------------------------#
 	#def __str__(self): pass
@@ -1246,21 +1256,8 @@ class Record(metaclass=RecordMeta):
 	def join(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields); return self
 	def rightJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' RIGHT JOIN '); return self
 	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN '); return self
-	#--------------------------------------#
-	def joinCTE(self, table, fields):
-		freshTableInstanceForCTEJoining = table.__class__()
-		freshTableInstanceForCTEJoining.tableName__ = TableName(table.alias.value())
-		self.joins__[table.alias.value()] = Join(freshTableInstanceForCTEJoining, fields)
-		return self
-	def rightJoinCTE(self, table, fields):
-		freshTableInstanceForCTEJoining = table.__class__()
-		freshTableInstanceForCTEJoining.tableName__ = TableName(table.alias.value())
-		self.joins__[table.alias.value()] = Join(freshTableInstanceForCTEJoining, fields, ' RIGHT JOIN ')
-		return self
-	def leftJoinCTE(self, table, fields):
-		freshTableInstanceForCTEJoining = table.__class__()
-		freshTableInstanceForCTEJoining.tableName__ = TableName(table.alias.value())
-		self.joins__[table.alias.value()] = Join(freshTableInstanceForCTEJoining, fields, ' LEFT JOIN ')
+	def with_cte(self, with_cte):
+		self.with_cte__ = with_cte
 		return self
 	#--------------------------------------#
 	def toDict(self): return self.data
