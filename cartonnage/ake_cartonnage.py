@@ -1,6 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
-#version: 202601250248
+#version: 202601300145
 #================================================================================#
 from datetime import datetime
 #================================================================================#
@@ -75,24 +75,24 @@ class Field:
 	# Subquery methods - take a Record instance and generate SQL
 	def in_subquery(self, record, selected="*"):
 		"""field IN (SELECT ... FROM ...)"""
-		query = Database.crud(operation=Database.read, record=record, selected=selected, group_by='', limit='')
+		query = Database.crud(operation=Database.select, record=record, selected=selected, group_by='', limit='')
 		return Expression(f"{self._field_name()} IN (\n{query.statement}\n)", query.parameters)
 
 	def not_in_subquery(self, record, selected="*"):
 		"""field NOT IN (SELECT ... FROM ...)"""
-		query = Database.crud(operation=Database.read, record=record, selected=selected, group_by='', limit='')
+		query = Database.crud(operation=Database.select, record=record, selected=selected, group_by='', limit='')
 		return Expression(f"{self._field_name()} NOT IN (\n{query.statement}\n)", query.parameters)
 
 	@staticmethod
 	def exists(record, selected="1"):
 		"""EXISTS (SELECT ... FROM ... WHERE ...)"""
-		query = Database.crud(operation=Database.read, record=record, selected=selected, group_by='', limit='')
+		query = Database.crud(operation=Database.select, record=record, selected=selected, group_by='', limit='')
 		return Expression(f"EXISTS (\n{query.statement}\n)", query.parameters)
 
 	@staticmethod
 	def not_exists(record, selected="1"):
 		"""NOT EXISTS (SELECT ... FROM ... WHERE ...)"""
-		query = Database.crud(operation=Database.read, record=record, selected=selected, group_by='', limit='')
+		query = Database.crud(operation=Database.select, record=record, selected=selected, group_by='', limit='')
 		return Expression(f"NOT EXISTS (\n{query.statement}\n)", query.parameters)
 #================================================================================#
 class Dummy:
@@ -269,7 +269,7 @@ class Values:
 		return fields
 	#--------------------------------------#
 	@staticmethod
-	def where(record, fieldsNames=None):
+	def where__(record, fieldsNames=None):
 		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, datetime, bool] values.
 		statement = ''
 		# fields = Values.fields(record)
@@ -296,8 +296,8 @@ class Filter:
 		self.__where = ''
 		self.parameters = []
 	
-	def read(self, selected="*", group_by='', order_by='', limit='', option=''): 
-		self.parent.database__.read(record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def select(self, selected="*", group_by='', order_by='', limit='', option=''): 
+		self.parent.database__.select(record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
 		return self.parent
 	def delete(self, option=''): 
 		self.parent.database__.delete(record=self.parent, option=option)
@@ -307,9 +307,6 @@ class Filter:
 		return self.parent
 
 	def fltr(self, field, placeholder): return self.where__()
-	# def parameters(self, parameters): return self.parameters__()
-	def where__(self): return self.__where[:-5]
-	def parameters__(self): return self.parameters
 	def combine(self, filter1, filter2, operator):
 		w1 = filter1.where__()
 		w2 = filter2.where__()
@@ -333,7 +330,7 @@ class Filter:
 		filter.combine(self, filter2, "AND")
 		return filter
 	
-	def filter(self, *args, **kwargs):
+	def where(self, *args, **kwargs):
 		for exp in args:
 			self.addCondition('_', exp)
 		for field, value in kwargs.items():
@@ -352,9 +349,8 @@ class Filter:
 
 	#'record' parameter to follow the same signature/interface of 'Values.where' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
-	def where(self, record=None):
-		return self.where__()
-	
+	def where__(self, record=None): return self.__where[:-5]
+
 	#This 'Filter.parameters' function follow the same signature/interface of 'Values.parameters' function design pattern
 	#Both are used interchangeably in 'Database.__crud' function
 	def parameters(self, record=None):
@@ -362,55 +358,55 @@ class Filter:
 	#--------------------------------------#
 	def in_subquery(self, selected="*", **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None).in_subquery(value, selected=selected))
+			self.where(Field(self.parent.__class__, field, None).in_subquery(value, selected=selected))
 		return self.parent
 	def exists(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field.exists(value))
+			self.where(Field.exists(value))
 		return self.parent
 	def not_exists(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field.not_exists(value))
+			self.where(Field.not_exists(value))
 		return self.parent
 	def in_(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None).in_(value))
+			self.where(Field(self.parent.__class__, field, None).in_(value))
 		return self.parent
 	def not_in(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None).not_in(value))
+			self.where(Field(self.parent.__class__, field, None).not_in(value))
 		return self.parent
 	def like(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None).like(value))
+			self.where(Field(self.parent.__class__, field, None).like(value))
 		return self.parent
 	def is_null(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None).is_null())
+			self.where(Field(self.parent.__class__, field, None).is_null())
 		return self.parent
 	def is_not_null(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None).is_not_null())
+			self.where(Field(self.parent.__class__, field, None).is_not_null())
 		return self.parent
 	def between(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None).between(value[0], value[1]))
+			self.where(Field(self.parent.__class__, field, None).between(value[0], value[1]))
 		return self.parent
 	def gt(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None) > value)
+			self.where(Field(self.parent.__class__, field, None) > value)
 		return self.parent
 	def ge(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None) >= value)
+			self.where(Field(self.parent.__class__, field, None) >= value)
 		return self.parent
 	def lt(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None) < value)
+			self.where(Field(self.parent.__class__, field, None) < value)
 		return self.parent
 	def le(self, **kwargs):
 		for field, value in kwargs.items():
-			self.filter(Field(self.parent.__class__, field, None) <= value)
+			self.where(Field(self.parent.__class__, field, None) <= value)
 		return self.parent
 	#--------------------------------------#
 #================================================================================#
@@ -494,8 +490,8 @@ class Database:
 			joiners.joinClause += f"{join.type}{join.object.table__()} {join.object.alias.value()} ON {join.predicates.value}"
 			#--------------------
 			# # Include both values (exact field matches) and filter conditions from joined object
-			# valuesStatement = join.object.values.where(join.object)
-			# filterStatement = join.object.filter_.where(join.object)
+			# valuesStatement = join.object.values.where__(join.object)
+			# filterStatement = join.object.filter_.where__(join.object)
 			# if valuesStatement and filterStatement:
 			# 	statement = f"{valuesStatement} AND {filterStatement}"
 			# elif valuesStatement:
@@ -528,7 +524,7 @@ class Database:
 			parent = query.parent
 			parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
 
-			if(query.operation in [Database.all, Database.read]):
+			if(query.operation in [Database.all, Database.select]):
 				# for index, column in enumerate(self.__cursor.description): columns.append(column[0].lower())
 				columns = [column[0].lower() for column in self.__cursor.description] #lower() to low column names
 				query.result.columns = columns
@@ -570,7 +566,7 @@ class Database:
 	#--------------------------------------#
 	def executeScript(self, sqlScriptFileName):
 		sqlScriptFile = open(sqlScriptFileName,'r')
-		sql = sqlScriptFile.read()
+		sql = sqlScriptFile.select()
 		return self.__cursor.executescript(sql)
 	#--------------------------------------#
 	@staticmethod
@@ -581,8 +577,8 @@ class Database:
 			with_cte = f"{record.with_cte__.value} "
 			with_cte_parameters = record.with_cte__.parameters
 
-		whereValues = record.values.where(record)
-		whereFilter = record.filter_.where(record)
+		whereValues = record.values.where__(record)
+		whereFilter = record.filter_.where__(record)
 		if whereValues and whereFilter:
 			where = f"{whereValues} AND {whereFilter}"
 		elif whereValues:
@@ -593,7 +589,7 @@ class Database:
 		joiners = Database.joining(record)
 		joinsCriteria = joiners.preparedStatement
 		#----- #ordered by occurance propability for single record
-		if(operation==Database.read):
+		if(operation==Database.select):
 			group_clause = f"GROUP BY {group_by}" if group_by else ''
 			order_clause = f"ORDER BY {order_by}" if order_by else ''
 			statement = f"{with_cte}SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_clause} {order_clause} {limit} {option}"
@@ -634,8 +630,8 @@ class Database:
 		joinsCriteria = joiners.preparedStatement
 		#
 		fieldsNames = onColumns if onColumns else list(record.values.fields(record))
-		whereValues = record.values.where(record, fieldsNames)
-		whereFilter = record.filter_.where(record)
+		whereValues = record.values.where__(record, fieldsNames)
+		whereFilter = record.filter_.where__(record)
 		if whereValues and whereFilter:
 			where = f"{whereValues} AND {whereFilter}"
 		elif whereValues:
@@ -669,12 +665,12 @@ class Database:
 		record.query__.operation = operation
 		return record.query__
 	#--------------------------------------#
-	def select(self, record, selected="*", group_by='', order_by='', limit='', option=''):
-		return self.crud(operation=Database.read, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def select_(self, record, selected="*", group_by='', order_by='', limit='', option=''):
+		return self.crud(operation=Database.select, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
 	def operation_statement(self, operation, record, option=''): return self.crud(operation=operation, record=record, option=option)
 	#--------------------------------------#
 	def all(self, record, option=''): self.executeStatement(self.crud(operation=Database.all, record=record, option=option))
-	def read(self, record, selected="*", group_by='', order_by='', limit='', option=''): self.executeStatement(self.select(record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option))
+	def select(self, record, selected="*", group_by='', order_by='', limit='', option=''): self.executeStatement(self.select_(record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option))
 	def insert(self, record, option=''): self.executeStatement(self.crud(operation=Database.insert, record=record, option=option))
 	def delete(self, record, option=''): self.executeStatement(self.crud(operation=Database.delete, record=record, option=option))
 	def update(self, record, option=''):
@@ -733,7 +729,7 @@ class SQLite(Database):
 		updateSet = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
 		values = ', '.join('?' for _ in keys)
 		# Build WHERE clause from filter_ if present
-		whereFilter = record.filter_.where(record)
+		whereFilter = record.filter_.where__(record)
 		whereClause = f"\n\t\tWHERE {whereFilter}" if whereFilter else ''
 		sql = f"""
 		INSERT INTO {record.table__()} ({fields})
@@ -814,7 +810,7 @@ class Oracle(Database):
 		insert_fields = ', '.join(keys)
 		insert_values = ', '.join(f's.{k}' for k in keys)
 		# Build WHERE clause from filter_ if present
-		whereFilter = record.filter_.where(record)
+		whereFilter = record.filter_.where__(record)
 		whereClause = f"\n\t\t\tWHERE {whereFilter}" if whereFilter else ''
 
 		sql = f"""
@@ -887,7 +883,7 @@ class MySQL(Database):
 		fields = ', '.join(keys)
 		values = ', '.join('%s' for _ in keys)
 		# MySQL doesn't support WHERE in ON DUPLICATE KEY UPDATE
-		whereFilter = record.filter_.where(record)
+		whereFilter = record.filter_.where__(record)
 		if whereFilter:
 			raise NotImplementedError("MySQL does not support WHERE clause in upsert. Use a different approach or remove the filter.")
 		update_set = ', '.join(f'{k} = VALUES({k})' for k in keys if k not in onColumns.split(','))
@@ -944,7 +940,7 @@ class Postgres(Database):
 		# Postgres uses EXCLUDED.column to reference the new values
 		update_set = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
 		# Build WHERE clause from filter_ if present
-		whereFilter = record.filter_.where(record)
+		whereFilter = record.filter_.where__(record)
 		whereClause = f"\n\t\tWHERE {whereFilter}" if whereFilter else ''
 
 		sql = f"""
@@ -1005,7 +1001,7 @@ class MicrosoftSQL(Database):
 		insert_fields = ', '.join(keys)
 		insert_values = ', '.join(f's.{k}' for k in keys)
 		# Build WHERE clause from filter_ if present (MSSQL uses AND in WHEN MATCHED)
-		whereFilter = record.filter_.where(record)
+		whereFilter = record.filter_.where__(record)
 		whereClause = f" AND {whereFilter}" if whereFilter else ''
 
 		sql = f"""
@@ -1082,7 +1078,7 @@ class Record(metaclass=RecordMeta):
 			#self. instead of Record. #change the static field self.__database for inherited children classes
 			if(operation): self.query__.operation = operation
 			# if(str((statement.strip())[:6]).lower()=="select"):
-			# 	self.query__.operation = Database.read
+			# 	self.query__.operation = Database.select
 			if(len(self.query__.parameters) and type(self.query__.parameters[0]) in (list, tuple)):
 				self.database__.executeMany(self.query__)
 			else:
@@ -1153,7 +1149,7 @@ class Record(metaclass=RecordMeta):
 	def getField(self, fieldName): return self.data[fieldName] #get field without invoke __getattr__
 	def setField(self, fieldName, fieldValue): self.data[fieldName]=fieldValue #set field without invoke __setattr__
 	#--------------------------------------#
-	def filter(self, *args, **kwargs): return self.filter_.filter(*args, **kwargs)
+	def where(self, *args, **kwargs): return self.filter_.where(*args, **kwargs)
 	#--------------------------------------#
 	def in_subquery(self, **kwargs):
 		self.filter_.in_subquery(**kwargs)
@@ -1214,15 +1210,15 @@ class Record(metaclass=RecordMeta):
 	#--------------------------------------#
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
-	def select(self, selected="*", group_by='', order_by='', limit='', option='', **kwargs): return self.database__.select(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
-	def ins_st(self, option=''): return self.database__.operation_statement(Database.insert, record=self, option=option)
-	def upd_st(self, option=''): return self.database__.operation_statement(Database.update, record=self, option=option)
-	def del_st(self, option=''): return self.database__.operation_statement(Database.delete, record=self, option=option)
+	def select_(self, selected="*", group_by='', order_by='', limit='', option='', **kwargs): return self.database__.select_(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def insert_(self, option=''): return self.database__.operation_statement(Database.insert, record=self, option=option)
+	def update_(self, option=''): return self.database__.operation_statement(Database.update, record=self, option=option)
+	def delete_(self, option=''): return self.database__.operation_statement(Database.delete, record=self, option=option)
 
-	def read(self, selected="*", group_by='', order_by='', limit='', option=''):
-		self.database__.read(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def select(self, selected="*", group_by='', order_by='', limit='', option=''):
+		self.database__.select(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
 		return self
-	# def read(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.read(selected, group_by, order_by, limit)
+	# def select(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.select(selected, group_by, order_by, limit)
 	def insert(self, option=''): 
 		self.database__.insert(record=self, option=option)
 		return self
@@ -1248,7 +1244,7 @@ class Record(metaclass=RecordMeta):
 		return self
 	#--------------------------------------#
 	def cte(self, selected="*", group_by='', order_by='', limit='', materialization=None):
-		query = self.select(selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+		query = self.select_(selected=selected, group_by=group_by, order_by=order_by, limit=limit)
 		return CTE(statement=query, materialization=materialization)
 	#--------------------------------------#
 	def toDict(self): return self.data
@@ -1336,7 +1332,7 @@ class Recordset:
 			rs.filter_all(Employees.department_id == 5)
 		"""
 		if self.firstRecord():
-			self.firstRecord().filter_.filter(*args, **kwargs)
+			self.firstRecord().filter_.where(*args, **kwargs)
 		return self
 
 	def where(self, *args, **kwargs):
