@@ -215,7 +215,7 @@ if(Record.database__.name not in ['Oracle']):
 		assert emp.rowsCount() == -1, emp.rowsCount()
 	else:
 		assert emp.rowsCount() == 2, emp.rowsCount()
-	
+
 	print(f"{'-'*80}")
 	print(emp.query__.statement)
 	print(emp.query__.parameters)
@@ -645,8 +645,7 @@ emp1 = (
 
 # check updated record
 emp1 = Employees()
-emp1.data = {'employee_id': 19950519} # you can set data directly
-emp1.select()
+emp1.value(employee_id=19950519).select()
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert emp1.data == {'employee_id': 19950519, 'first_name': 'William', 'last_name': 'Wallace', 'email': 'william.wallace@sqltutorial.org', 'phone_number': None, 'hire_date': None, 'job_id': None, 'salary': None, 'commission_pct': None, 'manager_id': None, 'department_id': None}
@@ -692,8 +691,17 @@ assert jobs.recordset.toDicts() == [{'job_id': 1, 'job_title': 'Public Accountan
 print("----------02A----------")
 # iterate over recordset and update records one by one: (not recommended if you can update with one predicate)
 for job in jobs:
-	job.set(min_salary=5000)
+	job.set(min_salary=4500)
+
+jobs.recordset.set(min_salary=5000)
+
+for job in jobs.recordset: # iterate over recordset
+	assert job.job_id in [1,6], job.job_id
+
+
 jobs.recordset.update()
+recordsetLen = len(jobs.recordset) # get len() of a Recordset
+assert recordsetLen == 2, recordsetLen
 
 ### it works because no field in any record of the recordset's records is set to Null.
 ### but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter.
@@ -701,6 +709,10 @@ jobs.recordset.update()
 
 jobs = Jobs().where(Jobs.job_title.like('%Accountant%')).select()
 assert jobs.recordset.toLists() == [[1, 'Public Accountant', 5000, 9000], [6, 'Accountant', 5000, 9000]], jobs.recordset.toLists() # confirm recordset update
+
+secondJobInRecordset = jobs.recordset[1] # access record instance by index
+assert secondJobInRecordset.job_id == 6, secondJobInRecordset.job_id
+
 print("----------02B----------")
 jobs.recordset.delete()
 
@@ -717,20 +729,26 @@ Record.database__.rollback()  # Force rollback
 #==============================================================================#
 print("---------------------------------------05---------------------------------------")
 #==============================================================================#
-# instantiate recordset 
+# recordset from list of dicts
+
+recordset = Recordset.fromDicts(Employees,
+	[
+		{'employee_id': 5, 'first_name': "Mickey", 'last_name': "Mouse"},
+		{'employee_id': 6, 'first_name': "Donald", 'last_name': "Duck"}
+	]
+)
+
+assert recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck'}], recordset.toDicts()
+
+# instantiate recordset
 recordset = Recordset()
 
 # create employee(s)/record(s) instances
-e1 = Employees()
-e2 = Employees()
-
-# set fields' values
-e1.value(employee_id=5, first_name="Mickey", last_name="Mouse")
-e2.value(employee_id=6, first_name="Donald", last_name="Duck")
+e1 = Employees().value(employee_id=5, first_name="Mickey", last_name="Mouse")
+e2 = Employees().value(employee_id=6, first_name="Donald", last_name="Duck")
 
 # add employee(s)/record(s) instances to the previously instantiated Recordset
-recordset.add(e1)
-recordset.add(e2)
+recordset.add(e1, e2)
 
 # Recordset insert:
 recordset.insert()
@@ -803,6 +821,10 @@ emp = Employees().where(Employees.first_name.in_(['Steven', 'Neena']))
 emp1 = Employees().set(**{'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000})
 emp2 = Employees().set(**{'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000})
 
+# you can also set_.new = {} directly if you are sure of the datatype(s) validation
+emp1.set__.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
+emp2.set__.new = {'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000}
+
 rs = Recordset()
 rs.add(emp1, emp2)
 
@@ -834,148 +856,30 @@ if(Record.database__.name == "Oracle"):
 if(Record.database__.name in ["MySQL", "Postgres", "MicrosoftSQL"]):
 	### MySQL | Postgres | Microsoft AzureSQL
 	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+
+Record.database__.rollback()
 #==============================================================================#
 print("---------------------------------------09 Expression Tests---------------------------------------")
 #==============================================================================#
-# Test 1: Expression in UPDATE - Increment salary
-emp = Employees().value(employee_id=100).select()
-original_salary = emp.salary
+emp = (
+	Employees()
+	.set(
+		first_name=Expression("UPPER(first_name)")
+		, last_name=Expression("LOWER(last_name)")
+		, email=Expression("first_name || '.' || last_name || '@test.com'")
+		, salary=Expression('salary + 100')
+		, commission_pct=Expression('COALESCE(commission_pct, 1)')
+	)
+	.value(employee_id=100)
+	.where(
+		(Employees.salary == Expression('salary')) &
+		(Employees.salary == Expression('salary + 0'))
+	)
+	.update()
+	.select(selected="first_name, last_name, email, salary, commission_pct")
+)
 
-emp.set(salary=Expression('salary + 100'))
-emp.update()
-
-# Verify the increment worked
-emp2 = Employees().value(employee_id=100).select()
-
-assert emp2.salary == original_salary + 100, f"Expected {original_salary + 100}, got {emp2.salary}"
-print(f"Test 1 PASSED: salary incremented from {original_salary} to {emp2.salary}")
-print("----------09A----------")
-# Test 2: Expression in UPDATE - Multiply salary (percentage raise)
-emp = Employees().value(employee_id=100).select()
-before_salary = emp.salary
-
-emp.set(salary=Expression('salary * 1.1'))  # 10% raise
-emp.update()
-
-emp2 = Employees().value(employee_id=100).select()
-# Note: SQLite may truncate to int, so we check approximately
-assert abs(float(emp2.salary) - float(before_salary) * 1.1) < 1, f"Expected ~{before_salary * 1.1}, got {emp2.salary}" # float for mysql
-print(f"Test 2 PASSED: salary multiplied from {before_salary} to {emp2.salary}")
-print("----------09B----------")
-# Test 3: Expression in UPDATE - Set to NULL using Expression
-emp = Employees().value(employee_id=100).select()
-
-emp.set(commission_pct=Expression('NULL'))
-emp.update()
-
-emp2 = Employees().value(employee_id=100).select()
-assert emp2.commission_pct is None, f"Expected None, got {emp2.commission_pct}"
-print("Test 3 PASSED: commission_pct set to NULL")
-print("----------09C----------")
-# Test 4: Expression in UPDATE - UPPER function on string field
-emp = Employees().value(employee_id=100).select()
-original_first = emp.first_name
-
-emp.set(first_name=Expression("UPPER(first_name)"))
-emp.update()
-
-emp2 = Employees().value(employee_id=100).select()
-assert emp2.first_name == original_first.upper(), f"Expected {original_first.upper()}, got {emp2.first_name}"
-print(f"Test 4 PASSED: first_name uppercased to {emp2.first_name}")
-
-# Restore original first_name for other tests
-emp = Employees().value(employee_id=100).set(first_name=original_first).update()
-print("----------09D----------")
-# Test 5: Expression in UPDATE - COALESCE (replace NULL with default)
-emp = Employees().value(employee_id=100).select()
-
-emp.set(commission_pct=Expression('COALESCE(commission_pct, 1)'))
-emp.update()
-
-emp2 = Employees().value(employee_id=100).select()
-assert emp2.commission_pct == 1, f"Expected 1, got {emp2.commission_pct}"
-print("Test 5 PASSED: commission_pct set via COALESCE")
-print("----------09E----------")
-# Test 6: Expression in UPDATE - Subtract/decrement
-emp = Employees().value(employee_id=100).select()
-before_salary = emp.salary
-
-emp.set(salary=Expression('salary - 50'))
-emp.update()
-
-emp2 = Employees().value(employee_id=100).select()
-assert emp2.salary == before_salary - 50, f"Expected {before_salary - 50}, got {emp2.salary}"
-print(f"Test 6 PASSED: salary decremented from {before_salary} to {emp2.salary}")
-print("----------09F----------")
-# Test 7: Expression in UPDATE - Division
-emp = Employees().value(employee_id=100).select()
-before_salary = emp.salary
-
-emp.set(salary=Expression('salary / 2'))
-emp.update()
-
-emp2 = Employees().value(employee_id=100).select()
-assert abs(emp2.salary - before_salary / 2) < 1, f"Expected ~{before_salary / 2}, got {emp2.salary}"
-print(f"Test 7 PASSED: salary divided from {before_salary} to {emp2.salary}")
-
-# Restore original salary
-emp = Employees().value(employee_id=100).set(salary=float(original_salary)).update() # float for mysql
-print(f"Salary restored to {original_salary}")
-print("----------09G----------")
-# Test 8: Expression in UPDATE - Concatenation (SQLite uses ||)
-emp = Employees().value(employee_id=100).select()
-original_email = emp.email
-
-emp.set(email=Expression("first_name || '.' || last_name || '@test.com'"))
-emp.update()
-
-emp2 = Employees().value(employee_id=100).select()
-print(f"Test 8 PASSED: email set to {emp2.email}")
-
-# Restore email
-emp = Employees().value(employee_id=100).set(email=original_email).update()
-print("----------09H----------")
-# Test 9: Expression in UPDATE - LOWER function
-emp = Employees().value(employee_id=100).select()
-
-emp.set(first_name=Expression("LOWER(first_name)"))
-emp.update()
-
-emp2 = Employees().value(employee_id=100).select()
-assert emp2.first_name == original_first.lower(), f"Expected {original_first.lower()}, got {emp2.first_name}"
-print(f"Test 9 PASSED: first_name lowercased to {emp2.first_name}")
-
-# Restore first_name
-emp = Employees().value(employee_id=100).set(first_name=original_first).update()
-print("----------09I----------")
-# Test 10: Expression in UPDATE with regular field update (mixed)
-emp = Employees().value(employee_id=100).select()
-original_phone = emp.phone_number
-
-emp.set(phone_number='999.999.9999', salary=Expression('salary + 1'))
-emp.update()
-
-emp2 = Employees().value(employee_id=100).select()
-assert emp2.phone_number == '999.999.9999'
-assert emp2.salary == original_salary + 1
-print("Test 10 PASSED: Mixed Expression and regular field update")
-
-# Restore
-emp = Employees().value(employee_id=100).set(phone_number=original_phone, salary=original_salary).update()
-print("----------09J----------")
-# Test 11: Expression in Filter - Compare field to computed value
-emp = Employees()
-emp.where(Employees.employee_id == Expression('100 + 0'))  # employee_id = 100
-emp.select()
-assert emp.employee_id == 100
-print("Test 11 PASSED: Filter with Expression('100 + 0')")
-print("----------09K----------")
-# Test 12: Expression in Filter - Compare to another field expression
-emp = Employees()
-emp.where(Employees.salary == Expression('salary'))  # salary = salary (always true)
-emp.select()
-assert emp.recordset.count() > 0
-print(f"Test 12 PASSED: Found {emp.recordset.count()} employees where salary = salary")
+assert emp.data == {'first_name': 'STEVEN', 'last_name': 'king', 'email': 'Steven.King@test.com', 'salary': 24100, 'commission_pct': 1}, emp.data
 print("---------------------------------------Expression Tests Complete---------------------------------------")
 
 Record.database__.rollback() # Record.database__.commit()

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-#version: 202601300145
+#version: 202601310217
 #================================================================================#
 from datetime import datetime
 #================================================================================#
@@ -1192,12 +1192,12 @@ class Record(metaclass=RecordMeta):
 #================================================================================#
 class Recordset:
 	def __init__(self):
-		self.__records = [] #mapped objects from records
+		self.records = [] #mapped objects from records
 		self.affectedRowsCount = 0
 		self.data = [] # extended in ORM
 	def table(self):
 		if(self.firstRecord()): return  self.firstRecord().table__.name
-	def empty(self): self.__records = []
+	def empty(self): self.records = []
 
 	@staticmethod
 	def fromDicts(record_cls, dicts):
@@ -1210,70 +1210,42 @@ class Recordset:
 			])
 		"""
 		rs = Recordset()
+		rs.data = dicts
 		for d in dicts:
 			record = record_cls()
-			for field, value in d.items():
-				setattr(record, field, value)
-			rs.add(record)
-		return rs
-
-	@staticmethod
-	def fromRecords(*records):
-		"""Create a Recordset from Record instances.
-
-		Usage:
-			rs = Recordset.from_records(emp1, emp2, emp3)
-		"""
-		rs = Recordset()
-		for record in records:
+			record.value(**d)
 			rs.add(record)
 		return rs
 		
 	def add(self, *args):
-		self.__records.extend(args)
+		self.records.extend(args)
 		return self
-	def iterate(self): return self.__records
+	def iterate(self): return self.records
 	def firstRecord(self):
-		if(len(self.__records)):
+		if(len(self.records)):
 			# make sure that first record has the recordset list if it's add manually to the current recordset not read from database
-			self.__records[0].recordset = self
-			return self.__records[0]
+			self.records[0].recordset = self
+			return self.records[0]
 		else:
 			return None
 	def lastRecord(self):
 		"""Return the last record in the recordset."""
-		if len(self.__records):
-			return self.__records[-1]
+		if len(self.records):
+			return self.records[-1]
 		return None
-	def count(self): return len(self.__records)
+	def count(self): return len(self.records)
 	def columns(self): return self.firstRecord().columns
 	def setField(self, fieldName, fieldValue):
-		for record in self.__records: record.__dict__[fieldName] = fieldValue
+		for record in self.records: record.__dict__[fieldName] = fieldValue
 	def rowsCount(self): return self.affectedRowsCount
 	def set(self, **kwargs):
-		"""Set the same values on all records for update operations.
-
-		Usage:
-			rs.set_all(manager_id=100, department_id=5).update(onColumns=['employee_id'])
-		"""
-		for record in self.__records:
-			for field, value in kwargs.items():
-				setattr(record.set, field, value)
+		for record in self.records:
+			record.set(**kwargs)
 		return self
-
-	def filter(self, *args, **kwargs):
-		"""Add filter conditions to the first record (applies to all in bulk operations).
-
-		Usage:
-			rs.filter_all(Employees.department_id == 5)
-		"""
-		if self.firstRecord():
-			self.firstRecord().filter_.where(*args, **kwargs)
+	def value(self, **kwargs):
+		for record in self.records:
+			record.value(**kwargs)
 		return self
-
-	def where(self, *args, **kwargs):
-		"""Alias for filter_all()."""
-		return self.filter_all(*args, **kwargs)
 	#--------------------------------------#
 	def insert(self, option=''):
 		if(self.firstRecord()): self.firstRecord().database__.insertMany(self.firstRecord(), option=option)
@@ -1293,10 +1265,10 @@ class Recordset:
 		return data
 	#--------------------------------------#
 	def toDicts(self):
-		return self.data
+		return self.data # [record.data for record in self.records]
 	#--------------------------------------#
-	def __iter__(self): return iter(self.__records)
-	def __len__(self): return len(self.__records)
-	def __getitem__(self, index): return self.__records[index]
+	def __iter__(self): return iter(self.records)
+	def __len__(self): return len(self.records)
+	def __getitem__(self, index): return self.records[index]
 	#--------------------------------------#
 #================================================================================#
