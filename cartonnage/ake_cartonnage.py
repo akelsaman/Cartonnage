@@ -177,13 +177,6 @@ class Join():
 		self.object = object
 		self.predicates = fields
 		self.__value = value
-#--------------------
-class Joiners():
-	def __init__(self, value=None):
-		self.joinClause = ''
-		self.preparedStatement = ''
-		self.parameters = []
-		self.__value = value
 #================================================================================#
 class Result:
 	def __init__(self, columns=None, rows=None, count=0):
@@ -471,30 +464,12 @@ class Database:
 		return operationsCount
 	#--------------------------------------#
 	def joining(record):
-		joiners = Joiners()
 		quoteChar = '' #cls.escapeChar()
+		joinClause = ''
 		for key, join in record.joins__.items():
 			#" INNER JOIN Persons pp ON "
-			joiners.joinClause += f"{join.type}{join.object.table__.name} {join.object.alias.value} ON {join.predicates.value}"
-			#--------------------
-			# # Include both values (exact field matches) and filter conditions from joined object
-			# valuesStatement = join.object.values.where__(join.object)
-			# filterStatement = join.object.filter_.where__(join.object)
-			# if valuesStatement and filterStatement:
-			# 	statement = f"{valuesStatement} AND {filterStatement}"
-			# elif valuesStatement:
-			# 	statement = valuesStatement
-			# else:
-			# 	statement = filterStatement
-			# if(statement): joiners.preparedStatement += f" AND {statement}"
-			# joiners.parameters.extend(join.object.values.parameters(join.object))
-			# joiners.parameters.extend(join.object.filter_.parameters)
-			# #--------------------
-			# child_joiners = Database.joining(join.object)
-			# joiners.joinClause += child_joiners.joinClause
-			# joiners.preparedStatement += child_joiners.preparedStatement
-			# joiners.parameters.extend(child_joiners.parameters)
-		return joiners
+			joinClause += f"{join.type}{join.object.table__.name} {join.object.alias.value} ON {join.predicates.value}"
+		return joinClause
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
@@ -575,12 +550,11 @@ class Database:
 			where = whereFilter
 
 		joiners = Database.joining(record)
-		joinsCriteria = joiners.preparedStatement
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.select):
 			group_clause = f"GROUP BY {group_by}" if group_by else ''
 			order_clause = f"ORDER BY {order_by}" if order_by else ''
-			statement = f"{with_cte}SELECT {selected} FROM {record.table__.name} {record.alias.value} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_clause} {order_clause} {limit} {option}"
+			statement = f"{with_cte}SELECT {selected} FROM {record.table__.name} {record.alias.value} {joiners} \nWHERE {where if (where) else '1=1'} \n{group_clause} {order_clause} {limit} {option}"
 		#-----
 		elif(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
@@ -588,13 +562,13 @@ class Database:
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set__.setFields()
-			statement = f"{with_cte}UPDATE {record.table__.name} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"{with_cte}UPDATE {record.table__.name} SET {setFields} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		elif(operation==Database.all):
-			statement = f"{with_cte}SELECT * FROM {record.table__.name} {record.alias.value} {joiners.joinClause} {option}"
+			statement = f"{with_cte}SELECT * FROM {record.table__.name} {record.alias.value} {joiners} {option}"
 		#-----
 		record.query__ = Query()
 		record.query__.parent = record
@@ -603,7 +577,6 @@ class Database:
 		record.query__.parameters.extend(with_cte_parameters)
 		record.query__.parameters.extend(record.set__.parameters()) # if update extend with fields set values first
 		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters) #state.parameters must be reset to empty list [] not None for this operation to work correctly
-		record.query__.parameters.extend(joiners.parameters)
 		record.query__.operation = operation
 		return record.query__
 	#--------------------------------------#
@@ -615,7 +588,6 @@ class Database:
 			with_cte_parameters = record.with_cte__.parameters
 
 		joiners = Database.joining(record)
-		joinsCriteria = joiners.preparedStatement
 		#
 		fieldsNames = onColumns if onColumns else list(record.values.fields(record))
 		whereValues = record.values.where__(record, fieldsNames)
@@ -633,10 +605,10 @@ class Database:
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set__.setFields()
-			statement = f"{with_cte}UPDATE {record.table__.name} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"{with_cte}UPDATE {record.table__.name} SET {setFields} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		record.query__ = Query() # as 
 		record.query__.parent = record
