@@ -95,22 +95,10 @@ class Field:
 		query = Database.crud(operation=Database.select, record=record, selected=selected, group_by='', limit='')
 		return Expression(f"NOT EXISTS (\n{query.statement}\n)", query.parameters)
 #================================================================================#
-class Dummy:
-	def __init__(self, value):
-		self.value = value
-#--------------------------------------#
-# for new SpecialValue review
-# Database() #Database.parameterize() #Database.getCopyInstance()
-# for NULL review ObjectRelationalMapper also
-class SpecialValue:
-	def __init__(self, value=None): self.__value = value
-	def value(self): return self.__value
-	def operator(self): return "="
-	def placeholder(self, placeholder): return placeholder
-	def condition(self): return self.__condition
-#--------------------------------------#
-class TableName(SpecialValue): pass
-class Alias(SpecialValue): pass
+class TableName:
+	def __init__(self, name): self.name = name
+class Alias:
+	def __init__(self, value): self.value = value
 #--------------------------------------#
 class Expression():
 	def __init__(self, value, parameters=None):
@@ -133,9 +121,9 @@ class CTE():
 		if(statement):
 			self.value = statement.statement
 			self.parameters = statement.parameters
-			self.alias = statement.parent.alias.value()
+			self.alias = statement.parent.alias.value
 		self.materialization(materialization)
-			# self.alias = record.alias.value()
+			# self.alias = record.alias.value
 	def __str__(self): return self.value
 	def __repr__(self): return self.value
 	def materialization(self, mode):
@@ -223,7 +211,7 @@ class Set:
 		statement = ''
 		for field in self.new.keys():
 			# some databases reject tablename. or alias. before field in set clause as they are don't implement join update
-			# statement += f"{self.parent.alias.value()}.{field}={self.parent.database__.placeholder()}, "
+			# statement += f"{self.parent.alias.value}.{field}={self.parent.database__.placeholder()}, "
 			value = self.new[field]
 			if isinstance(value, Expression):
 				statement += f"{field}={value.value}, " # Expression directly # value.value = Expression.value
@@ -277,7 +265,7 @@ class Values:
 		for field in fields:
 			value = record.getField(field)
 			placeholder = record.database__.placeholder()
-			statement += f"{record.alias.value()}.{field} = {placeholder} AND "
+			statement += f"{record.alias.value}.{field} = {placeholder} AND "
 		return statement[:-5]
 	#--------------------------------------#
 	@staticmethod
@@ -339,7 +327,7 @@ class Filter:
 		
 	def addCondition(self, field, value):
 		placeholder = self.parent.database__.placeholder()
-		field = f"{self.parent.alias.value()}.{field}"
+		field = f"{self.parent.alias.value}.{field}"
 		if(type(value) in [str, int, float, datetime, bool]):
 			self.__where += f"{field} = {placeholder} AND "
 			self.parameters.append(value)
@@ -487,7 +475,7 @@ class Database:
 		quoteChar = '' #cls.escapeChar()
 		for key, join in record.joins__.items():
 			#" INNER JOIN Persons pp ON "
-			joiners.joinClause += f"{join.type}{join.object.table__()} {join.object.alias.value()} ON {join.predicates.value}"
+			joiners.joinClause += f"{join.type}{join.object.table__.name} {join.object.alias.value} ON {join.predicates.value}"
 			#--------------------
 			# # Include both values (exact field matches) and filter conditions from joined object
 			# valuesStatement = join.object.values.where__(join.object)
@@ -561,7 +549,7 @@ class Database:
 			self.__cursor.executemany(query.statement, query.parameters)
 			self.operationsCount +=1
 			rowcount = self.__cursor.rowcount
-			query.parent.recordset.rowsCount = rowcount
+			query.parent.recordset.affectedRowsCount = rowcount
 		return rowcount
 	#--------------------------------------#
 	def executeScript(self, sqlScriptFileName):
@@ -592,21 +580,21 @@ class Database:
 		if(operation==Database.select):
 			group_clause = f"GROUP BY {group_by}" if group_by else ''
 			order_clause = f"ORDER BY {order_by}" if order_by else ''
-			statement = f"{with_cte}SELECT {selected} FROM {record.table__()} {record.alias.value()} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_clause} {order_clause} {limit} {option}"
+			statement = f"{with_cte}SELECT {selected} FROM {record.table__.name} {record.alias.value} {joiners.joinClause} \nWHERE {where if (where) else '1=1'} {joinsCriteria} \n{group_clause} {order_clause} {limit} {option}"
 		#-----
 		elif(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
-			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause} {option}"
+			statement = f"{with_cte}INSERT INTO {record.table__.name} {fieldsValuesClause} {option}"
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set__.setFields()
-			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"{with_cte}UPDATE {record.table__.name} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"{with_cte}DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		elif(operation==Database.all):
-			statement = f"{with_cte}SELECT * FROM {record.table__()} {record.alias.value()} {joiners.joinClause} {option}"
+			statement = f"{with_cte}SELECT * FROM {record.table__.name} {record.alias.value} {joiners.joinClause} {option}"
 		#-----
 		record.query__ = Query()
 		record.query__.parent = record
@@ -641,14 +629,14 @@ class Database:
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
-			statement = f"{with_cte}INSERT INTO {record.table__()} {fieldsValuesClause} {option}"
+			statement = f"{with_cte}INSERT INTO {record.table__.name} {fieldsValuesClause} {option}"
 		#-----
 		elif(operation==Database.update):
 			setFields = record.set__.setFields()
-			statement = f"{with_cte}UPDATE {record.table__()} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+			statement = f"{with_cte}UPDATE {record.table__.name} SET {setFields} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
 		#-----
 		elif(operation==Database.delete):
-			statement = f"{with_cte}DELETE FROM {record.table__()} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners.joinClause} \nWHERE {where} {joinsCriteria} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		record.query__ = Query() # as 
 		record.query__.parent = record
@@ -732,7 +720,7 @@ class SQLite(Database):
 		whereFilter = record.filter_.where__(record)
 		whereClause = f"\n\t\tWHERE {whereFilter}" if whereFilter else ''
 		sql = f"""
-		INSERT INTO {record.table__()} ({fields})
+		INSERT INTO {record.table__.name} ({fields})
 		VALUES ({values})
 		ON CONFLICT ({onColumns})
 		DO UPDATE SET {updateSet}{whereClause} {option}
@@ -814,7 +802,7 @@ class Oracle(Database):
 		whereClause = f"\n\t\t\tWHERE {whereFilter}" if whereFilter else ''
 
 		sql = f"""
-		MERGE INTO {record.table__()} t
+		MERGE INTO {record.table__.name} t
 		USING (SELECT {source_fields} FROM dual) s
 		ON ({on_clause})
 		WHEN MATCHED THEN
@@ -889,7 +877,7 @@ class MySQL(Database):
 		update_set = ', '.join(f'{k} = VALUES({k})' for k in keys if k not in onColumns.split(','))
 
 		sql = f"""
-		INSERT INTO {record.table__()} ({fields})
+		INSERT INTO {record.table__.name} ({fields})
 		VALUES ({values})
 		ON DUPLICATE KEY UPDATE {update_set} {option}
 		"""
@@ -944,7 +932,7 @@ class Postgres(Database):
 		whereClause = f"\n\t\tWHERE {whereFilter}" if whereFilter else ''
 
 		sql = f"""
-		INSERT INTO {record.table__()} ({fields})
+		INSERT INTO {record.table__.name} ({fields})
 		VALUES ({values})
 		ON CONFLICT ({onColumns})
 		DO UPDATE SET {update_set}{whereClause} {option}
@@ -1005,7 +993,7 @@ class MicrosoftSQL(Database):
 		whereClause = f" AND {whereFilter}" if whereFilter else ''
 
 		sql = f"""
-		MERGE INTO {record.table__()} AS t
+		MERGE INTO {record.table__.name} AS t
 		USING (SELECT {source_fields}) AS s
 		ON ({on_clause})
 		WHEN MATCHED{whereClause} THEN
@@ -1039,9 +1027,9 @@ class RecordMeta(type):
 		if bases:
 			parentClassName = bases[0].__name__
 			if(parentClassName == "Record" or parentClassName.startswith('__')):
-				cls.tableName__ = TableName(name)
+				cls.table__ = TableName(name)
 			else:
-				cls.tableName__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
+				cls.table__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
 			cls.alias = Alias(f"{quoteChar}{name}{quoteChar}")
 		return cls
 
@@ -1052,7 +1040,7 @@ class RecordMeta(type):
 #================================================================================#
 class Record(metaclass=RecordMeta):
 	database__	= None
-	tableName__ = TableName()
+	table__ = TableName('')
 	#--------------------------------------#
 	def __init__(self, statement=None, parameters=None, alias=None, operation=None, **kwargs):
 		self.with_cte__ = None
@@ -1062,9 +1050,6 @@ class Record(metaclass=RecordMeta):
 		self.filter_ = Filter(self)
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.data = {}
-		
-		# self.setupTableNameAndAlias()
-		# self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
 
 		if(kwargs):
 			for key, value in kwargs.items():
@@ -1115,19 +1100,12 @@ class Record(metaclass=RecordMeta):
 				self.__dict__["data"][name] = value
 		return self
 	#--------------------------------------#
-	# def setupTableNameAndAlias(self):
-	# 	quoteChar = '' #self.database__.escapeChar()
-	# 	parentClassName = self.__class__.__bases__[0].__name__
-	# 	if(parentClassName == "Record" or parentClassName.startswith('__')):
-	# 		self.tableName__ = TableName(self.__class__.__name__)
-	# 	else:
-	# 		self.tableName__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
-	# 	self.alias = Alias(f"{quoteChar}{self.__class__.__name__}{quoteChar}")
-	#--------------------------------------#
-	@classmethod
-	def table__(cls):
-		quoteChar = '' #self.database__.escapeChar()
-		return f"{quoteChar}{cls.tableName__.value()}{quoteChar}"
+	def __str__(self):
+		items = list(self.data.items())[:5]  # Show first 5 fields
+		fields = ', '.join(f'{k}={v!r}' for k, v in items)
+		if len(self.data) > 5:
+			fields += ', ...'
+		return f"<{self.__class__.__name__} {fields}>"
 	#--------------------------------------#
 	def __repr__(self):
 		items = list(self.data.items())[:5]  # Show first 5 fields
@@ -1191,22 +1169,8 @@ class Record(metaclass=RecordMeta):
 		self.filter_.le(**kwargs)
 		return self
 	#--------------------------------------#
-	#def __str__(self): pass
-	#--------------------------------------#
 	def __iter__(self):
-		self.__iterationIndex = Dummy(0)
-		self.__iterationBound = Dummy(len(self.recordset.iterate()))
-		return self
-	#--------------------------------------#
-	def __next__(self): #python 3 compatibility
-		if(self.__iterationIndex.value < self.__iterationBound.value):
-			currentItem = self.recordset.iterate()[self.__iterationIndex.value]
-			self.__iterationIndex.value += 1
-			return currentItem
-		else:
-			del(self.__iterationIndex) # to prevent using them as database's column
-			del(self.__iterationBound) # to prevent using them as database's column
-			raise StopIteration
+		return iter(self.recordset.iterate())
 	#--------------------------------------#
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
@@ -1236,9 +1200,9 @@ class Record(metaclass=RecordMeta):
 		return self
 	def commit(self): self.database__.commit()
 	#--------------------------------------#
-	def join(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields); return self
-	def rightJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' RIGHT JOIN '); return self
-	def leftJoin(self, table, fields): self.joins__[table.alias.value()] = Join(table, fields, ' LEFT JOIN '); return self
+	def join(self, table, fields): self.joins__[table.alias.value] = Join(table, fields); return self
+	def rightJoin(self, table, fields): self.joins__[table.alias.value] = Join(table, fields, ' RIGHT JOIN '); return self
+	def leftJoin(self, table, fields): self.joins__[table.alias.value] = Join(table, fields, ' LEFT JOIN '); return self
 	def with_cte(self, with_cte):
 		self.with_cte__ = with_cte
 		return self
@@ -1257,10 +1221,10 @@ class Record(metaclass=RecordMeta):
 class Recordset:
 	def __init__(self):
 		self.__records = [] #mapped objects from records
-		self.rowsCount = 0
+		self.affectedRowsCount = 0
 		self.data = [] # extended in ORM
 	def table(self):
-		if(self.firstRecord()): return  self.firstRecord().table__()
+		if(self.firstRecord()): return  self.firstRecord().table__.name
 	def empty(self): self.__records = []
 
 	@staticmethod
@@ -1313,7 +1277,7 @@ class Recordset:
 	def columns(self): return self.firstRecord().columns
 	def setField(self, fieldName, fieldValue):
 		for record in self.__records: record.__dict__[fieldName] = fieldValue
-	def affectedRowsCount(self): return self.rowsCount
+	def rowsCount(self): return self.affectedRowsCount
 	def set(self, **kwargs):
 		"""Set the same values on all records for update operations.
 
@@ -1358,5 +1322,9 @@ class Recordset:
 	#--------------------------------------#
 	def toDicts(self):
 		return self.data
+	#--------------------------------------#
+	def __iter__(self): return iter(self.__records)
+	def __len__(self): return len(self.__records)
+	def __getitem__(self, index): return self.__records[index]
 	#--------------------------------------#
 #================================================================================#

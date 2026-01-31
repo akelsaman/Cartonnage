@@ -136,7 +136,6 @@ hierarchy = Hierarchy() # used as subquery ... IN (SELECT * FROM Hierarchy) # Hi
 # 'MySQL': Not support 'Default Behavior'
 # 'MicrosoftSQL': Not supported directly, Uses temp tables instead.
 
-
 #  ['Oracle', 'MySQL', 'MicrosoftSQL']:
 cte1 = (
 	P()
@@ -216,7 +215,7 @@ if(Record.database__.name not in ['Oracle']):
 		assert emp.rowsCount() == -1, emp.rowsCount()
 	else:
 		assert emp.rowsCount() == 2, emp.rowsCount()
-
+	
 	print(f"{'-'*80}")
 	print(emp.query__.statement)
 	print(emp.query__.parameters)
@@ -285,9 +284,9 @@ if not (Record.database__.name == "Oracle"):
 
 	# Insert, Update, and Delete with Recursive CTE is not tracked on SQLite3 and MicrosoftSQL
 	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
-		assert employees.rowsCount == -1, employees.rowsCount
+		assert employees.rowsCount() == -1, employees.rowsCount
 	else:
-		assert employees.rowsCount == 2, employees.rowsCount
+		assert employees.rowsCount() == 2, employees.rowsCount
 
 	# This will delete only 100, But 101 will not be deleted ? why because database will evaluate CTE after each deletion !
 	# after deleteing 100 which is the only parent with manager_id=null will be no parent qualified with manager_id=null
@@ -296,9 +295,9 @@ if not (Record.database__.name == "Oracle"):
 
 
 	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
-		assert employees.rowsCount == -1, employees.rowsCount
+		assert employees.rowsCount() == -1, employees.rowsCount
 	else:
-		assert employees.rowsCount == 1, employees.rowsCount
+		assert employees.rowsCount() == 1, employees.rowsCount
 
 	availableEmployeesAfterDeletion = (
 		Employees()
@@ -320,9 +319,9 @@ if (Record.database__.name not in ["Oracle", "MySQL"]):
 	employees.insert()
 
 	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
-		assert employees.rowsCount == -1, employees.rowsCount
+		assert employees.rowsCount() == -1, employees.rowsCount
 	else:
-		assert employees.rowsCount == 2, employees.rowsCount
+		assert employees.rowsCount() == 2, employees.rowsCount
 
 Record.database__.rollback()  # Force rollback
 #==============================================================================#
@@ -738,7 +737,7 @@ recordset.insert()
 if Record.database__.name == "MicrosoftSQL":
 	pass
 else:
-	assert recordset.rowsCount == 2, recordset.rowsCount # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+	assert recordset.rowsCount() == 2, recordset.rowsCount() # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
 
 e1.set(manager_id=77)
 e2.set(manager_id=88)
@@ -751,7 +750,7 @@ if Record.database__.name == "MicrosoftSQL":
 	employees = Employees().in_(manager_id = [77, 88]).select()
 	assert employees.recordset.toLists() == [[5, 'Mickey', 'Mouse', None, None, None, None, None, None, 77, None], [6, 'Donald', 'Duck', None, None, None, None, None, None, 88, None]]
 else:
-	assert recordset.rowsCount == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+	assert recordset.rowsCount() == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
 
 # Recordset delete:
 e1.where(Employees.manager_id < 100) # add general condition to all records of the recordset
@@ -761,7 +760,7 @@ if Record.database__.name == "MicrosoftSQL":
 	employees = Employees().in_(manager_id = [77, 88]).select()
 	assert employees.recordset.toLists() == []
 else:
-	assert recordset.rowsCount == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+	assert recordset.rowsCount() == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
 
 Record.database__.rollback()  # Force rollback
 #==============================================================================#
