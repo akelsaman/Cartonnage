@@ -628,7 +628,13 @@ class Database:
 		query = self.crud(operation=operation, record=record, option=option)
 		for field, value in record.set__.new.items():
 			record.setField(field, value)
-			record.set__.empty()
+		record.set__.empty()
+		return query
+	def upsert_(self, operation, record, option=''):
+		query = self._upsert(operation=Database.upsert, record=record, onColumns=onColumns, option=option)
+		for field, value in record.set__.new.items():
+			record.setField(field, value)
+		record.set__.empty()
 		return query
 	#--------------------------------------#
 	def all(self, record, option=''): self.executeStatement(self.crud(operation=Database.all, record=record, option=option))
@@ -639,12 +645,12 @@ class Database:
 		self.executeStatement(self.crud(operation=Database.update, record=record, option=option))
 		for field, value in record.set__.new.items():
 			record.setField(field, value)
-			record.set__.empty()
+		record.set__.empty()
 	def upsert(self, record, onColumns, option=''):
 		self.executeStatement(self._upsert(operation=Database.upsert, record=record, onColumns=onColumns, option=option))
 		for field, value in record.set__.new.items():
 			record.setField(field, value)
-			record.set__.empty()
+		record.set__.empty()
 	#--------------------------------------#
 	def insertMany_(self, operation, record, onColumns=None, option=''): return self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
 	def deleteMany_(self, operation, record, onColumns=None, option=''): return self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
@@ -653,7 +659,14 @@ class Database:
 		for r in record.recordset.iterate():
 			for field, value in r.set__.new.items():
 				r.setField(field, value)
-				r.set__.empty()
+			r.set__.empty()
+		return query
+	def upsertMany_(self, record, onColumns, option=''):
+		query = self._upsertMany(operation=Database.upsert, record=record, onColumns=onColumns, option=option)
+		for r in record.recordset.iterate():
+			for field, value in r.set__.new.items():
+				r.setField(field, value)
+			r.set__.empty()
 		return query
 	def insertMany(self, record, option=''): self.executeMany(self.crudMany(operation=Database.insert, record=record, option=option))
 	def deleteMany(self, record, onColumns, option=''): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns, option=option))
@@ -662,12 +675,13 @@ class Database:
 		for r in record.recordset.iterate():
 			for field, value in r.set__.new.items():
 				r.setField(field, value)
-				r.set__.empty()
+			r.set__.empty()
 	def upsertMany(self, record, onColumns, option=''):
 		self.executeMany(self._upsertMany(operation=Database.upsert, record=record, onColumns=onColumns, option=option))
-		for field, value in record.set__.new.items():
-			record.setField(field, value)
-			record.set__.empty()
+		for r in record.recordset.iterate():
+			for field, value in r.set__.new.items():
+				r.setField(field, value)
+			r.set__.empty()
 	#--------------------------------------#
 	@classmethod
 	def paginate(cls, pageNumber=1, recordsCount=1):
