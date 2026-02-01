@@ -7,15 +7,13 @@ from datetime import date
 
 import time
 start = time.time()
-
-
 #================================================================================#
 from ake_connections import *
-# initSQLite3Env()
+initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
-initAzureSQLEnv()
+# initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
 # initSQLite3PoolEnv()
@@ -650,8 +648,11 @@ emp = (
 	.set(
 		first_name=Expression("UPPER(first_name)")
 		, last_name=Expression("LOWER(last_name)")
-		, email=Expression("first_name || '.' || last_name || '@test.com'")
-		, salary=Expression('salary + 100')
+		# UPPER and LOWER are used because:
+		# SQLite3, Oracle, and MySQL use new values uppered and lowered before concat.
+		# Postgres and MySQL uses original value before UPPER and LOWER.
+		, email=Expression("UPPER(first_name) || '.' || LOWER(last_name) || '@test.com'")
+		, salary=Employees.salary + 100
 		, commission_pct=Expression('COALESCE(commission_pct, 1)')
 	)
 	.value(employee_id=100)
