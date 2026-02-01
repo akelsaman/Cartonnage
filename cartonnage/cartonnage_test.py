@@ -9,11 +9,11 @@ import time
 start = time.time()
 #================================================================================#
 from ake_connections import *
-initSQLite3Env()
+# initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
-# initAzureSQLEnv()
+initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
 # initSQLite3PoolEnv()
@@ -59,6 +59,31 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
 # Recursive depth column
 # Lateral
 # Transaction savepoints	SAVEPOINT/ROLLBACK TO support	Low
+
+# Multiple tables
+(
+	Employees()
+	.from_(Departments)
+	.where(
+		(Employees.employee_id==100) &
+		(Employees.department_id==Departments.department_id)
+	)
+	.select(selected="Employees.*, Departments.department_name")
+)
+# → SELECT ... FROM Employees Employees, Departments Departments WHERE ...
+
+# With subquery
+class EmployeesGt1000(Employees): pass
+sub = Employees().where(Employees.salary > 1000).select_().alias('EmployeesGt1000')
+(
+	Employees().from_(sub)
+	.where(Employees.employee_id == EmployeesGt1000.employee_id)
+	.select(selected="Employees.*, EmployeesGt1000.salary")
+)
+# → SELECT ... FROM Employees Employees, (SELECT * FROM Employees WHERE salary > 1000) AS high_paid WHERE ...
+
+# Raw strings # not implemented
+# Employees().from_("Employees e", "Departments d").select()
 #================================================================================#
 print("------------------------------------00------------------------------------")
 #================================================================================#
@@ -882,5 +907,5 @@ print(f"{Record.database__.name} Operations Count: {Record.database__.operations
 end = time.time()
 print(end - start)
 #==============================================================================#
-print("---------------------------------------COMPREHENSIVE TEST---------------------------------------")
+print("---------------------------COMPREHENSIVE TEST---------------------------")
 #==============================================================================#

@@ -192,6 +192,9 @@ class Query:
 		self.parameters	= [] #to prevent #ValueError: parameters are of unsupported type in line #self.__cursor.execute(query.statement, tuple(query.parameters))
 		self.operation	= None
 		self.many = False
+	def alias(self, alias):
+		self.alias__ = alias
+		return self
 #================================================================================#
 class Set:
 	def __init__(self, parent):
@@ -545,12 +548,23 @@ class Database:
 		else:
 			where = whereFilter
 
+		fromClause = f'{record.table__.name} {record.alias.value}, '
+		fromParameters = []
+		if(record.from__):
+			for tbl in record.from__:
+				if(isinstance(tbl, Query)):
+					fromClause += f"({tbl.statement}) {tbl.alias__}, "
+					fromParameters.extend(tbl.parameters)
+				else:
+					fromClause += f"{tbl.table__.name} {tbl.alias.value}, "
+		fromClause = fromClause[:-2]
+
 		joiners = Database.joining(record)
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.select):
 			group_clause = f"GROUP BY {group_by}" if group_by else ''
 			order_clause = f"ORDER BY {order_by}" if order_by else ''
-			statement = f"{with_cte}SELECT {selected} FROM {record.table__.name} {record.alias.value} {joiners} \nWHERE {where if (where) else '1=1'} \n{group_clause} {order_clause} {limit} {option}"
+			statement = f"{with_cte}SELECT {selected} FROM {fromClause} {joiners} \nWHERE {where if (where) else '1=1'} \n{group_clause} {order_clause} {limit} {option}"
 		#-----
 		elif(operation==Database.insert):
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
@@ -571,6 +585,7 @@ class Database:
 		record.query__.statement = statement
 		record.query__.parameters = []
 		record.query__.parameters.extend(with_cte_parameters)
+		record.query__.parameters.extend(fromParameters)
 		record.query__.parameters.extend(record.set__.parameters()) # if update extend with fields set values first
 		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters) #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.operation = operation
@@ -1058,6 +1073,7 @@ class Record(metaclass=RecordMeta):
 		self.values = Database.values
 		self.set__ = Set(self)
 		self.joins__ = {}
+		self.from__ = []
 		self.filter_ = Filter(self)
 		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
 		self.data = {}
@@ -1211,6 +1227,9 @@ class Record(metaclass=RecordMeta):
 		return self
 	def commit(self): self.database__.commit()
 	#--------------------------------------#
+	def from_(self, *tables):
+		self.from__.append(*tables)
+		return self
 	def join(self, table, fields): self.joins__[table.alias.value] = Join(table, fields); return self
 	def rightJoin(self, table, fields): self.joins__[table.alias.value] = Join(table, fields, ' RIGHT JOIN '); return self
 	def leftJoin(self, table, fields): self.joins__[table.alias.value] = Join(table, fields, ' LEFT JOIN '); return self
