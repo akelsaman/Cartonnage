@@ -277,16 +277,6 @@ class Filter:
 	def empty(self):
 		self.__where = ''
 		self.parameters = []
-	
-	def select(self, selected="*", group_by='', order_by='', limit='', option=''):
-		self.parent.database__.select(record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
-		return self.parent
-	def delete(self, option=''):
-		self.parent.database__.delete(record=self.parent, option=option)
-		return self.parent
-	def update(self, option=''):
-		self.parent.database__.update(record=self.parent, option=option)
-		return self.parent
 
 	def fltr(self, field, placeholder): return self.where__()
 	def combine(self, filter1, filter2, operator):
@@ -622,7 +612,7 @@ class Database:
 			params = []
 			params.extend(with_cte_parameters)
 			params.extend(r.set__.parameters())
-			params.extend(r.values.parameters(r, fieldsNames=fieldsNames) )
+			params.extend(r.values.parameters(r, fieldsNames=fieldsNames))
 			params.extend(filterParamters)
 			record.query__.parameters.append(tuple(params))
 		record.query__.operation = operation
@@ -631,7 +621,14 @@ class Database:
 	#--------------------------------------#
 	def select_(self, record, selected="*", group_by='', order_by='', limit='', option=''):
 		return self.crud(operation=Database.select, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
-	def operation_statement(self, operation, record, option=''): return self.crud(operation=operation, record=record, option=option)
+	def insert_(self, operation, record, option=''): return self.crud(operation=operation, record=record, option=option)
+	def delete_(self, operation, record, option=''): return self.crud(operation=operation, record=record, option=option)
+	def update_(self, operation, record, option=''):
+		query = self.crud(operation=operation, record=record, option=option)
+		for field, value in record.set__.new.items():
+			record.setField(field, value)
+			record.set__.empty()
+		return query
 	#--------------------------------------#
 	def all(self, record, option=''): self.executeStatement(self.crud(operation=Database.all, record=record, option=option))
 	def select(self, record, selected="*", group_by='', order_by='', limit='', option=''): self.executeStatement(self.select_(record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option))
@@ -648,7 +645,15 @@ class Database:
 			record.setField(field, value)
 			record.set__.empty()
 	#--------------------------------------#
-	def operation_many_statement(self, operation, record, onColumns=None, option=''): return self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
+	def insertMany_(self, operation, record, onColumns=None, option=''): return self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
+	def deleteMany_(self, operation, record, onColumns=None, option=''): return self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
+	def updateMany_(self, operation, record, onColumns=None, option=''):
+		query = self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
+		for r in record.recordset.iterate():
+			for field, value in r.set__.new.items():
+				r.setField(field, value)
+				r.set__.empty()
+		return query
 	def insertMany(self, record, option=''): self.executeMany(self.crudMany(operation=Database.insert, record=record, option=option))
 	def deleteMany(self, record, onColumns, option=''): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns, option=option))
 	def updateMany(self, record, onColumns, option=''):
@@ -1153,9 +1158,9 @@ class Record(metaclass=RecordMeta):
 	def next(self): return self.__next__() #python 2 compatibility
 	#--------------------------------------#
 	def select_(self, selected="*", group_by='', order_by='', limit='', option='', **kwargs): return self.database__.select_(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
-	def insert_(self, option=''): return self.database__.operation_statement(Database.insert, record=self, option=option)
-	def update_(self, option=''): return self.database__.operation_statement(Database.update, record=self, option=option)
-	def delete_(self, option=''): return self.database__.operation_statement(Database.delete, record=self, option=option)
+	def insert_(self, option=''): return self.database__.insert_(Database.insert, record=self, option=option)
+	def update_(self, option=''): return self.database__.update_(Database.update, record=self, option=option)
+	def delete_(self, option=''): return self.database__.delete_(Database.delete, record=self, option=option)
 
 	def select(self, selected="*", group_by='', order_by='', limit='', option=''):
 		self.database__.select(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
@@ -1255,13 +1260,13 @@ class Recordset:
 	#--------------------------------------#
 	def insert_(self, option=''): 
 		if(self.firstRecord()):
-			return self.firstRecord().database__.operation_many_statement(Database.insert, record=self.firstRecord(), option=option)
+			return self.firstRecord().database__.insertMany_(Database.insert, record=self.firstRecord(), option=option)
 	def update_(self, onColumns=None, option=''): 
 		if(self.firstRecord()):
-			return self.firstRecord().database__.operation_many_statement(Database.update, record=self.firstRecord(), onColumns=onColumns, option=option)
+			return self.firstRecord().database__.updateMany_(Database.update, record=self.firstRecord(), onColumns=onColumns, option=option)
 	def delete_(self, onColumns=None, option=''): 
 		if(self.firstRecord()):
-			return self.firstRecord().database__.operation_many_statement(Database.delete, record=self.firstRecord(), onColumns=onColumns, option=option)
+			return self.firstRecord().database__.deleteMany_(Database.delete, record=self.firstRecord(), onColumns=onColumns, option=option)
 	#--------------------------------------#
 	def insert(self, option=''):
 		if(self.firstRecord()): 

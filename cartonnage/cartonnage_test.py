@@ -58,26 +58,37 @@ class T(Record): pass # used for upsert
 
 employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
 #==============================================================================#
-# recordset = Recordset.fromDicts(Employees,
-# 	[
-# 		{'employee_id': 5, 'first_name': "Mickey", 'last_name': "Mouse"},
-# 		{'employee_id': 6, 'first_name': "Donald", 'last_name': "Duck"}
-# 	]
-# )
+try:
+	emp = (
+		Employees()
+		.where(Employees.first_name == 'Steve')
+		.value(employee_id=1000, first_name='Ahmed', last_name='ELSamman')
+		.insert()
+	)
+except Exception as e:
+	# will raise and exception because you added where to an insert statement
+	print(e)
+	
+recordset = Recordset.fromDicts(Employees,
+	[
+		{'employee_id': 5, 'first_name': "Mickey", 'last_name': "Mouse"},
+		{'employee_id': 6, 'first_name': "Donald", 'last_name': "Duck"}
+	]
+)
 
-# assert recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck'}], recordset.toDicts()
+assert recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck'}], recordset.toDicts()
 
-# session = Session(Record.database__)
-# session.set(recordset.insert_())
-# recordset.set(phone_number='+201011223344')
-# session.set(recordset.update_())
-# session.commit()
-# insertedEmployeesAfterUpdate = (
-# 	Employees().where(Employees.employee_id.in_([5,6])).select(selected="employee_id, first_name, last_name, phone_number")
-# )
-# assert insertedEmployeesAfterUpdate.recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse', 'phone_number': '+201011223344'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck', 'phone_number': '+201011223344'}], insertedEmployeesAfterUpdate.recordset.data
-# session.set(recordset.delete_(onColumns=["employee_id"]))
-# session.commit()
+session = Session(Record.database__)
+session.set(recordset.insert_())
+recordset.set(phone_number='+201011223344')
+session.set(recordset.update_())
+session.commit()
+insertedEmployeesAfterUpdate = (
+	Employees().where(Employees.employee_id.in_([5,6])).select(selected="employee_id, first_name, last_name, phone_number")
+)
+assert insertedEmployeesAfterUpdate.recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse', 'phone_number': '+201011223344'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck', 'phone_number': '+201011223344'}], insertedEmployeesAfterUpdate.recordset.data
+session.set(recordset.delete_(onColumns=["employee_id"]))
+session.commit()
 
 #==============================================================================#
 # 1. Non-Recursive CTE (all databases)
