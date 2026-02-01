@@ -398,7 +398,8 @@ class ObjectRelationalMapper:
 		for row in rows:
 			object.data = row
 			object.columns = columns
-			passedObject.recordset.add(object)
+			# passedObject.recordset.add(object)
+			passedObject.recordset.records.append(object) # don't use .add() it will add again the .data while it extended above
 			object = passedObject.__class__() #object = Record() #bug
 #================================================================================#
 class DummyObjectRelationalMapper:
@@ -1224,11 +1225,15 @@ class Recordset:
 		rs.data = dicts
 		for d in dicts:
 			record = record_cls()
-			record.value(**d)
-			rs.add(record)
+			# record.value(**d)
+			# rs.add(record)
+			rs.records.append(record)
+			record.data = d
 		return rs
 		
 	def add(self, *args):
+		for rec in args:
+			self.data.append(rec.data)
 		self.records.extend(args)
 		return self
 	def iterate(self): return self.records
