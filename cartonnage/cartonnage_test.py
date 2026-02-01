@@ -57,7 +57,7 @@ class S(Record): pass # used for upsert
 class T(Record): pass # used for upsert
 
 employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
-#==============================================================================#
+#================================================================================#
 try:
 	emp = (
 		Employees()
@@ -89,8 +89,7 @@ insertedEmployeesAfterUpdate = (
 assert insertedEmployeesAfterUpdate.recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse', 'phone_number': '+201011223344'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck', 'phone_number': '+201011223344'}], insertedEmployeesAfterUpdate.recordset.data
 session.set(recordset.delete_(onColumns=["employee_id"]))
 session.commit()
-
-#==============================================================================#
+#================================================================================#
 # 1. Non-Recursive CTE (all databases)
 # WITH sales_summary AS (
 #     SELECT region, SUM(amount) as total
@@ -156,210 +155,9 @@ session.commit()
 # Recursive depth column
 # Lateral
 # Transaction savepoints	SAVEPOINT/ROLLBACK TO support	Low
-# =============== SELECT, INSERT, UPDATE, and DELETE Record WithCTE ===============
-class Hierarchy(Record): pass # for recursive CTE
-class P(Employees): pass
-class C(Employees): pass
-class ExecutivesDepartment(Departments): pass
-class AdministrationJobs(Jobs): pass
-
-hierarchy = Hierarchy() # used as subquery ... IN (SELECT * FROM Hierarchy) # Hierarchy is Recursive CTE
-
-# Oracle: use hints after SELECT
-# 'MySQL': Not support 'Default Behavior'
-# 'MicrosoftSQL': Not supported directly, Uses temp tables instead.
-
-#  ['Oracle', 'MySQL', 'MicrosoftSQL']:
-cte1 = (
-	P()
-	.where(P.manager_id.is_null())
-	.cte(selected='/*+ INLINE */ employee_id, manager_id, first_name', materialization=None)
-)
-cte2 = (
-	C()
-	.join(Hierarchy, (C.manager_id == Hierarchy.employee_id))
-	.where(C.first_name == 'Neena')
-	.cte(selected='/*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name', materialization=None)
-)
-cte3 = (
-	ExecutivesDepartment()
-	.where(ExecutivesDepartment.department_name == 'Executive')
-	.cte(selected='/*+ INLINE */ ExecutivesDepartment.*', materialization=None)
-)
-cte4 = (
-	AdministrationJobs()
-	.where(AdministrationJobs.job_title.like('Administration%'))
-	.cte(selected='/*+ MATERIALIZE */ AdministrationJobs.*', materialization=None)
-)
-
-if Record.database__.name in ['SQLite3', 'Postgres']:
-	cte1.materialization=False
-	cte2.materialization=True
-	cte3.materialization=False
-	cte4.materialization=True
-
-
-# ^ union: recursive_cte = (cte1 ^ cte2)
-# Recursive CTE wit UINION only supported by: SQLite3, MySQL, Postgres.
-recursive_cte = (cte1 + cte2)
-recursive_cte.alias = "Hierarchy" # you have to set alias for Recursive CTE
-
-# columnsAliases used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
-recursive_cte.columnsAliases = "employee_id, manager_id, first_name"
-
-# ee.materialization(True) # Error: materialization with recursive
-
-# RECURSIVE: Required for MySQL and Postgres. Optional for SQLite3.
-# RECURSIVE: are not used by Oracle and MicrosoftSQL.
-if Record.database__.name in ['Oracle', 'MicrosoftSQL']:
-	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=False)
-elif Record.database__.name in ['Postgres']:
-	"""
-	CYCLE Detection (PostgreSQL 14+): CYCLE employee_id SET is_cycle USING path
-	SEARCH Clause (PostgreSQL 14+): SEARCH DEPTH FIRST BY employee_id SET ordercol
-	"""
-	# with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='CYCLE employee_id SET is_cycle USING path')
-	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='SEARCH DEPTH FIRST BY employee_id SET ordercol')
-else:# ['SQLite3', 'MySQL']
-	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True)
-
-sql_query = f"{with_cte.value} SELECT * FROM Hierarchy" # build on top of generated WITH CTE
-print(sql_query)
-
-print("Raw SQL:")
-# Run SELECT WITH CTE as raw/plain SQL
-rec = Record(statement=sql_query, parameters=with_cte.parameters, operation=Database.select)
-for r in rec:
-	print(r.data)
-
-print("Cartonnage:")
-
-if(Record.database__.name not in ['Oracle']):
-	emp = (
-		Employees()
-		.with_cte(with_cte)
-		.where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
-		.set(salary = 2000)
-		.update()
-	)
-
-	# sqlite3 returns -1 for complex operations not the real affected rows count
-	if(Record.database__.name in ['SQLite3']):
-		assert emp.rowsCount() == -1, emp.rowsCount()
-	else:
-		assert emp.rowsCount() == 2, emp.rowsCount()
-
-	print(f"{'-'*80}")
-	print(emp.query__.statement)
-	print(emp.query__.parameters)
-
-emp = (
-	Employees()
-	.with_cte(with_cte)
-	.join(Hierarchy, (Employees.employee_id == Hierarchy.employee_id))
-	.join(ExecutivesDepartment, (Employees.department_id == ExecutivesDepartment.department_id))
-	.join(AdministrationJobs, (Employees.job_id == AdministrationJobs.job_id))
-)
-if Record.database__.name in ['MicrosoftSQL']:
-	# MSSQL MAXRECURSION Option: OPTION (MAXRECURSION 100)
-	emp.select(option='OPTION (MAXRECURSION 100)')
-else:
-	emp.select()
-
-for r in emp:
-	print(r.data)
-
-print(f"{'-'*80}")
-print(emp.query__.statement)
-print(emp.query__.parameters)
-
-if(Record.database__.name not in ['Oracle']):
-	emp = (
-		Employees()
-		.with_cte(with_cte)
-		.where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
-		.delete()
-	)
-
-	# sqlite3 returns -1 for complex operations not the real affected rows count
-	if(Record.database__.name in ['SQLite3']):
-		assert emp.rowsCount() == -1, emp.rowsCount()
-	else:
-		assert emp.rowsCount() == 2, emp.rowsCount()
-
-	print(f"{'-'*80}")
-	print(emp.query__.statement)
-	print(emp.query__.parameters)
-
-# print("After delete - checking if in transaction:")
-# print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
-Record.database__.rollback()  # Force rollback
-# =============================== Recordset WithCTE ===============================
-employees = Recordset()
-emp1 = (
-	Employees()
-	.value(employee_id = 100)
-	.select()
-).set(last_name='Ahmed')
-emp2 = (
-	Employees()
-	.value(employee_id = 101)
-	.select()
-).set(last_name='kamal')
-
-employees.add(emp1, emp2)
-
-if not (Record.database__.name == "Oracle"):
-	# add with_cte and filters to Recordset through it's first Record instance
-	emp1.with_cte(with_cte).where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
-	# use onColumns if you are not sure all columns are null free
-	employees.update(onColumns=["employee_id"])
-
-	# Insert, Update, and Delete with Recursive CTE is not tracked on SQLite3 and MicrosoftSQL
-	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
-		assert employees.rowsCount() == -1, employees.rowsCount
-	else:
-		assert employees.rowsCount() == 2, employees.rowsCount
-
-	# This will delete only 100, But 101 will not be deleted ? why because database will evaluate CTE after each deletion !
-	# after deleteing 100 which is the only parent with manager_id=null will be no parent qualified with manager_id=null
-	# so when no parent then no childs ! so 101 will not available with the second iteration to be deleted.
-	employees.delete(onColumns=["employee_id"])
-
-
-	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
-		assert employees.rowsCount() == -1, employees.rowsCount
-	else:
-		assert employees.rowsCount() == 1, employees.rowsCount
-
-	availableEmployeesAfterDeletion = (
-		Employees()
-		.where(Employees.employee_id.in_([100,101]))
-		.select(selected="employee_id")
-	)
-	availableEmployees = [{'employee_id': 101}]
-	assert availableEmployeesAfterDeletion.recordset.data == availableEmployees, availableEmployeesAfterDeletion.recordset.data
-
-	# now I will delete 101 to test Recordset insertion WithCTE
-	# use onColumns if you are not sure all columns are null free
-	availableEmployeesAfterDeletion.delete()
-
-# Record.database__._Database__cursor.execute("SELECT employee_id FROM Employees WHERE employee_id IN (100, 101)")
-# print("RAW CHECK:", Record.database__._Database__cursor.fetchall())
-
-if (Record.database__.name not in ["Oracle", "MySQL"]):
-
-	employees.insert()
-
-	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
-		assert employees.rowsCount() == -1, employees.rowsCount
-	else:
-		assert employees.rowsCount() == 2, employees.rowsCount
-
-Record.database__.rollback()  # Force rollback
-#==============================================================================#
-print("---------------------------------------00---------------------------------------")
-#==============================================================================#
+#================================================================================#
+print("------------------------------------00------------------------------------")
+#================================================================================#
 jobSubQuery = (Jobs().where(Jobs.job_title.in_(['Programmer', 'Purchasing Clerk'])))
 departmentExistsQuery = (
 	Departments().where(
@@ -465,9 +263,9 @@ assert employee.recordset.toLists() == [[103, 'Alexander', 'Hunold', 'alexander.
 assert employee.recordset.toDicts() == employee.recordset.data
 assert employee.recordset.columns() == employee.columns
 assert employee.rowsCount() == 2
-#==============================================================================#
-print("---------------------------------------01---------------------------------------")
-#==============================================================================#
+#================================================================================#
+print("------------------------------------01------------------------------------")
+#================================================================================#
 # read section 00 in sql_cartonnage_test.py and write a test scenatio for each feature included in this section:
 # Expressive filtering:
 # Join two tables
@@ -648,9 +446,9 @@ employee = (
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
 assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
-#==============================================================================#
-print("---------------------------------------02---------------------------------------")
-#==============================================================================#
+#================================================================================#
+print("------------------------------------02------------------------------------")
+#================================================================================#
 # select all and get recordset [all records] count, convert them to list of Dictionaries/lists
 reg = Regions().all()
 
@@ -658,9 +456,9 @@ assert reg.recordset.count() == 4
 assert reg.columns == ['region_id', 'region_name']
 assert reg.recordset.toDicts() == [{'region_id': 1, 'region_name': 'Europe'}, {'region_id': 2, 'region_name': 'Americas'}, {'region_id': 3, 'region_name': 'Asia'}, {'region_id': 4, 'region_name': 'Middle East and Africa'}]
 assert reg.recordset.toLists() == [[1, 'Europe'], [2, 'Americas'], [3, 'Asia'], [4, 'Middle East and Africa']]
-#==============================================================================#
-print("---------------------------------------03---------------------------------------")
-#==============================================================================#
+#================================================================================#
+print("------------------------------------03------------------------------------")
+#================================================================================#
 # insert single record
 emp1 = Employees()
 emp1.data = {'employee_id': 19950519, 'first_name': 'William', 'last_name': 'Wallace', 'email': None, 'phone_number': '555.666.777'}
@@ -711,9 +509,9 @@ dep1.where(Dependents.employee_id == 206).select()
 assert dep1.data == {}
 
 Record.database__.rollback()  # Force rollback
-#==============================================================================#
-print("---------------------------------------04---------------------------------------")
-# #==============================================================================#
+#================================================================================#
+print("------------------------------------04------------------------------------")
+#================================================================================#
 # filter and fetchmany records into recordset
 jobs = Jobs().where(Jobs.job_title.like('%Accountant%')).select()
 
@@ -759,9 +557,9 @@ jobs = Jobs().where(Jobs.job_title.like('%Accountant%')).select()
 assert jobs.recordset.toLists() == []  # confirm recordset delete
 
 Record.database__.rollback()  # Force rollback
-#==============================================================================#
-print("---------------------------------------05---------------------------------------")
-#==============================================================================#
+#================================================================================#
+print("------------------------------------05------------------------------------")
+#================================================================================#
 # recordset from list of dicts
 
 recordset = Recordset.fromDicts(Employees,
@@ -814,9 +612,9 @@ else:
 	assert recordset.rowsCount() == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
 
 Record.database__.rollback()  # Force rollback
-#==============================================================================#
-print("---------------------------------------06---------------------------------------")
-# #==============================================================================#
+#================================================================================#
+print("------------------------------------06------------------------------------")
+#================================================================================#
 # Execute raw sql statement and get recordset of the returned rows
 records = Record(statement="SELECT * FROM Employees WHERE employee_id IN(100, 101, 102) ", operation=Database.select)
 assert records.recordset.count() == 3
@@ -836,9 +634,9 @@ employee.insert()
 
 employee = Employees().value(employee_id=1000).select()
 assert employee.data == {'employee_id': 1000, 'first_name': 'Super', 'last_name': 'Man', 'email': None, 'phone_number': None, 'hire_date': None, 'job_id': None, 'salary': None, 'commission_pct': None, 'manager_id': None, 'department_id': None}
-#==============================================================================#
-print("---------------------------------------07---------------------------------------")
-# #==============================================================================#
+#================================================================================#
+print("------------------------------------07------------------------------------")
+#================================================================================#
 # group_by with HAVING clause
 employees = Employees().select(selected='manager_id, count(1) AS "count"', group_by='manager_id HAVING count(1) > 4', order_by='manager_id ASC')
 
@@ -846,9 +644,9 @@ assert employees.recordset.data == [
 	{'manager_id': 100, 'count': 14}, {'manager_id': 101, 'count': 5}, 
 	{'manager_id': 108, 'count': 5}, {'manager_id': 114, 'count': 5}
 ], employees.recordset.data
-#==============================================================================#
-print("---------------------------------------08---------------------------------------")
-# #==============================================================================#
+#================================================================================#
+print("------------------------------------08------------------------------------")
+#================================================================================#
 emp = Employees().where(Employees.first_name.in_(['Steven', 'Neena']))
 
 emp1 = Employees().set(**{'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000})
@@ -891,9 +689,9 @@ if(Record.database__.name in ["MySQL", "Postgres", "MicrosoftSQL"]):
 	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
 
 Record.database__.rollback()
-#==============================================================================#
-print("---------------------------------------09 Expression Tests---------------------------------------")
-#==============================================================================#
+#================================================================================#
+print("---------------------------09 Expression Tests---------------------------")
+#================================================================================#
 emp = (
 	Employees()
 	.set(
@@ -913,11 +711,217 @@ emp = (
 )
 
 assert emp.data == {'first_name': 'STEVEN', 'last_name': 'king', 'email': 'Steven.King@test.com', 'salary': 24100, 'commission_pct': 1}, emp.data
-print("---------------------------------------Expression Tests Complete---------------------------------------")
+#================================================================================#
+print("----------- SELECT, INSERT, UPDATE, and DELETE Record WithCTE -----------")
+#================================================================================#
+class Hierarchy(Record): pass # for recursive CTE
+class P(Employees): pass
+class C(Employees): pass
+class ExecutivesDepartment(Departments): pass
+class AdministrationJobs(Jobs): pass
 
+hierarchy = Hierarchy() # used as subquery ... IN (SELECT * FROM Hierarchy) # Hierarchy is Recursive CTE
+
+# Oracle: use hints after SELECT
+# 'MySQL': Not support 'Default Behavior'
+# 'MicrosoftSQL': Not supported directly, Uses temp tables instead.
+
+#  ['Oracle', 'MySQL', 'MicrosoftSQL']:
+cte1 = (
+	P()
+	.where(P.manager_id.is_null())
+	.cte(selected='/*+ INLINE */ employee_id, manager_id, first_name', materialization=None)
+)
+cte2 = (
+	C()
+	.join(Hierarchy, (C.manager_id == Hierarchy.employee_id))
+	.where(C.first_name == 'Neena')
+	.cte(selected='/*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name', materialization=None)
+)
+cte3 = (
+	ExecutivesDepartment()
+	.where(ExecutivesDepartment.department_name == 'Executive')
+	.cte(selected='/*+ INLINE */ ExecutivesDepartment.*', materialization=None)
+)
+cte4 = (
+	AdministrationJobs()
+	.where(AdministrationJobs.job_title.like('Administration%'))
+	.cte(selected='/*+ MATERIALIZE */ AdministrationJobs.*', materialization=None)
+)
+
+if Record.database__.name in ['SQLite3', 'Postgres']:
+	cte1.materialization=False
+	cte2.materialization=True
+	cte3.materialization=False
+	cte4.materialization=True
+
+
+# ^ union: recursive_cte = (cte1 ^ cte2)
+# Recursive CTE wit UINION only supported by: SQLite3, MySQL, Postgres.
+recursive_cte = (cte1 + cte2)
+recursive_cte.alias = "Hierarchy" # you have to set alias for Recursive CTE
+
+# columnsAliases used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
+recursive_cte.columnsAliases = "employee_id, manager_id, first_name"
+
+# ee.materialization(True) # Error: materialization with recursive
+
+# RECURSIVE: Required for MySQL and Postgres. Optional for SQLite3.
+# RECURSIVE: are not used by Oracle and MicrosoftSQL.
+if Record.database__.name in ['Oracle', 'MicrosoftSQL']:
+	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=False)
+elif Record.database__.name in ['Postgres']:
+	"""
+	CYCLE Detection (PostgreSQL 14+): CYCLE employee_id SET is_cycle USING path
+	SEARCH Clause (PostgreSQL 14+): SEARCH DEPTH FIRST BY employee_id SET ordercol
+	"""
+	# with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='CYCLE employee_id SET is_cycle USING path')
+	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='SEARCH DEPTH FIRST BY employee_id SET ordercol')
+else:# ['SQLite3', 'MySQL']
+	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True)
+
+sql_query = f"{with_cte.value} SELECT * FROM Hierarchy" # build on top of generated WITH CTE
+print(sql_query)
+
+print("Raw SQL:")
+# Run SELECT WITH CTE as raw/plain SQL
+rec = Record(statement=sql_query, parameters=with_cte.parameters, operation=Database.select)
+for r in rec:
+	print(r.data)
+
+print("Cartonnage:")
+
+if(Record.database__.name not in ['Oracle']):
+	emp = (
+		Employees()
+		.with_cte(with_cte)
+		.where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
+		.set(salary = 2000)
+		.update()
+	)
+
+	# sqlite3 returns -1 for complex operations not the real affected rows count
+	if(Record.database__.name in ['SQLite3']):
+		assert emp.rowsCount() == -1, emp.rowsCount()
+	else:
+		assert emp.rowsCount() == 2, emp.rowsCount()
+
+	print(f"{'-'*80}")
+	print(emp.query__.statement)
+	print(emp.query__.parameters)
+
+emp = (
+	Employees()
+	.with_cte(with_cte)
+	.join(Hierarchy, (Employees.employee_id == Hierarchy.employee_id))
+	.join(ExecutivesDepartment, (Employees.department_id == ExecutivesDepartment.department_id))
+	.join(AdministrationJobs, (Employees.job_id == AdministrationJobs.job_id))
+)
+if Record.database__.name in ['MicrosoftSQL']:
+	# MSSQL MAXRECURSION Option: OPTION (MAXRECURSION 100)
+	emp.select(option='OPTION (MAXRECURSION 100)')
+else:
+	emp.select()
+
+for r in emp:
+	print(r.data)
+
+print(f"{'-'*80}")
+print(emp.query__.statement)
+print(emp.query__.parameters)
+
+if(Record.database__.name not in ['Oracle']):
+	emp = (
+		Employees()
+		.with_cte(with_cte)
+		.where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
+		.delete()
+	)
+
+	# sqlite3 returns -1 for complex operations not the real affected rows count
+	if(Record.database__.name in ['SQLite3']):
+		assert emp.rowsCount() == -1, emp.rowsCount()
+	else:
+		assert emp.rowsCount() == 2, emp.rowsCount()
+
+	print(f"{'-'*80}")
+	print(emp.query__.statement)
+	print(emp.query__.parameters)
+
+# print("After delete - checking if in transaction:")
+# print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
+Record.database__.rollback()  # Force rollback
+#================================================================================#
+print("--------------------------- Recordset WithCTE ---------------------------")
+#================================================================================#
+employees = Recordset()
+emp1 = (
+	Employees()
+	.value(employee_id = 100)
+	.select()
+).set(last_name='Ahmed')
+emp2 = (
+	Employees()
+	.value(employee_id = 101)
+	.select()
+).set(last_name='kamal')
+
+employees.add(emp1, emp2)
+
+if not (Record.database__.name == "Oracle"):
+	# add with_cte and filters to Recordset through it's first Record instance
+	emp1.with_cte(with_cte).where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
+	# use onColumns if you are not sure all columns are null free
+	employees.update(onColumns=["employee_id"])
+
+	# Insert, Update, and Delete with Recursive CTE is not tracked on SQLite3 and MicrosoftSQL
+	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
+		assert employees.rowsCount() == -1, employees.rowsCount
+	else:
+		assert employees.rowsCount() == 2, employees.rowsCount
+
+	# This will delete only 100, But 101 will not be deleted ? why because database will evaluate CTE after each deletion !
+	# after deleteing 100 which is the only parent with manager_id=null will be no parent qualified with manager_id=null
+	# so when no parent then no childs ! so 101 will not available with the second iteration to be deleted.
+	employees.delete(onColumns=["employee_id"])
+
+
+	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
+		assert employees.rowsCount() == -1, employees.rowsCount
+	else:
+		assert employees.rowsCount() == 1, employees.rowsCount
+
+	availableEmployeesAfterDeletion = (
+		Employees()
+		.where(Employees.employee_id.in_([100,101]))
+		.select(selected="employee_id")
+	)
+	availableEmployees = [{'employee_id': 101}]
+	assert availableEmployeesAfterDeletion.recordset.data == availableEmployees, availableEmployeesAfterDeletion.recordset.data
+
+	# now I will delete 101 to test Recordset insertion WithCTE
+	# use onColumns if you are not sure all columns are null free
+	availableEmployeesAfterDeletion.delete()
+
+# Record.database__._Database__cursor.execute("SELECT employee_id FROM Employees WHERE employee_id IN (100, 101)")
+# print("RAW CHECK:", Record.database__._Database__cursor.fetchall())
+
+if (Record.database__.name not in ["Oracle", "MySQL"]):
+
+	employees.insert()
+
+	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
+		assert employees.rowsCount() == -1, employees.rowsCount
+	else:
+		assert employees.rowsCount() == 2, employees.rowsCount
+
+Record.database__.rollback()  # Force rollback
+#==============================================================================#
 Record.database__.rollback() # Record.database__.commit()
 Record.database__.close()
-print("---------------------------------------ALL FEATURES TESTED---------------------------------------")
+#==============================================================================#
+print("--------------------------ALL FEATURES TESTED--------------------------")
+#==============================================================================#
 print(f"{Record.database__.name} Operations Count: {Record.database__.operationsCount}")
 # assert Record.database__.operationsCount == 13
 
