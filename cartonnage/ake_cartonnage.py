@@ -191,6 +191,7 @@ class Query:
 		self.result		= Result()
 		self.parameters	= [] #to prevent #ValueError: parameters are of unsupported type in line #self.__cursor.execute(query.statement, tuple(query.parameters))
 		self.operation	= None
+		self.many = False
 #================================================================================#
 class Set:
 	def __init__(self, parent):
@@ -277,13 +278,13 @@ class Filter:
 		self.__where = ''
 		self.parameters = []
 	
-	def select(self, selected="*", group_by='', order_by='', limit='', option=''): 
+	def select(self, selected="*", group_by='', order_by='', limit='', option=''):
 		self.parent.database__.select(record=self.parent, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
 		return self.parent
-	def delete(self, option=''): 
+	def delete(self, option=''):
 		self.parent.database__.delete(record=self.parent, option=option)
 		return self.parent
-	def update(self, option=''): 
+	def update(self, option=''):
 		self.parent.database__.update(record=self.parent, option=option)
 		return self.parent
 
@@ -557,6 +558,7 @@ class Database:
 			statement = f"{with_cte}SELECT {selected} FROM {record.table__.name} {record.alias.value} {joiners} \nWHERE {where if (where) else '1=1'} \n{group_clause} {order_clause} {limit} {option}"
 		#-----
 		elif(operation==Database.insert):
+			updateSetParameters = record.set__.parameters()
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
 			statement = f"{with_cte}INSERT INTO {record.table__.name} {fieldsValuesClause} {option}"
 		#-----
@@ -575,12 +577,14 @@ class Database:
 		record.query__.statement = statement
 		record.query__.parameters = []
 		record.query__.parameters.extend(with_cte_parameters)
-		record.query__.parameters.extend(record.set__.parameters()) # if update extend with fields set values first
+		record.query__.parameters.extend(updateSetParameters) # if update extend with fields set values first
 		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters) #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.operation = operation
+		record.query__.many = False # default is False
 		return record.query__
 	#--------------------------------------#
-	def crudMany(self, operation, record, selected="*", onColumns=None, group_by='', limit='', option=''):
+	@staticmethod
+	def crudMany(operation, record, selected="*", onColumns=None, group_by='', limit='', option=''):
 		with_cte = ''
 		with_cte_parameters = []
 		if(record.__dict__.get('with_cte__')):
@@ -600,7 +604,7 @@ class Database:
 			where = whereFilter
 		#----- #ordered by occurance propability for single record
 		if(operation==Database.insert):
-			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([self.placeholder() for i in range(0, len(record.values.fields(record)))])})"
+			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
 			statement = f"{with_cte}INSERT INTO {record.table__.name} {fieldsValuesClause} {option}"
 		#-----
 		elif(operation==Database.update):
@@ -610,7 +614,7 @@ class Database:
 		elif(operation==Database.delete):
 			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
-		record.query__ = Query() # as 
+		record.query__ = Query()
 		record.query__.parent = record
 		record.query__.statement = statement
 		filterParamters = record.filter_.parameters
@@ -623,6 +627,7 @@ class Database:
 			params.extend(filterParamters)
 			record.query__.parameters.append(tuple(params))
 		record.query__.operation = operation
+		record.query__.many = True
 		return record.query__
 	#--------------------------------------#
 	def select_(self, record, selected="*", group_by='', order_by='', limit='', option=''):
@@ -644,6 +649,7 @@ class Database:
 			record.setField(field, value)
 			record.set__.empty()
 	#--------------------------------------#
+	def operation_many_statement(self, operation, record, onColumns=None, option=''): return self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
 	def insertMany(self, record, option=''): self.executeMany(self.crudMany(operation=Database.insert, record=record, option=option))
 	def deleteMany(self, record, onColumns, option=''): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns, option=option))
 	def updateMany(self, record, onColumns, option=''):
@@ -658,13 +664,14 @@ class Database:
 			record.setField(field, value)
 			record.set__.empty()
 	#--------------------------------------#
-	def paginate(self, pageNumber=1, recordsCount=1):
+	@classmethod
+	def paginate(cls, pageNumber=1, recordsCount=1):
 		try:
 			pageNumber = int(pageNumber)
 			recordsCount = int(recordsCount)
 			if(pageNumber and recordsCount):
 				offset = (pageNumber - 1) * recordsCount
-				return self.limit(offset, recordsCount)
+				return cls.limit(offset, recordsCount)
 			else:
 				return ''
 		except Exception as e:
@@ -1247,16 +1254,36 @@ class Recordset:
 			record.value(**kwargs)
 		return self
 	#--------------------------------------#
+	def insert_(self, option=''): 
+		if(self.firstRecord()):
+			return self.firstRecord().database__.operation_many_statement(Database.insert, record=self.firstRecord(), option=option)
+	def update_(self, onColumns=None, option=''): 
+		if(self.firstRecord()):
+			return self.firstRecord().database__.operation_many_statement(Database.update, record=self.firstRecord(), onColumns=onColumns, option=option)
+	def delete_(self, onColumns=None, option=''): 
+		if(self.firstRecord()):
+			return self.firstRecord().database__.operation_many_statement(Database.delete, record=self.firstRecord(), onColumns=onColumns, option=option)
+	#--------------------------------------#
 	def insert(self, option=''):
-		if(self.firstRecord()): self.firstRecord().database__.insertMany(self.firstRecord(), option=option)
+		if(self.firstRecord()): 
+			self.firstRecord().database__.insertMany(self.firstRecord(), option=option)
+		return self
 	def update(self, onColumns=None, option=''):
-		if(self.firstRecord()):  self.firstRecord().database__.updateMany(self.firstRecord(), onColumns=onColumns, option=option)
+		if(self.firstRecord()):  
+			self.firstRecord().database__.updateMany(self.firstRecord(), onColumns=onColumns, option=option)
+		return self
 	def delete(self, onColumns=None, option=''):
-		if(self.firstRecord()):  self.firstRecord().database__.deleteMany(self.firstRecord(), onColumns=onColumns, option=option)
+		if(self.firstRecord()):  
+			self.firstRecord().database__.deleteMany(self.firstRecord(), onColumns=onColumns, option=option)
+		return self
 	def upsert(self, onColumns=None, option=''):
-		if(self.firstRecord()):  self.firstRecord().database__.upsertMany(self.firstRecord(), onColumns=onColumns, option=option)
+		if(self.firstRecord()): 
+			self.firstRecord().database__.upsertMany(self.firstRecord(), onColumns=onColumns, option=option)
+		return self
 	def commit(self):
-		if(self.firstRecord()):  self.firstRecord().database__.commit()
+		if(self.firstRecord()):
+			self.firstRecord().database__.commit()
+		return self
 	#--------------------------------------#
 	def toLists(self):
 		data = []
@@ -1271,4 +1298,32 @@ class Recordset:
 	def __len__(self): return len(self.records)
 	def __getitem__(self, index): return self.records[index]
 	#--------------------------------------#
+#================================================================================#
+class Session:
+	def __init__(self, database):
+		self.database = database
+		self._pending = []  # List of (query, is_many) tuples
+
+	def set(self, query):
+		self._pending.append(query)
+		return self
+
+	def flush(self):
+		"""Execute all pending operations"""
+		for query in self._pending:
+			if query.many:
+				self.database.executeMany(query)
+			else:
+				self.database.executeStatement(query)
+		self._pending = []
+
+	def commit(self):
+		"""Flush and commit transaction"""
+		self.flush()
+		self.database.commit()
+
+	def rollback(self):
+		"""Rollback and clear pending"""
+		self.database.rollback()
+		self._pending = []
 #================================================================================#
