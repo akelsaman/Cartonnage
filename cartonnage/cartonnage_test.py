@@ -57,100 +57,6 @@ class S(Record): pass # used for upsert
 class T(Record): pass # used for upsert
 
 employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
-#================================================================================#
-try:
-	emp = (
-		Employees()
-		.where(Employees.first_name == 'Steve')
-		.value(employee_id=1000, first_name='Ahmed', last_name='ELSamman')
-		.insert()
-	)
-except Exception as e:
-	# will raise and exception because you added where to an insert statement
-	print(e)
-	
-recordset = Recordset.fromDicts(Employees,
-	[
-		{'employee_id': 5, 'first_name': "Mickey", 'last_name': "Mouse"},
-		{'employee_id': 6, 'first_name': "Donald", 'last_name': "Duck"}
-	]
-)
-
-assert recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck'}], recordset.toDicts()
-
-session = Session(Record.database__)
-session.set(recordset.insert_())
-recordset.set(phone_number='+201011223344')
-session.set(recordset.update_())
-session.commit()
-insertedEmployeesAfterUpdate = (
-	Employees().where(Employees.employee_id.in_([5,6])).select(selected="employee_id, first_name, last_name, phone_number")
-)
-assert insertedEmployeesAfterUpdate.recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse', 'phone_number': '+201011223344'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck', 'phone_number': '+201011223344'}], insertedEmployeesAfterUpdate.recordset.data
-session.set(recordset.delete_(onColumns=["employee_id"]))
-session.commit()
-#================================================================================#
-# 1. Non-Recursive CTE (all databases)
-# WITH sales_summary AS (
-#     SELECT region, SUM(amount) as total
-#     FROM sales
-#     GROUP BY region
-# )
-# SELECT * FROM sales_summary;
-# 5. Multiple CTEs (all databases)
-# WITH 
-#     cte1 AS (SELECT ...),
-#     cte2 AS (SELECT ... FROM cte1)
-# SELECT * FROM cte2;
-
-## PostgreSQL/MySQL/SQLite
-# cte = """
-# WITH RECURSIVE Hierarchy AS (
-#     SELECT /*+ MATERIALIZE */ employee_id, manager_id, first_name FROM Employees WHERE manager_id IS NULL
-#     UNION ALL
-#     SELECT C.employee_id, C.manager_id, C.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
-# )
-# SELECT * FROM Hierarchy
-# """
-
-# cte = """
-# WITH RECURSIVE Hierarchy AS (
-#     -- Anchor 1: top-level managers (no manager)
-#     SELECT employee_id, manager_id, first_name, CAST('ROOT' AS CHAR(20)) as type FROM Employees WHERE manager_id IS NULL
-#     UNION ALL
-#     -- Anchor 2: specific department heads
-#     SELECT employee_id, manager_id, first_name, CAST('DEPT_HEAD' AS CHAR(20)) as type FROM Employees WHERE employee_id IN (108, 114, 120)
-#     UNION ALL
-#     -- Recursive: their subordinates
-#     SELECT C.employee_id, C.manager_id, C.first_name, CAST('SUBORDINATE' AS CHAR(20)) FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
-# )
-# SELECT * FROM Hierarchy
-# """
-
-### Oracle
-# cte = """
-# WITH Hierarchy (employee_id, manager_id, first_name) AS (
-#     SELECT employee_id, manager_id, first_name FROM Employees P WHERE P.manager_id IS NULL
-#     UNION ALL
-#     SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
-# )
-# SELECT * FROM Hierarchy
-# """
-
-### Recursive CTE - MSSQL (no RECURSIVE keyword)
-# cte = """
-# WITH Hierarchy AS (
-#     SELECT employee_id, manager_id, first_name FROM Employees P WHERE P.manager_id IS NULL
-#     UNION ALL
-#     SELECT c.employee_id, c.manager_id, c.first_name FROM Employees C INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
-# )
-# SELECT * FROM hierarchy
-# OPTION (MAXRECURSION 100);
-# """
-
-# ee1 = CTE(p_select.statement, p_select.parameters)
-# ee2 = CTE(c_select.statement, c_select.parameters)
-
 # ================================================================================
 # Recursive depth column
 # Lateral
@@ -508,6 +414,18 @@ dep1 = Dependents()
 dep1.where(Dependents.employee_id == 206).select()
 assert dep1.data == {}
 
+# insert single record
+try:
+	emp = (
+		Employees()
+		.where(Employees.first_name == 'Steve')
+		.value(employee_id=1000, first_name='Ahmed', last_name='ELSamman')
+		.insert()
+	)
+except Exception as e:
+	# will raise and exception because you added where to an insert statement
+	print(e)
+
 Record.database__.rollback()  # Force rollback
 #================================================================================#
 print("------------------------------------04------------------------------------")
@@ -689,6 +607,37 @@ if(Record.database__.name in ["MySQL", "Postgres", "MicrosoftSQL"]):
 	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
 
 Record.database__.rollback()
+#================================================================================#
+print("--------------------------------- Session --------------------------------")
+#================================================================================#
+recordset = Recordset.fromDicts(Employees,
+	[
+		{'employee_id': 5, 'first_name': "Mickey", 'last_name': "Mouse"},
+		{'employee_id': 6, 'first_name': "Donald", 'last_name': "Duck"}
+	]
+)
+
+assert recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck'}], recordset.toDicts()
+
+# Instanitiate a session with a database instance
+session = Session(Record.database__)
+# Set Recordset insert query to current Session
+session.set(recordset.insert_())
+# Update all the Recordset's records with the same phone number
+recordset.set(phone_number='+201011223344')
+# Set Recordset update query to current Session
+session.set(recordset.update_())
+# Commit current session
+session.commit()
+# Select inserted and updated records
+insertedEmployeesAfterUpdate = (
+	Employees().where(Employees.employee_id.in_([5,6])).select(selected="employee_id, first_name, last_name, phone_number")
+)
+assert insertedEmployeesAfterUpdate.recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse', 'phone_number': '+201011223344'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck', 'phone_number': '+201011223344'}], insertedEmployeesAfterUpdate.recordset.data
+# Set Recordset delete query to current Session
+session.set(recordset.delete_(onColumns=["employee_id"]))
+# Commit the session
+session.commit()
 #================================================================================#
 print("---------------------------09 Expression Tests---------------------------")
 #================================================================================#
