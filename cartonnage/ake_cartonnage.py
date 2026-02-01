@@ -558,7 +558,6 @@ class Database:
 			statement = f"{with_cte}SELECT {selected} FROM {record.table__.name} {record.alias.value} {joiners} \nWHERE {where if (where) else '1=1'} \n{group_clause} {order_clause} {limit} {option}"
 		#-----
 		elif(operation==Database.insert):
-			updateSetParameters = record.set__.parameters()
 			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
 			statement = f"{with_cte}INSERT INTO {record.table__.name} {fieldsValuesClause} {option}"
 		#-----
@@ -577,7 +576,7 @@ class Database:
 		record.query__.statement = statement
 		record.query__.parameters = []
 		record.query__.parameters.extend(with_cte_parameters)
-		record.query__.parameters.extend(updateSetParameters) # if update extend with fields set values first
+		record.query__.parameters.extend(record.set__.parameters()) # if update extend with fields set values first
 		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters) #state.parameters must be reset to empty list [] not None for this operation to work correctly
 		record.query__.operation = operation
 		record.query__.many = False # default is False
