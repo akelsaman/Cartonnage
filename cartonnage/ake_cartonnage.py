@@ -472,10 +472,10 @@ class Database:
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			print(f"<s|{'-'*3}")
-			print(" > Execute statement: ", query.statement)
-			print(" > Execute parameters: ", query.parameters)
-			print(f"{'-'*3}|e>")
+			# print(f"<s|{'-'*3}")
+			# print(" > Execute statement: ", query.statement)
+			# print(" > Execute parameters: ", query.parameters)
+			# print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -512,10 +512,10 @@ class Database:
 			return query
 	#--------------------------------------#
 	def executeMany(self, query):
-		print(f"<s|{'-'*3}")
-		print(" > Execute statement: ", query.statement)
-		print(" > Execute parameters: ", query.parameters)
-		print(f"{'-'*3}|e>")
+		# print(f"<s|{'-'*3}")
+		# print(" > Execute statement: ", query.statement)
+		# print(" > Execute parameters: ", query.parameters)
+		# print(f"{'-'*3}|e>")
 		rowcount = 0
 		if not hasattr(query.parent, 'recordset') or not isinstance(query.parent.recordset, Recordset):
 			query.parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.

@@ -9,11 +9,11 @@ import time
 start = time.time()
 #================================================================================#
 from ake_connections import *
-# initSQLite3Env()
+initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
-initAzureSQLEnv()
+# initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
 # initSQLite3PoolEnv()
@@ -59,31 +59,6 @@ employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
 # Recursive depth column
 # Lateral
 # Transaction savepoints	SAVEPOINT/ROLLBACK TO support	Low
-
-# Multiple tables
-(
-	Employees()
-	.from_(Departments)
-	.where(
-		(Employees.employee_id==100) &
-		(Employees.department_id==Departments.department_id)
-	)
-	.select(selected="Employees.*, Departments.department_name")
-)
-# → SELECT ... FROM Employees Employees, Departments Departments WHERE ...
-
-# With subquery
-class EmployeesGt1000(Employees): pass
-sub = Employees().where(Employees.salary > 1000).select_().alias('EmployeesGt1000')
-(
-	Employees().from_(sub)
-	.where(Employees.employee_id == EmployeesGt1000.employee_id)
-	.select(selected="Employees.*, EmployeesGt1000.salary")
-)
-# → SELECT ... FROM Employees Employees, (SELECT * FROM Employees WHERE salary > 1000) AS high_paid WHERE ...
-
-# Raw strings # not implemented
-# Employees().from_("Employees e", "Departments d").select()
 #================================================================================#
 print("------------------------------------00------------------------------------")
 #================================================================================#
@@ -586,7 +561,7 @@ assert employees.recordset.data == [
 	{'manager_id': 108, 'count': 5}, {'manager_id': 114, 'count': 5}
 ], employees.recordset.data
 #================================================================================#
-print("------------------------------------08------------------------------------")
+print("----------------------------------upsert----------------------------------")
 #================================================================================#
 emp = Employees().where(Employees.first_name.in_(['Steven', 'Neena']))
 
@@ -614,8 +589,8 @@ if(Record.database__.name in ["Oracle", "MicrosoftSQL"]):
 	)
 
 rs.upsert(onColumns='employee_id')
-print(emp1.query__.statement)
-print(emp1.query__.parameters)
+# print(emp1.query__.statement)
+# print(emp1.query__.parameters)
 
 emp = Employees().where(Employees.employee_id.in_([100,101])).select()
 
@@ -666,7 +641,34 @@ session.set(recordset.insert_())
 session.rollbackTo('sp1')
 session.releaseSavepoint('sp1')
 #================================================================================#
-print("---------------------------09 Expression Tests---------------------------")
+print("-----------------------------------From-----------------------------------")
+#================================================================================#
+# From multiple tables
+(
+	Employees()
+	.from_(Departments)
+	.where(
+		(Employees.employee_id==100) &
+		(Employees.department_id==Departments.department_id)
+	)
+	.select(selected="Employees.*, Departments.department_name")
+)
+# → SELECT ... FROM Employees Employees, Departments Departments WHERE ...
+
+# From multiples tables and subqueries
+class EmployeesGt1000(Employees): pass
+sub = Employees().where(Employees.salary > 1000).select_().alias('EmployeesGt1000')
+(
+	Employees().from_(sub)
+	.where(Employees.employee_id == EmployeesGt1000.employee_id)
+	.select(selected="Employees.*, EmployeesGt1000.salary")
+)
+# → SELECT ... FROM Employees Employees, (SELECT * FROM Employees WHERE salary > 1000) AS high_paid WHERE ...
+
+# Raw strings # not implemented
+# Employees().from_("Employees e", "Departments d").select()
+#================================================================================#
+print("-------------------------------Expressions-------------------------------")
 #================================================================================#
 emp = (
 	Employees()
@@ -760,7 +762,7 @@ else:# ['SQLite3', 'MySQL']
 	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True)
 
 sql_query = f"{with_cte.value} SELECT * FROM Hierarchy" # build on top of generated WITH CTE
-print(sql_query)
+# print(sql_query)
 
 print("Raw SQL:")
 # Run SELECT WITH CTE as raw/plain SQL
@@ -785,9 +787,9 @@ if(Record.database__.name not in ['Oracle']):
 	else:
 		assert emp.rowsCount() == 2, emp.rowsCount()
 
-	print(f"{'-'*80}")
-	print(emp.query__.statement)
-	print(emp.query__.parameters)
+	# print(f"{'-'*80}")
+	# print(emp.query__.statement)
+	# print(emp.query__.parameters)
 
 emp = (
 	Employees()
@@ -805,9 +807,9 @@ else:
 for r in emp:
 	print(r.data)
 
-print(f"{'-'*80}")
-print(emp.query__.statement)
-print(emp.query__.parameters)
+# print(f"{'-'*80}")
+# print(emp.query__.statement)
+# print(emp.query__.parameters)
 
 if(Record.database__.name not in ['Oracle']):
 	emp = (
@@ -823,9 +825,9 @@ if(Record.database__.name not in ['Oracle']):
 	else:
 		assert emp.rowsCount() == 2, emp.rowsCount()
 
-	print(f"{'-'*80}")
-	print(emp.query__.statement)
-	print(emp.query__.parameters)
+	# print(f"{'-'*80}")
+	# print(emp.query__.statement)
+	# print(emp.query__.parameters)
 
 # print("After delete - checking if in transaction:")
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
