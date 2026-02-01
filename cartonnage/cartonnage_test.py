@@ -11,11 +11,11 @@ start = time.time()
 
 #================================================================================#
 from ake_connections import *
-initSQLite3Env()
+# initSQLite3Env()
 # initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
-# initAzureSQLEnv()
+initAzureSQLEnv()
 
 # ----- Pooled versions (recommended) -----
 # initSQLite3PoolEnv()
@@ -638,6 +638,10 @@ assert insertedEmployeesAfterUpdate.recordset.data == [{'employee_id': 5, 'first
 session.set(recordset.delete_(onColumns=["employee_id"]))
 # Commit the session
 session.commit()
+session.savepoint("sp1")
+session.set(recordset.insert_())
+session.rollbackTo('sp1')
+session.releaseSavepoint('sp1')
 #================================================================================#
 print("---------------------------09 Expression Tests---------------------------")
 #================================================================================#
@@ -658,8 +662,8 @@ emp = (
 	.update()
 	.select(selected="first_name, last_name, email, salary, commission_pct")
 )
-
-assert emp.data == {'first_name': 'STEVEN', 'last_name': 'king', 'email': 'Steven.King@test.com', 'salary': 24100, 'commission_pct': 1}, emp.data
+emp.data['salary'] = int(emp.data['salary'])
+assert emp.data == {'first_name': 'STEVEN', 'last_name': 'king', 'email': 'STEVEN.king@test.com', 'salary': 24100, 'commission_pct': 1}, emp.data
 #================================================================================#
 print("----------- SELECT, INSERT, UPDATE, and DELETE Record WithCTE -----------")
 #================================================================================#

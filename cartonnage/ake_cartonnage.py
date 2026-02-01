@@ -449,6 +449,10 @@ class Database:
 	def commit(self): self.__connection.commit()
 	def rollback(self): self.__connection.rollback()
 	def close(self): self.__connection.close()
+	# Savepoint - works for SQLite3, PostgreSQL, MySQL
+	def savepoint(self, name): self.__cursor.execute(f"SAVEPOINT {name}")
+	def releaseSavepoint(self, name): self.__cursor.execute(f"RELEASE SAVEPOINT {name}")
+	def rollbackTo(self, name): self.__cursor.execute(f"ROLLBACK TO SAVEPOINT {name}")
 	#--------------------------------------#
 	def operationsCountReset(self):
 		operationsCount = self.operationsCount
@@ -826,6 +830,10 @@ class Oracle(Database):
 			params = r.set__.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
+
+	# Oracle savepoint - no RELEASE, ROLLBACK TO without SAVEPOINT keyword
+	def releaseSavepoint(self, name): pass  # Not supported in Oracle
+	def rollbackTo(self, name): self._Database__cursor.execute(f"ROLLBACK TO {name}")
 #================================================================================#
 class MySQL(Database):
 	def __init__(self, connection):
@@ -1017,6 +1025,11 @@ class MicrosoftSQL(Database):
 			params = r.set__.parameters() + record.filter_.parameters
 			record.query__.parameters.append(tuple(params))
 		return record.query__
+
+	# MSSQL savepoint - uses SAVE TRANSACTION / ROLLBACK TRANSACTION
+	def savepoint(self, name): self._Database__cursor.execute(f"SAVE TRANSACTION {name}")
+	def releaseSavepoint(self, name): pass  # Not supported in MSSQL
+	def rollbackTo(self, name): self._Database__cursor.execute(f"ROLLBACK TRANSACTION {name}")
 #================================================================================#
 class RecordMeta(type):
 	def __new__(mcs, name, bases, namespace):
@@ -1349,4 +1362,21 @@ class Session:
 		"""Rollback and clear pending"""
 		self.database.rollback()
 		self._pending = []
+
+	def savepoint(self, name):
+		"""Flush pending and create savepoint"""
+		self.flush()
+		self.database.savepoint(name)
+		return self
+
+	def releaseSavepoint(self, name):
+		"""Release savepoint"""
+		self.database.releaseSavepoint(name)
+		return self
+
+	def rollbackTo(self, name):
+		"""Rollback to savepoint and clear pending"""
+		self.database.rollbackTo(name)
+		self._pending = []
+		return self
 #================================================================================#
