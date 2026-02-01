@@ -8,9 +8,17 @@ from datetime import date
 import time
 start = time.time()
 #================================================================================#
+# Cartonnage has been tested on the following database versions:
+# 
+# SQLite3 version 3.51.0
+# Oracle 19c, 23ai, and 26ai
+# MySQL 8.0.35
+# PostgreSQL 17.7
+# MicrosoftAzureSQL NA
+#================================================================================#
 from ake_connections import *
-initSQLite3Env()
-# initOracleEnv()
+# initSQLite3Env()
+initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
 # initAzureSQLEnv()
@@ -55,10 +63,14 @@ class S(Record): pass # used for upsert
 class T(Record): pass # used for upsert
 
 employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
+
+# r = Record(statement=""" 
+# 	SELECT @@VERSION
+# """, operation=Database.read)
+# print(r.data)
 # ================================================================================
 # Recursive depth column
 # Lateral
-# Transaction savepoints	SAVEPOINT/ROLLBACK TO support	Low
 #================================================================================#
 print("------------------------------------00------------------------------------")
 #================================================================================#
