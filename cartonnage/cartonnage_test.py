@@ -1,6 +1,7 @@
 #!/usr/bin/python3
-# from cartonnage import *
-from ake_cartonnage import *
+
+# from ake_cartonnage import *
+from cartonnage import * # installed by pip install cartonnage
 
 from decimal import Decimal
 from datetime import date

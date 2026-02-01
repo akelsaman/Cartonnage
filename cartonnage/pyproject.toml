@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cartonnage"
-version = "0.1.2"
+version = "0.1.4"
 description = "A lightweight Python ORM supporting SQLite, MySQL, PostgreSQL, Oracle, and Microsoft SQL Server"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
