@@ -18,8 +18,8 @@ start = time.time()
 # MicrosoftAzureSQL NA
 #================================================================================#
 from ake_connections import *
-# initSQLite3Env()
-initOracleEnv()
+initSQLite3Env()
+# initOracleEnv()
 # initMySQLEnv()
 # initPostgresEnv()
 # initAzureSQLEnv()
