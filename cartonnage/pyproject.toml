@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cartonnage"
-version = "0.1.5"
+version = "0.1.6"
 description = "Cartonnage ORM is a Python ORM that achieves an outstanding balance between simplicity and power, supporting SQLite, MySQL, PostgreSQL, Oracle, and Microsoft SQL Server"
 readme = "README.md"
-license = "AGPL-3.0-or-later"
+license = "MIT"
 requires-python = ">=3.8"
 authors = [
     { name = "Ahmed Kamal ELSamman", email = "ak.elsaman@gmail.com" }

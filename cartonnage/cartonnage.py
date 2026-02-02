@@ -1,0 +1,1401 @@
+#!/usr/bin/python3
+
+#version: 202601310217
+#================================================================================#
+from datetime import datetime
+#================================================================================#
+NoneType = type(None)
+#================================================================================#
+class Field:
+	def __init__(self, cls, name, value):
+		self.cls = cls
+		self.name = name
+		self.value = value
+		self.placeholder = cls.database__.placeholder()
+
+	def _field_name(self):
+		return f"{self.cls.__name__}.{self.name}"
+
+	def _resolve_value(self, value):
+		"""Returns (sql_value, parameters)"""
+		if type(value) == Field:
+			return (f"{value.cls.__name__}.{value.name}", [])
+		elif isinstance(value, Expression):
+			return (value.value, value.parameters)
+		else:
+			return (self.placeholder, [value])
+
+	def __eq__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} = {sql_val}", params)
+	def __ne__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} <> {sql_val}", params)
+	def __gt__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} > {sql_val}", params)
+	def __ge__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} >= {sql_val}", params)
+	def __lt__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} < {sql_val}", params)
+	def __le__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} <= {sql_val}", params)
+	def __add__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} + {sql_val}", params)
+	def __sub__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} - {sql_val}", params)
+	def __mul__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} * {sql_val}", params)
+	def __truediv__(self, value):
+		sql_val, params = self._resolve_value(value)
+		return Expression(f"{self._field_name()} / {sql_val}", params)
+
+	# SQL-specific methods
+	def is_null(self):
+		return Expression(f"{self._field_name()} IS NULL", [])
+	def is_not_null(self):
+		return Expression(f"{self._field_name()} IS NOT NULL", [])
+	def like(self, pattern):
+		return Expression(f"{self._field_name()} LIKE {self.placeholder}", [pattern])
+	def in_(self, values):
+		placeholders = ', '.join([self.placeholder] * len(values))
+		return Expression(f"{self._field_name()} IN ({placeholders})", list(values))
+	def not_in(self, values):
+		placeholders = ', '.join([self.placeholder] * len(values))
+		return Expression(f"{self._field_name()} NOT IN ({placeholders})", list(values))
+	def between(self, low, high):
+		return Expression(f"{self._field_name()} BETWEEN {self.placeholder} AND {self.placeholder}", [low, high])
+
+	# Subquery methods - take a Record instance and generate SQL
+	def in_subquery(self, record, selected="*"):
+		"""field IN (SELECT ... FROM ...)"""
+		query = Database.crud(operation=Database.select, record=record, selected=selected, group_by='', limit='')
+		return Expression(f"{self._field_name()} IN (\n{query.statement}\n)", query.parameters)
+
+	def not_in_subquery(self, record, selected="*"):
+		"""field NOT IN (SELECT ... FROM ...)"""
+		query = Database.crud(operation=Database.select, record=record, selected=selected, group_by='', limit='')
+		return Expression(f"{self._field_name()} NOT IN (\n{query.statement}\n)", query.parameters)
+
+	@staticmethod
+	def exists(record, selected="1"):
+		"""EXISTS (SELECT ... FROM ... WHERE ...)"""
+		query = Database.crud(operation=Database.select, record=record, selected=selected, group_by='', limit='')
+		return Expression(f"EXISTS (\n{query.statement}\n)", query.parameters)
+
+	@staticmethod
+	def not_exists(record, selected="1"):
+		"""NOT EXISTS (SELECT ... FROM ... WHERE ...)"""
+		query = Database.crud(operation=Database.select, record=record, selected=selected, group_by='', limit='')
+		return Expression(f"NOT EXISTS (\n{query.statement}\n)", query.parameters)
+#================================================================================#
+class TableName:
+	def __init__(self, name): self.name = name
+class Alias:
+	def __init__(self, value): self.value = value
+#--------------------------------------#
+class Expression():
+	def __init__(self, value, parameters=None):
+		self.value = value
+		self.parameters = parameters if parameters is not None else []
+	def fltr(self, field, placeholder): return self.value
+	def __str__(self): return self.value
+	def __repr__(self): return self.value
+	def __and__(self, other): return Expression(f"({self.value} AND {other.value})", self.parameters + other.parameters)
+	def __or__(self, other): return Expression(f"({self.value} OR {other.value})", self.parameters + other.parameters)
+#--------------------------------------#
+class CTE():
+	def __init__(self, statement=None, alias='', materialization=None):
+		self.value = ''
+		self.parameters = []
+		self.alias = alias
+		self.as_keyword = ' AS '
+		self.columnsAliases = ''
+		# self.parameters = parameters if parameters is not None else []
+		if(statement):
+			self.value = statement.statement
+			self.parameters = statement.parameters
+			self.alias = statement.parent.alias.value
+		self.materialization(materialization)
+			# self.alias = record.alias.value
+	def __str__(self): return self.value
+	def __repr__(self): return self.value
+	def materialization(self, mode):
+		if(mode):
+			self.as_keyword = ' AS MATERIALIZED '
+		elif(mode == False):
+			self.as_keyword = ' AS NOT MATERIALIZED '
+	# ALIAS AS (SELECT ...
+	def sql_endless(self): return f"{self.alias}{f' ({self.columnsAliases})' if self.columnsAliases else ''}{self.as_keyword}({self.value}"
+	# ALIAS AS (SELECT ...)
+	def sql(self): return f"{self.sql_endless()})"
+	def __add__(self, other):
+		cte = CTE()
+		# cte.as_keyword = self.as_keyword
+		cte.alias = self.alias
+		cte.value = f"{self.value} UNION ALL\n {other.value}"
+		cte.parameters.extend(self.parameters)
+		cte.parameters.extend(other.parameters)
+		return cte
+	def __xor__(self, other):
+		cte = CTE()
+		# cte.as_keyword = self.as_keyword
+		cte.alias = self.alias
+		cte.value = f"{self.value} UNION\n {other.value}"
+		cte.parameters.extend(self.parameters)
+		cte.parameters.extend(other.parameters)
+		return cte
+	def __rshift__(self, other):
+		cte = CTE()
+		cte.as_keyword = self.as_keyword
+		cte.alias = self.alias
+		# SELECT ..., 
+		cte.value = f"{self.value}) ,\n {other.sql_endless()}" #{other.alias}{self.as_keyword}({other.value}
+		cte.parameters.extend(self.parameters)
+		cte.parameters.extend(other.parameters)
+		return cte
+# #--------------------------------------#
+class WithCTE():
+	def __init__(self, cte, recursive=None, options=''):
+		self.with_keyword = "WITH"
+		if(recursive):
+			self.with_keyword = "WITH RECURSIVE"
+		self.value = f"{self.with_keyword} \n {cte.sql()} {options} \n"
+		self.parameters = cte.parameters
+	def __str__(self): return self.value
+	def __repr__(self): return self.value
+# #--------------------------------------#
+class Join():
+	def __init__(self, object, fields, type=' INNER JOIN ', value=None):
+		self.type = type
+		self.object = object
+		self.predicates = fields
+		self.__value = value
+#================================================================================#
+class Result:
+	def __init__(self, columns=None, rows=None, count=0):
+		self.columns	= columns
+		self.rows		= rows
+		self.count		= count
+#================================================================================#
+class Query:
+	def __init__(self):
+		self.parent = None
+		self.statement	= None
+		self.result		= Result()
+		self.parameters	= [] #to prevent #ValueError: parameters are of unsupported type in line #self.__cursor.execute(query.statement, tuple(query.parameters))
+		self.operation	= None
+		self.many = False
+	def alias(self, alias):
+		self.alias__ = alias
+		return self
+#================================================================================#
+class Set:
+	def __init__(self, parent):
+		self.__dict__['parent'] = parent
+		self.empty()
+
+	def empty(self):
+		self.__dict__['new'] = {}
+
+	def setFields(self):
+		statement = ''
+		for field in self.new.keys():
+			# some databases reject tablename. or alias. before field in set clause as they are don't implement join update
+			# statement += f"{self.parent.alias.value}.{field}={self.parent.database__.placeholder()}, "
+			value = self.new[field]
+			if isinstance(value, Expression):
+				statement += f"{field}={value.value}, " # Expression directly # value.value = Expression.value
+			else:
+				statement += f"{field}={self.parent.database__.placeholder()}, "
+		return statement[:-2]
+	
+	def parameters(self, fieldsNames=None):
+		fields = fieldsNames if(fieldsNames) else list(self.new.keys())
+		parameters = []
+		for field in fields:
+			value = self.new[field]
+			if isinstance(value, Expression):  # Skip expressions
+				parameters.extend(value.parameters) # value.parameters = Expression.parameters
+			else:
+				parameters.append(value) #	if type(value) != Expression:
+		return parameters
+
+	# def __setattr__(self, name, value):
+	# 	self.setFieldValue(name, value)
+
+	def setFieldValue(self, name, value):
+		# if(name=="custom"): self.__dict__["custom"] = value
+		if(type(value) in [NoneType, str, int, float, datetime, bool] or isinstance(value, Expression)):
+			self.__dict__["new"][name] = value
+		else:
+			object.__setattr__(self, name, value)
+#================================================================================#
+class Values:
+	# Usage of Values:
+	#	1. insert FIELDS NAMES and VALUES
+	#	2. Where exact values
+	#--------------------------------------#
+	@staticmethod
+	def fields(record):
+		fields = []
+		# for field in record.__dict__: 
+		# 	value = record.__dict__[field]
+		for field in record.data: 
+			value = record.data[field]
+			if(type(value) in [str, int, float, datetime, bool]):
+				fields.append(field)
+		return fields
+	#--------------------------------------#
+	@staticmethod
+	def where__(record, fieldsNames=None):
+		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, datetime, bool] values.
+		statement = ''
+		# fields = Values.fields(record)
+		fields = fieldsNames if (fieldsNames) else Values.fields(record)
+		for field in fields:
+			value = record.getField(field)
+			placeholder = record.database__.placeholder()
+			statement += f"{record.alias.value}.{field} = {placeholder} AND "
+		return statement[:-5]
+	#--------------------------------------#
+	@staticmethod
+	def parameters(record, fieldsNames=None):
+		#getStatement always used to collect exact values not filters so no "NOT NULL", "LIKE", ... but only [str, int, float, datetime, bool] values.
+		fields = fieldsNames if (fieldsNames) else Values.fields(record)
+		return list(map(record.getField, fields))
+	#--------------------------------------#
+#================================================================================#
+class Filter:
+	def __init__(self, parent):
+		self.__dict__['parent'] = parent
+		self.empty()
+
+	def empty(self):
+		self.__where = ''
+		self.parameters = []
+
+	def fltr(self, field, placeholder): return self.where__()
+	def combine(self, filter1, filter2, operator):
+		w1 = filter1.where__()
+		w2 = filter2.where__()
+		if(w1 and w2):
+			self.__where = f"(({w1}) {operator} ({w2})) AND "
+			self.parameters.extend(filter1.parameters)
+			self.parameters.extend(filter2.parameters)
+		elif(w1):
+			self.__where = f"({w1}) AND "
+			self.parameters.extend(filter1.parameters)
+		elif(w2):
+			self.__where = f"({w2}) AND "
+			self.parameters.extend(filter2.parameters)
+
+	def __or__(self, filter2):
+		filter = Filter(self.parent)
+		filter.combine(self, filter2, "OR")
+		return filter
+	def __and__(self, filter2):
+		filter = Filter(self.parent)
+		filter.combine(self, filter2, "AND")
+		return filter
+	
+	def where(self, *args, **kwargs):
+		for exp in args:
+			self.addCondition('_', exp)
+		for field, value in kwargs.items():
+			self.addCondition(field, value)
+		return self.parent
+		
+	def addCondition(self, field, value):
+		placeholder = self.parent.database__.placeholder()
+		field = f"{self.parent.alias.value}.{field}"
+		if(type(value) in [str, int, float, datetime, bool]):
+			self.__where += f"{field} = {placeholder} AND "
+			self.parameters.append(value)
+		else:
+			self.__where += f"{value.fltr(field, placeholder)} AND "
+			self.parameters.extend(value.parameters)
+
+	#'record' parameter to follow the same signature/interface of 'Values.where' function design pattern
+	#Both are used interchangeably in 'Database.__crud' function
+	def where__(self, record=None): return self.__where[:-5]
+
+	#This 'Filter.parameters' function follow the same signature/interface of 'Values.parameters' function design pattern
+	#Both are used interchangeably in 'Database.__crud' function
+	def parameters(self, record=None):
+		return self.__parameters
+	#--------------------------------------#
+	def in_subquery(self, selected="*", **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None).in_subquery(value, selected=selected))
+		return self.parent
+	def exists(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field.exists(value))
+		return self.parent
+	def not_exists(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field.not_exists(value))
+		return self.parent
+	def in_(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None).in_(value))
+		return self.parent
+	def not_in(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None).not_in(value))
+		return self.parent
+	def like(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None).like(value))
+		return self.parent
+	def is_null(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None).is_null())
+		return self.parent
+	def is_not_null(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None).is_not_null())
+		return self.parent
+	def between(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None).between(value[0], value[1]))
+		return self.parent
+	def gt(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None) > value)
+		return self.parent
+	def ge(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None) >= value)
+		return self.parent
+	def lt(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None) < value)
+		return self.parent
+	def le(self, **kwargs):
+		for field, value in kwargs.items():
+			self.where(Field(self.parent.__class__, field, None) <= value)
+		return self.parent
+	#--------------------------------------#
+#================================================================================#
+# fieldValue = fieldValue.decode('utf-8') # mysql python connector returns bytearray instead of string
+class ObjectRelationalMapper:
+	def __init__(self): pass
+	#--------------------------------------#
+	def map(self, passedObject):
+		query = passedObject.query__
+		rows = query.result.rows
+		columns = query.result.columns
+		passedObject.recordset.data.extend(rows)
+		if(passedObject.recordset.count()):
+			object = passedObject.__class__() #object = Record() #bug
+		else:
+			object = passedObject
+		for row in rows:
+			object.data = row
+			object.columns = columns
+			# passedObject.recordset.add(object)
+			passedObject.recordset.records.append(object) # don't use .add() it will add again the .data while it extended above
+			object = passedObject.__class__() #object = Record() #bug
+#================================================================================#
+class DummyObjectRelationalMapper:
+	def __init__(self): pass
+	#--------------------------------------#
+	def map(self, passedObject):
+		pass
+#================================================================================#
+class Database:
+	# ------
+	orm	= ObjectRelationalMapper()
+	# ------
+	values = Values
+	# ------
+	all				= 0
+	insert			= 1
+	read			= 2
+	update			= 4
+	delete			= 5
+	upsert			= 6
+	#--------------------------------------#
+	def __init__(self, database=None, username=None, password=None, host=None):
+		self.__database		= database
+		self.__username		= username
+		self.__password		= password
+		self.__host			= host
+		self.__connection	= None
+		self.__cursor		= None
+		self.__placeholder	= '?'
+		self.__escapeChar	= '`'
+		self.operationsCount = 0
+		self.batchSize = 10000
+		# self.connect()
+	#--------------------------------------#
+	def placeholder(self): return self.__placeholder
+	def escapeChar(self): return self.__escapeChar
+	#--------------------------------------#
+	def connectionParameters(self):
+		if(self.__database):
+			if(self.__username):
+				if(self.__password):
+					if(self.__host): return 4
+					else: return 3
+			else: return 1
+	#--------------------------------------#
+	def cursor(self): self.__cursor	= self.__connection.cursor()
+	def commit(self): self.__connection.commit()
+	def rollback(self): self.__connection.rollback()
+	def close(self): self.__connection.close()
+	# Savepoint - works for SQLite3, PostgreSQL, MySQL
+	def savepoint(self, name): self.__cursor.execute(f"SAVEPOINT {name}")
+	def releaseSavepoint(self, name): self.__cursor.execute(f"RELEASE SAVEPOINT {name}")
+	def rollbackTo(self, name): self.__cursor.execute(f"ROLLBACK TO SAVEPOINT {name}")
+	#--------------------------------------#
+	def operationsCountReset(self):
+		operationsCount = self.operationsCount
+		self.operationsCount = 0
+		return operationsCount
+	#--------------------------------------#
+	def joining(record):
+		quoteChar = '' #cls.escapeChar()
+		joinClause = ''
+		for key, join in record.joins__.items():
+			#" INNER JOIN Persons pp ON "
+			joinClause += f"{join.type}{join.object.table__.name} {join.object.alias.value} ON {join.predicates.value}"
+		return joinClause
+	#--------------------------------------#
+	def executeStatement(self, query):
+		if(query.statement):
+			# print(f"<s|{'-'*3}")
+			# print(" > Execute statement: ", query.statement)
+			# print(" > Execute parameters: ", query.parameters)
+			# print(f"{'-'*3}|e>")
+			#
+			self.__cursor.execute(query.statement, tuple(query.parameters))
+			self.operationsCount +=1
+			#
+			count=0
+			columns = []
+
+			parent = query.parent
+			parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
+
+			if(query.operation in [Database.all, Database.select]):
+				# for index, column in enumerate(self.__cursor.description): columns.append(column[0].lower())
+				columns = [column[0].lower() for column in self.__cursor.description] #lower() to low column names
+				query.result.columns = columns
+				
+				while True:
+					fetchedRows = [dict(zip(columns, row)) for row in self.__cursor.fetchmany(self.batchSize)]
+					query.result.rows = fetchedRows
+					count += len(fetchedRows)
+					self.orm.map(parent)
+					if not fetchedRows:
+						break
+			else:
+				count = self.__cursor.rowcount
+				
+			#rowcount is readonly attribute and it contains the count/number of the inserted/updated/deleted records/rows.
+			#rowcount is -1 in case of rows/records select.
+
+			if hasattr(self.__cursor, 'lastrowid'): lastrowid = self.__cursor.lastrowid #MySQL has last row id
+			#cursor.description returns a tuple of information describes each column in the table.
+			#(name, type_code, display_size, internal_size, precision, scale, null_ok)
+			rows = []
+			query.result = Result(columns, rows, count)
+			return query
+	#--------------------------------------#
+	def executeMany(self, query):
+		# print(f"<s|{'-'*3}")
+		# print(" > Execute statement: ", query.statement)
+		# print(" > Execute parameters: ", query.parameters)
+		# print(f"{'-'*3}|e>")
+		rowcount = 0
+		if not hasattr(query.parent, 'recordset') or not isinstance(query.parent.recordset, Recordset):
+			query.parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
+		if(query.statement):
+			self.__cursor.executemany(query.statement, query.parameters)
+			self.operationsCount +=1
+			rowcount = self.__cursor.rowcount
+			query.parent.recordset.affectedRowsCount = rowcount
+		return rowcount
+	#--------------------------------------#
+	def executeScript(self, sqlScriptFileName):
+		sqlScriptFile = open(sqlScriptFileName,'r')
+		sql = sqlScriptFile.select()
+		return self.__cursor.executescript(sql)
+	#--------------------------------------#
+	@staticmethod
+	def crud(operation, record, selected="*", group_by='', order_by='', limit='', option=''):
+		with_cte = ''
+		with_cte_parameters = []
+		if(record.__dict__.get('with_cte__')):
+			with_cte = f"{record.with_cte__.value} "
+			with_cte_parameters = record.with_cte__.parameters
+
+		whereValues = record.values.where__(record)
+		whereFilter = record.filter_.where__(record)
+		if whereValues and whereFilter:
+			where = f"{whereValues} AND {whereFilter}"
+		elif whereValues:
+			where = whereValues
+		else:
+			where = whereFilter
+
+		fromClause = f'{record.table__.name} {record.alias.value}, '
+		fromParameters = []
+		if(record.from__):
+			for tbl in record.from__:
+				if(isinstance(tbl, Query)):
+					fromClause += f"({tbl.statement}) {tbl.alias__}, "
+					fromParameters.extend(tbl.parameters)
+				else:
+					fromClause += f"{tbl.table__.name} {tbl.alias.value}, "
+		fromClause = fromClause[:-2]
+
+		joiners = Database.joining(record)
+		#----- #ordered by occurance propability for single record
+		if(operation==Database.select):
+			group_clause = f"GROUP BY {group_by}" if group_by else ''
+			order_clause = f"ORDER BY {order_by}" if order_by else ''
+			statement = f"{with_cte}SELECT {selected} FROM {fromClause} {joiners} \nWHERE {where if (where) else '1=1'} \n{group_clause} {order_clause} {limit} {option}"
+		#-----
+		elif(operation==Database.insert):
+			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
+			statement = f"{with_cte}INSERT INTO {record.table__.name} {fieldsValuesClause} {option}"
+		#-----
+		elif(operation==Database.update):
+			setFields = record.set__.setFields()
+			statement = f"{with_cte}UPDATE {record.table__.name} SET {setFields} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+		#-----
+		elif(operation==Database.delete):
+			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+		#-----
+		elif(operation==Database.all):
+			statement = f"{with_cte}SELECT * FROM {record.table__.name} {record.alias.value} {joiners} {option}"
+		#-----
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = statement
+		record.query__.parameters = []
+		record.query__.parameters.extend(with_cte_parameters)
+		record.query__.parameters.extend(fromParameters)
+		record.query__.parameters.extend(record.set__.parameters()) # if update extend with fields set values first
+		record.query__.parameters.extend(record.values.parameters(record) + record.filter_.parameters) #state.parameters must be reset to empty list [] not None for this operation to work correctly
+		record.query__.operation = operation
+		record.query__.many = False # default is False
+		return record.query__
+	#--------------------------------------#
+	@staticmethod
+	def crudMany(operation, record, selected="*", onColumns=None, group_by='', limit='', option=''):
+		with_cte = ''
+		with_cte_parameters = []
+		if(record.__dict__.get('with_cte__')):
+			with_cte = f"{record.with_cte__.value} "
+			with_cte_parameters = record.with_cte__.parameters
+
+		joiners = Database.joining(record)
+		#
+		fieldsNames = onColumns if onColumns else list(record.values.fields(record))
+		whereValues = record.values.where__(record, fieldsNames)
+		whereFilter = record.filter_.where__(record)
+		if whereValues and whereFilter:
+			where = f"{whereValues} AND {whereFilter}"
+		elif whereValues:
+			where = whereValues
+		else:
+			where = whereFilter
+		#----- #ordered by occurance propability for single record
+		if(operation==Database.insert):
+			fieldsValuesClause = f"({', '.join(record.values.fields(record))}) VALUES ({', '.join([record.database__.placeholder() for i in range(0, len(record.values.fields(record)))])})"
+			statement = f"{with_cte}INSERT INTO {record.table__.name} {fieldsValuesClause} {option}"
+		#-----
+		elif(operation==Database.update):
+			setFields = record.set__.setFields()
+			statement = f"{with_cte}UPDATE {record.table__.name} SET {setFields} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "update all" by mistake if user forget to set filters
+		#-----
+		elif(operation==Database.delete):
+			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
+		#-----
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = statement
+		filterParamters = record.filter_.parameters
+		for r in record.recordset.iterate():
+			#no problem with r.set__.parameters() as it's emptied after sucessful update
+			params = []
+			params.extend(with_cte_parameters)
+			params.extend(r.set__.parameters())
+			params.extend(r.values.parameters(r, fieldsNames=fieldsNames))
+			params.extend(filterParamters)
+			record.query__.parameters.append(tuple(params))
+		record.query__.operation = operation
+		record.query__.many = True
+		return record.query__
+	#--------------------------------------#
+	def select_(self, record, selected="*", group_by='', order_by='', limit='', option=''):
+		return self.crud(operation=Database.select, record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def insert_(self, operation, record, option=''): return self.crud(operation=operation, record=record, option=option)
+	def delete_(self, operation, record, option=''): return self.crud(operation=operation, record=record, option=option)
+	def update_(self, operation, record, option=''):
+		query = self.crud(operation=operation, record=record, option=option)
+		for field, value in record.set__.new.items():
+			record.setField(field, value)
+		record.set__.empty()
+		return query
+	def upsert_(self, operation, record, option=''):
+		query = self._upsert(operation=Database.upsert, record=record, onColumns=onColumns, option=option)
+		for field, value in record.set__.new.items():
+			record.setField(field, value)
+		record.set__.empty()
+		return query
+	#--------------------------------------#
+	def all(self, record, option=''): self.executeStatement(self.crud(operation=Database.all, record=record, option=option))
+	def select(self, record, selected="*", group_by='', order_by='', limit='', option=''): self.executeStatement(self.select_(record=record, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option))
+	def insert(self, record, option=''): self.executeStatement(self.crud(operation=Database.insert, record=record, option=option))
+	def delete(self, record, option=''): self.executeStatement(self.crud(operation=Database.delete, record=record, option=option))
+	def update(self, record, option=''):
+		self.executeStatement(self.crud(operation=Database.update, record=record, option=option))
+		for field, value in record.set__.new.items():
+			record.setField(field, value)
+		record.set__.empty()
+	def upsert(self, record, onColumns, option=''):
+		self.executeStatement(self._upsert(operation=Database.upsert, record=record, onColumns=onColumns, option=option))
+		for field, value in record.set__.new.items():
+			record.setField(field, value)
+		record.set__.empty()
+	#--------------------------------------#
+	def insertMany_(self, operation, record, onColumns=None, option=''): return self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
+	def deleteMany_(self, operation, record, onColumns=None, option=''): return self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
+	def updateMany_(self, operation, record, onColumns=None, option=''):
+		query = self.crudMany(operation=operation, record=record, onColumns=onColumns, option=option)
+		for r in record.recordset.iterate():
+			for field, value in r.set__.new.items():
+				r.setField(field, value)
+			r.set__.empty()
+		return query
+	def upsertMany_(self, record, onColumns, option=''):
+		query = self._upsertMany(operation=Database.upsert, record=record, onColumns=onColumns, option=option)
+		for r in record.recordset.iterate():
+			for field, value in r.set__.new.items():
+				r.setField(field, value)
+			r.set__.empty()
+		return query
+	def insertMany(self, record, option=''): self.executeMany(self.crudMany(operation=Database.insert, record=record, option=option))
+	def deleteMany(self, record, onColumns, option=''): self.executeMany(self.crudMany(operation=Database.delete, record=record, onColumns=onColumns, option=option))
+	def updateMany(self, record, onColumns, option=''):
+		self.executeMany(self.crudMany(operation=Database.update, record=record, onColumns=onColumns, option=option))
+		for r in record.recordset.iterate():
+			for field, value in r.set__.new.items():
+				r.setField(field, value)
+			r.set__.empty()
+	def upsertMany(self, record, onColumns, option=''):
+		self.executeMany(self._upsertMany(operation=Database.upsert, record=record, onColumns=onColumns, option=option))
+		for r in record.recordset.iterate():
+			for field, value in r.set__.new.items():
+				r.setField(field, value)
+			r.set__.empty()
+	#--------------------------------------#
+	@classmethod
+	def paginate(cls, pageNumber=1, recordsCount=1):
+		try:
+			pageNumber = int(pageNumber)
+			recordsCount = int(recordsCount)
+			if(pageNumber and recordsCount):
+				offset = (pageNumber - 1) * recordsCount
+				return cls.limit(offset, recordsCount)
+			else:
+				return ''
+		except Exception as e:
+			print(e)
+			return ''
+	#--------------------------------------#
+#================================================================================#
+class SQLite(Database):
+	def __init__(self, connection):
+		Database.__init__(self)
+		self.name = "SQLite3"
+		self._Database__connection = connection
+		self.cursor()
+		
+	@staticmethod
+	def limit(offset=0, recordsCount=1):
+		return f"LIMIT {offset}, {recordsCount}"
+
+	def upsertStatement(self, operation, record, onColumns, option=''):
+		keys = list(record.set__.new.keys())
+		fields = ', '.join(keys)
+		updateSet = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
+		values = ', '.join('?' for _ in keys)
+		# Build WHERE clause from filter_ if present
+		whereFilter = record.filter_.where__(record)
+		whereClause = f"\n\t\tWHERE {whereFilter}" if whereFilter else ''
+		sql = f"""
+		INSERT INTO {record.table__.name} ({fields})
+		VALUES ({values})
+		ON CONFLICT ({onColumns})
+		DO UPDATE SET {updateSet}{whereClause} {option}
+		"""
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		record.query__.parameters = list(record.set__.new.values())
+		record.query__.parameters.extend(record.filter_.parameters)
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		for r in record.recordset.iterate():
+			params = r.set__.parameters() + record.filter_.parameters
+			record.query__.parameters.append(tuple(params))
+		return record.query__
+
+	### SQLite
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (?, ?, ?)
+	# ON CONFLICT (employee_id)
+	# DO UPDATE SET 
+	#     first_name = EXCLUDED.first_name,
+	#     salary = EXCLUDED.salary
+	# """
+#================================================================================#
+class Oracle(Database):
+	def __init__(self, connection):
+		Database.__init__(self)
+		self.name = "Oracle"
+		self._Database__connection = connection
+		self.cursor()
+		self._Database__placeholder = ':1' #1 #start of numeric
+		self._Database__escapeChar = "'"
+
+	@staticmethod
+	def limit(offset=0, recordsCount=1):
+		return f"OFFSET {offset} ROWS FETCH NEXT {recordsCount} ROWS ONLY"
+
+	### Oracle
+	# raw_sql = """
+	# MERGE INTO Employees t
+	# USING (SELECT :1 AS employee_id,:1 AS first_name, :1 AS salary FROM dual) s
+	# ON (t.employee_id = s.employee_id)
+	# WHEN MATCHED THEN
+	#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+	# WHEN NOT MATCHED THEN
+	#     INSERT (employee_id, first_name, salary) VALUES (:1, :1, :1)
+	# """
+
+	### oracle ai23+
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (:1, :2, :3)
+	# ON CONFLICT (employee_id)
+	# DO UPDATE SET
+	#     first_name = :2,
+	#     salary = :3
+	# """
+
+	def upsertStatement(self, operation, record, onColumns, option=''):
+		keys = list(record.set__.new.keys())
+		fields = ', '.join(keys)
+		# Oracle uses :1, :2, :3 style placeholders
+		source_fields = ', '.join(f':1 AS {k}' for k in keys)
+		on_clause = ' AND '.join(f't.{col} = s.{col}' for col in onColumns.split(','))
+		update_set = ', '.join(f't.{k} = s.{k}' for k in keys if k not in onColumns.split(','))
+		insert_fields = ', '.join(keys)
+		insert_values = ', '.join(f's.{k}' for k in keys)
+		# Build WHERE clause from filter_ if present
+		whereFilter = record.filter_.where__(record)
+		whereClause = f"\n\t\t\tWHERE {whereFilter}" if whereFilter else ''
+
+		sql = f"""
+		MERGE INTO {record.table__.name} t
+		USING (SELECT {source_fields} FROM dual) s
+		ON ({on_clause})
+		WHEN MATCHED THEN
+			UPDATE SET {update_set}{whereClause}
+		WHEN NOT MATCHED THEN
+			INSERT ({insert_fields}) VALUES ({insert_values}) {option}
+		"""
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		record.query__.parameters = list(record.set__.new.values())
+		record.query__.parameters.extend(record.filter_.parameters)
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		for r in record.recordset.iterate():
+			params = r.set__.parameters() + record.filter_.parameters
+			record.query__.parameters.append(tuple(params))
+		return record.query__
+
+	# Oracle savepoint - no RELEASE, ROLLBACK TO without SAVEPOINT keyword
+	def releaseSavepoint(self, name): pass  # Not supported in Oracle
+	def rollbackTo(self, name): self._Database__cursor.execute(f"ROLLBACK TO {name}")
+#================================================================================#
+class MySQL(Database):
+	def __init__(self, connection):
+		Database.__init__(self)
+		self.name = "MySQL"
+		self._Database__connection = connection
+		self._Database__placeholder = '%s'  # MySQL uses %s, not ?
+		self.cursor()
+	def prepared(self, prepared=True):
+		self._Database__cursor = self._Database__connection.cursor(prepared=prepared)
+	def lastTotalRows(self):
+		self._Database__cursor.execute("SELECT FOUND_ROWS() AS last_total_rows")
+		(last_total_rows,) = self._Database__cursor.fetchone()
+		return last_total_rows
+
+	@staticmethod
+	def limit(offset=0, recordsCount=1):
+		return f"LIMIT {offset}, {recordsCount}" # f"LIMIT {recordsCount} OFFSET {offset}"
+
+	### MySQL
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (%s, %s, %s)
+	# ON DUPLICATE KEY UPDATE
+	#     first_name = VALUES(first_name),
+	#     salary = VALUES(salary)
+	# """
+
+	### Or with MySQL 8.0.19+ alias syntax:
+
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (%s, %s, %s) AS new
+	# ON DUPLICATE KEY UPDATE
+	#     first_name = new.first_name,
+	#     salary = new.salary
+	# """
+
+	def upsertStatement(self, operation, record, onColumns, option=''):
+		keys = list(record.set__.new.keys())
+		fields = ', '.join(keys)
+		values = ', '.join('%s' for _ in keys)
+		# MySQL doesn't support WHERE in ON DUPLICATE KEY UPDATE
+		whereFilter = record.filter_.where__(record)
+		if whereFilter:
+			raise NotImplementedError("MySQL does not support WHERE clause in upsert. Use a different approach or remove the filter.")
+		update_set = ', '.join(f'{k} = VALUES({k})' for k in keys if k not in onColumns.split(','))
+
+		sql = f"""
+		INSERT INTO {record.table__.name} ({fields})
+		VALUES ({values})
+		ON DUPLICATE KEY UPDATE {update_set} {option}
+		"""
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		record.query__.parameters = list(record.set__.new.values())
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		for r in record.recordset.iterate():
+			params = r.set__.parameters()
+			record.query__.parameters.append(tuple(params))
+		return record.query__
+#================================================================================#
+class Postgres(Database):
+	def __init__(self, connection):
+		Database.__init__(self)
+		self.name = "Postgres"
+		self._Database__connection = connection
+		self._Database__placeholder = '%s'  # MySQL uses %s, not ?
+		self.cursor()
+		
+	@staticmethod
+	def limit(offset=0, recordsCount=1):
+		return f"LIMIT {recordsCount} OFFSET {offset}"
+
+	### Postgres
+	# raw_sql = """
+	# INSERT INTO Employees (employee_id, first_name, salary)
+	# VALUES (%s, %s, %s)
+	# ON CONFLICT (employee_id)
+	# DO UPDATE SET
+	#     first_name = EXCLUDED.first_name,
+	#     salary = EXCLUDED.salary
+	# """
+
+	def upsertStatement(self, operation, record, onColumns, option=''):
+		keys = list(record.set__.new.keys())
+		fields = ', '.join(keys)
+		values = ', '.join('%s' for _ in keys)
+		# Postgres uses EXCLUDED.column to reference the new values
+		update_set = ', '.join(f'{k} = EXCLUDED.{k}' for k in keys if k not in onColumns.split(','))
+		# Build WHERE clause from filter_ if present
+		whereFilter = record.filter_.where__(record)
+		whereClause = f"\n\t\tWHERE {whereFilter}" if whereFilter else ''
+
+		sql = f"""
+		INSERT INTO {record.table__.name} ({fields})
+		VALUES ({values})
+		ON CONFLICT ({onColumns})
+		DO UPDATE SET {update_set}{whereClause} {option}
+		"""
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		record.query__.parameters = list(record.set__.new.values())
+		record.query__.parameters.extend(record.filter_.parameters)
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		for r in record.recordset.iterate():
+			params = r.set__.parameters() + record.filter_.parameters
+			record.query__.parameters.append(tuple(params))
+		return record.query__
+#================================================================================#
+class MicrosoftSQL(Database):
+	def __init__(self, connection):
+		Database.__init__(self)
+		self.name = "MicrosoftSQL"
+		self._Database__connection = connection
+		self.cursor()
+		self._Database__cursor.fast_executemany = True
+		
+	@staticmethod
+	def limit(offset=0, recordsCount=1):
+		return f"OFFSET {offset} ROWS FETCH NEXT {recordsCount} ROWS ONLY"
+
+	### MSSQL
+	# raw_sql = """
+	# MERGE INTO Employees AS t
+	# USING (SELECT ? AS employee_id, ? AS first_name, ? AS salary) AS s
+	# ON (t.employee_id = s.employee_id)
+	# WHEN MATCHED THEN
+	#     UPDATE SET t.first_name = s.first_name, t.salary = s.salary
+	# WHEN NOT MATCHED THEN
+	#     INSERT (employee_id, first_name, salary) VALUES (s.employee_id, s.first_name, s.salary);
+	# """
+
+	def upsertStatement(self, operation, record, onColumns, option=''):
+		keys = list(record.set__.new.keys())
+		fields = ', '.join(keys)
+		# MSSQL uses ? placeholders
+		source_fields = ', '.join(f'? AS {k}' for k in keys)
+		on_clause = ' AND '.join(f't.{col} = s.{col}' for col in onColumns.split(','))
+		update_set = ', '.join(f't.{k} = s.{k}' for k in keys if k not in onColumns.split(','))
+		insert_fields = ', '.join(keys)
+		insert_values = ', '.join(f's.{k}' for k in keys)
+		# Build WHERE clause from filter_ if present (MSSQL uses AND in WHEN MATCHED)
+		whereFilter = record.filter_.where__(record)
+		whereClause = f" AND {whereFilter}" if whereFilter else ''
+
+		sql = f"""
+		MERGE INTO {record.table__.name} AS t
+		USING (SELECT {source_fields}) AS s
+		ON ({on_clause})
+		WHEN MATCHED{whereClause} THEN
+			UPDATE SET {update_set}
+		WHEN NOT MATCHED THEN
+			INSERT ({insert_fields}) VALUES ({insert_values}) {option};
+		"""
+		record.query__ = Query()
+		record.query__.parent = record
+		record.query__.statement = sql
+		record.query__.operation = operation
+		return record
+
+	def _upsert(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		record.query__.parameters = list(record.set__.new.values())
+		record.query__.parameters.extend(record.filter_.parameters)
+		return record.query__
+
+	def _upsertMany(self, operation, record, onColumns, option=''):
+		self.upsertStatement(operation, record, onColumns, option)
+		for r in record.recordset.iterate():
+			params = r.set__.parameters() + record.filter_.parameters
+			record.query__.parameters.append(tuple(params))
+		return record.query__
+
+	# MSSQL savepoint - uses SAVE TRANSACTION / ROLLBACK TRANSACTION
+	def savepoint(self, name): self._Database__cursor.execute(f"SAVE TRANSACTION {name}")
+	def releaseSavepoint(self, name): pass  # Not supported in MSSQL
+	def rollbackTo(self, name): self._Database__cursor.execute(f"ROLLBACK TRANSACTION {name}")
+#================================================================================#
+class RecordMeta(type):
+	def __new__(mcs, name, bases, namespace):
+		quoteChar = ''
+		cls = super().__new__(mcs, name, bases, namespace)
+		if bases:
+			parentClassName = bases[0].__name__
+			if(parentClassName == "Record" or parentClassName.startswith('__')):
+				cls.table__ = TableName(name)
+			else:
+				cls.table__ = TableName(f"{quoteChar}{parentClassName}{quoteChar}")
+			cls.alias = Alias(f"{quoteChar}{name}{quoteChar}")
+		return cls
+
+	def __getattr__(cls, field):
+		# Don't cache Field on class - return new Field each time
+		# This prevents Field objects from shadowing instance data attributes
+		return Field(cls, field, None)
+#================================================================================#
+class Record(metaclass=RecordMeta):
+	database__	= None
+	table__ = TableName('')
+	#--------------------------------------#
+	def __init__(self, statement=None, parameters=None, alias=None, operation=None, **kwargs):
+		self.with_cte__ = None
+		self.values = Database.values
+		self.set__ = Set(self)
+		self.joins__ = {}
+		self.from__ = []
+		self.filter_ = Filter(self)
+		self.columns = [] #use only after reading data from database #because it's loaded only from the query's result
+		self.data = {}
+
+		if(kwargs):
+			for key, value in kwargs.items():
+				setattr(self, key, value)
+
+		if(statement):
+			self.query__ = Query() # must be declared before self.query__(statement)
+			self.query__.parent = self
+			self.query__.statement = statement
+			if(parameters): self.query__.parameters = parameters #if prepared statement's parameters are passed
+			#self. instead of Record. #change the static field self.__database for inherited children classes
+			if(operation): self.query__.operation = operation
+			# if(str((statement.strip())[:6]).lower()=="select"):
+			# 	self.query__.operation = Database.select
+			if(len(self.query__.parameters) and type(self.query__.parameters[0]) in (list, tuple)):
+				self.database__.executeMany(self.query__)
+			else:
+				self.database__.executeStatement(self.query__)
+				Database.orm.map(self)
+	#--------------------------------------#
+	def __getattr__(self, name):
+		# if(name=="custom"): return self.__dict__["custom"]
+		try:
+			return self.__dict__["data"][name]
+		except:
+			try:
+				return object.__getattribute__(self, name)
+			# except:
+			# 	return None
+			# except KeyError:
+			# 		raise AttributeError(f"'{self.__class__.__name__}' has no field '{name}'")
+			except KeyError:
+				# Only return None if columns haven't been loaded yet
+				if self.columns and name not in self.columns:
+					raise AttributeError(f"'{self.__class__.__name__}' has no field '{name}'")
+				return None
+
+	def __setattr__(self, name, value):
+		# if(name=="custom"): self.__dict__["custom"] = value
+		if(type(value) in [str, int, float, datetime, bool]):
+			self.__dict__["data"][name] = value
+		else:
+			object.__setattr__(self, name, value)		
+
+	def value(self, **kwargs):
+		for name, value in kwargs.items():
+			if(type(value) in [str, int, float, datetime, bool]):
+				self.__dict__["data"][name] = value
+		return self
+	#--------------------------------------#
+	def __str__(self):
+		items = list(self.data.items())[:5]  # Show first 5 fields
+		fields = ', '.join(f'{k}={v!r}' for k, v in items)
+		if len(self.data) > 5:
+			fields += ', ...'
+		return f"<{self.__class__.__name__} {fields}>"
+	#--------------------------------------#
+	def __repr__(self):
+		items = list(self.data.items())[:5]  # Show first 5 fields
+		fields = ', '.join(f'{k}={v!r}' for k, v in items)
+		if len(self.data) > 5:
+			fields += ', ...'
+		return f"<{self.__class__.__name__} {fields}>"
+	#--------------------------------------#
+	def id(self): return self.query__.result.lastrowid
+	#--------------------------------------#
+	def rowsCount(self): return self.query__.result.count
+	#--------------------------------------#
+	# def getField(self, fieldName): return self.__dict__[fieldName] #get field without invoke __getattr__
+	# def setField(self, fieldName, fieldValue): self.__dict__[fieldName]=fieldValue #set field without invoke __setattr__
+	def set(self, **kwargs):
+		for key, value in kwargs.items():
+			self.set__.setFieldValue(key, value)
+		return self
+	def getField(self, fieldName): return self.data[fieldName] #get field without invoke __getattr__
+	def setField(self, fieldName, fieldValue): self.data[fieldName]=fieldValue #set field without invoke __setattr__
+	#--------------------------------------#
+	def where(self, *args, **kwargs): return self.filter_.where(*args, **kwargs)
+	#--------------------------------------#
+	def in_subquery(self, **kwargs):
+		self.filter_.in_subquery(**kwargs)
+		return self
+	def exists(self, **kwargs):
+		self.filter_.exists(**kwargs)
+		return self
+	def not_exists(self, **kwargs):
+		self.filter_.not_exists(**kwargs)
+		return self
+	def in_(self, **kwargs):
+		self.filter_.in_(**kwargs)
+		return self
+	def not_in(self, **kwargs):
+		self.filter_.not_in(**kwargs)
+		return self
+	def like(self, **kwargs):
+		self.filter_.like(**kwargs)
+		return self
+	def is_null(self, **kwargs):
+		self.filter_.is_null(**kwargs)
+		return self
+	def is_not_null(self, **kwargs):
+		self.filter_.is_not_null(**kwargs)
+		return self
+	def between(self, **kwargs):
+		self.filter_.between(**kwargs)
+		return self	
+	def gt(self, **kwargs):
+		self.filter_.gt(**kwargs)
+		return self
+	def ge(self, **kwargs):
+		self.filter_.ge(**kwargs)
+		return self
+	def lt(self, **kwargs):
+		self.filter_.lt(**kwargs)
+		return self
+	def le(self, **kwargs):
+		self.filter_.le(**kwargs)
+		return self
+	#--------------------------------------#
+	def __iter__(self):
+		return iter(self.recordset.iterate())
+	#--------------------------------------#
+	def next(self): return self.__next__() #python 2 compatibility
+	#--------------------------------------#
+	def select_(self, selected="*", group_by='', order_by='', limit='', option='', **kwargs): return self.database__.select_(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+	def insert_(self, option=''): return self.database__.insert_(Database.insert, record=self, option=option)
+	def update_(self, option=''): return self.database__.update_(Database.update, record=self, option=option)
+	def delete_(self, option=''): return self.database__.delete_(Database.delete, record=self, option=option)
+
+	def select(self, selected="*", group_by='', order_by='', limit='', option=''):
+		self.database__.select(record=self, selected=selected, group_by=group_by, order_by=order_by, limit=limit, option=option)
+		return self
+	# def select(self, selected="*", group_by='', order_by='', limit='', **kwargs): return self.filter_.select(selected, group_by, order_by, limit)
+	def insert(self, option=''): 
+		self.database__.insert(record=self, option=option)
+		return self
+	def update(self, option=''): 
+		self.database__.update(record=self, option=option)
+		return self
+	def delete(self, option=''): 
+		self.database__.delete(record=self, option=option)
+		return self
+	def all(self, option=''): 
+		self.database__.all(record=self, option=option)
+		return self
+	def upsert(self, onColumns, option=''): 
+		self.database__.upsert(record=self, onColumns=onColumns, option=option)
+		return self
+	def commit(self): self.database__.commit()
+	#--------------------------------------#
+	def from_(self, *tables):
+		self.from__.append(*tables)
+		return self
+	def join(self, table, fields): self.joins__[table.alias.value] = Join(table, fields); return self
+	def rightJoin(self, table, fields): self.joins__[table.alias.value] = Join(table, fields, ' RIGHT JOIN '); return self
+	def leftJoin(self, table, fields): self.joins__[table.alias.value] = Join(table, fields, ' LEFT JOIN '); return self
+	def with_cte(self, with_cte):
+		self.with_cte__ = with_cte
+		return self
+	#--------------------------------------#
+	def cte(self, selected="*", group_by='', order_by='', limit='', materialization=None):
+		query = self.select_(selected=selected, group_by=group_by, order_by=order_by, limit=limit)
+		return CTE(statement=query, materialization=materialization)
+	#--------------------------------------#
+	def toDict(self): return self.data
+	#--------------------------------------#
+	def toList(self): return list(self.toDict().values())
+	#--------------------------------------#
+	def limit(self, pageNumber=1, recordsCount=1): return self.database__.paginate(pageNumber, recordsCount)
+	#--------------------------------------#
+#================================================================================#
+class Recordset:
+	def __init__(self):
+		self.records = [] #mapped objects from records
+		self.affectedRowsCount = 0
+		self.data = [] # extended in ORM
+	def table(self):
+		if(self.firstRecord()): return  self.firstRecord().table__.name
+	def empty(self): self.records = []
+
+	@staticmethod
+	def fromDicts(record_cls, dicts):
+		"""Create a Recordset from a list of dictionaries.
+
+		Usage:
+			rs = Recordset.from_dicts(Employees, [
+				{'employee_id': 1, 'first_name': 'John'},
+				{'employee_id': 2, 'first_name': 'Jane'}
+			])
+		"""
+		rs = Recordset()
+		rs.data = dicts
+		for d in dicts:
+			record = record_cls()
+			# record.value(**d)
+			# rs.add(record)
+			rs.records.append(record)
+			record.data = d
+		return rs
+		
+	def add(self, *args):
+		for rec in args:
+			self.data.append(rec.data)
+		self.records.extend(args)
+		return self
+	def iterate(self): return self.records
+	def firstRecord(self):
+		if(len(self.records)):
+			# make sure that first record has the recordset list if it's add manually to the current recordset not read from database
+			self.records[0].recordset = self
+			return self.records[0]
+		else:
+			return None
+	def lastRecord(self):
+		"""Return the last record in the recordset."""
+		if len(self.records):
+			return self.records[-1]
+		return None
+	def count(self): return len(self.records)
+	def columns(self): return self.firstRecord().columns
+	def setField(self, fieldName, fieldValue):
+		for record in self.records: record.__dict__[fieldName] = fieldValue
+	def rowsCount(self): return self.affectedRowsCount
+	def set(self, **kwargs):
+		for record in self.records:
+			record.set(**kwargs)
+		return self
+	def value(self, **kwargs):
+		for record in self.records:
+			record.value(**kwargs)
+		return self
+	#--------------------------------------#
+	def insert_(self, option=''): 
+		if(self.firstRecord()):
+			return self.firstRecord().database__.insertMany_(Database.insert, record=self.firstRecord(), option=option)
+	def update_(self, onColumns=None, option=''): 
+		if(self.firstRecord()):
+			return self.firstRecord().database__.updateMany_(Database.update, record=self.firstRecord(), onColumns=onColumns, option=option)
+	def delete_(self, onColumns=None, option=''): 
+		if(self.firstRecord()):
+			return self.firstRecord().database__.deleteMany_(Database.delete, record=self.firstRecord(), onColumns=onColumns, option=option)
+	#--------------------------------------#
+	def insert(self, option=''):
+		if(self.firstRecord()): 
+			self.firstRecord().database__.insertMany(self.firstRecord(), option=option)
+		return self
+	def update(self, onColumns=None, option=''):
+		if(self.firstRecord()):  
+			self.firstRecord().database__.updateMany(self.firstRecord(), onColumns=onColumns, option=option)
+		return self
+	def delete(self, onColumns=None, option=''):
+		if(self.firstRecord()):  
+			self.firstRecord().database__.deleteMany(self.firstRecord(), onColumns=onColumns, option=option)
+		return self
+	def upsert(self, onColumns=None, option=''):
+		if(self.firstRecord()): 
+			self.firstRecord().database__.upsertMany(self.firstRecord(), onColumns=onColumns, option=option)
+		return self
+	def commit(self):
+		if(self.firstRecord()):
+			self.firstRecord().database__.commit()
+		return self
+	#--------------------------------------#
+	def toLists(self):
+		data = []
+		for record in self.iterate():
+			data.append(record.toList())
+		return data
+	#--------------------------------------#
+	def toDicts(self):
+		return self.data # [record.data for record in self.records]
+	#--------------------------------------#
+	def __iter__(self): return iter(self.records)
+	def __len__(self): return len(self.records)
+	def __getitem__(self, index): return self.records[index]
+	#--------------------------------------#
+#================================================================================#
+class Session:
+	def __init__(self, database):
+		self.database = database
+		self._pending = []  # List of (query, is_many) tuples
+
+	def set(self, query):
+		self._pending.append(query)
+		return self
+
+	def flush(self):
+		"""Execute all pending operations"""
+		for query in self._pending:
+			if query.many:
+				self.database.executeMany(query)
+			else:
+				self.database.executeStatement(query)
+		self._pending = []
+
+	def commit(self):
+		"""Flush and commit transaction"""
+		self.flush()
+		self.database.commit()
+
+	def rollback(self):
+		"""Rollback and clear pending"""
+		self.database.rollback()
+		self._pending = []
+
+	def savepoint(self, name):
+		"""Flush pending and create savepoint"""
+		self.flush()
+		self.database.savepoint(name)
+		return self
+
+	def releaseSavepoint(self, name):
+		"""Release savepoint"""
+		self.database.releaseSavepoint(name)
+		return self
+
+	def rollbackTo(self, name):
+		"""Rollback to savepoint and clear pending"""
+		self.database.rollbackTo(name)
+		self._pending = []
+		return self
+#================================================================================#
