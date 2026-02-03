@@ -1,6 +1,7 @@
 # Cartonnage
 
-A lightweight Python ORM supporting multiple databases:
+Cartonnage is a Database-First ORM—designed as a 'Live Database Reflection ORM' or 'Record Reflection Layer (RRL)'—that reflects your existing database at runtime, speaking its schema fluently: not model-first, not schema-first, but runtime-bound, making it the ORM for existing databases:
+
 - SQLite
 - MySQL
 - PostgreSQL
@@ -24,4 +25,4 @@ pip install cartonnage[all]       # All databases
 
 ## License
 
-AGPL-3.0-or-later
+MIT

@@ -97,6 +97,7 @@ class Field:
 #================================================================================#
 class TableName:
 	def __init__(self, name): self.name = name
+	def sname(self): return self.name
 class Alias:
 	def __init__(self, value): self.value = value
 #--------------------------------------#
@@ -467,15 +468,15 @@ class Database:
 		joinClause = ''
 		for key, join in record.joins__.items():
 			#" INNER JOIN Persons pp ON "
-			joinClause += f"{join.type}{join.object.table__.name} {join.object.alias.value} ON {join.predicates.value}"
+			joinClause += f"{join.type}{join.object.table__.sname()} {join.object.alias.value} ON {join.predicates.value}"
 		return joinClause
 	#--------------------------------------#
 	def executeStatement(self, query):
 		if(query.statement):
-			# print(f"<s|{'-'*3}")
-			# print(" > Execute statement: ", query.statement)
-			# print(" > Execute parameters: ", query.parameters)
-			# print(f"{'-'*3}|e>")
+			print(f"<s|{'-'*3}")
+			print(" > Execute statement: ", query.statement)
+			print(" > Execute parameters: ", query.parameters)
+			print(f"{'-'*3}|e>")
 			#
 			self.__cursor.execute(query.statement, tuple(query.parameters))
 			self.operationsCount +=1
@@ -512,10 +513,10 @@ class Database:
 			return query
 	#--------------------------------------#
 	def executeMany(self, query):
-		# print(f"<s|{'-'*3}")
-		# print(" > Execute statement: ", query.statement)
-		# print(" > Execute parameters: ", query.parameters)
-		# print(f"{'-'*3}|e>")
+		print(f"<s|{'-'*3}")
+		print(" > Execute statement: ", query.statement)
+		print(" > Execute parameters: ", query.parameters)
+		print(f"{'-'*3}|e>")
 		rowcount = 0
 		if not hasattr(query.parent, 'recordset') or not isinstance(query.parent.recordset, Recordset):
 			query.parent.recordset = Recordset() # initiating recordset once for parent not for every new record so here is better.
@@ -548,7 +549,7 @@ class Database:
 		else:
 			where = whereFilter
 
-		fromClause = f'{record.table__.name} {record.alias.value}, '
+		fromClause = f'{record.table__.sname()} {record.alias.value}, '
 		fromParameters = []
 		if(record.from__):
 			for tbl in record.from__:
@@ -556,7 +557,7 @@ class Database:
 					fromClause += f"({tbl.statement}) {tbl.alias__}, "
 					fromParameters.extend(tbl.parameters)
 				else:
-					fromClause += f"{tbl.table__.name} {tbl.alias.value}, "
+					fromClause += f"{tbl.table__.sname()} {tbl.alias.value}, "
 		fromClause = fromClause[:-2]
 
 		joiners = Database.joining(record)
@@ -578,7 +579,7 @@ class Database:
 			statement = f"{with_cte}DELETE FROM {record.table__.name} {joiners} \nWHERE {where} {option}" #no 1=1 to prevent "delete all" by mistake if user forget to set values
 		#-----
 		elif(operation==Database.all):
-			statement = f"{with_cte}SELECT * FROM {record.table__.name} {record.alias.value} {joiners} {option}"
+			statement = f"{with_cte}SELECT * FROM {record.table__.sname()} {record.alias.value} {joiners} {option}"
 		#-----
 		record.query__ = Query()
 		record.query__.parent = record

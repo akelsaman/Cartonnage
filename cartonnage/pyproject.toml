@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cartonnage"
-version = "0.1.6"
-description = "Cartonnage ORM is a Python ORM that achieves an outstanding balance between simplicity and power, supporting SQLite, MySQL, PostgreSQL, Oracle, and Microsoft SQL Server"
+version = "0.1.7"
+description = "Cartonnage is a Database-First ORM—designed as a 'Live Database Reflection ORM' or 'Record Reflection Layer (RRL)'—that reflects your existing database at runtime, speaking its schema fluently: not model-first, not schema-first, but runtime-bound, making it the ORM for existing databases."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"

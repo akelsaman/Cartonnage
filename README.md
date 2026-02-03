@@ -1,214 +1,178 @@
-#!/usr/bin/python3
+# Installation:
+```
+pip install cartonnage
+```
 
-# from ake_cartonnage import *
-from cartonnage import * # installed by pip install cartonnage
+# Basic usage:
+```python
+import sqlite3
+connection = sqlite3.connect(AKESQLiteConfig.DATABASE_PATH, check_same_thread=True, autocommit=False)
 
-from decimal import Decimal
-from datetime import date
-
-import time
-start = time.time()
-#================================================================================#
-# Cartonnage has been tested on the following database versions:
-# 
-# SQLite3 version 3.51.0
-# Oracle 19c, 23ai, and 26ai
-# MySQL 8.0.35
-# PostgreSQL 17.7
-# MicrosoftAzureSQL NA
-#================================================================================#
-from ake_connections import *
-initSQLite3Env()
-# initOracleEnv()
-# initMySQLEnv()
-# initPostgresEnv()
-# initAzureSQLEnv()
-
-# ----- Pooled versions (recommended) -----
-# initSQLite3PoolEnv()
-# initOraclePoolEnv()
-# initMySQLPoolEnv()
-# initPostgresPoolEnv()
-# initAzureSQLPoolEnv()
-
-# initOracleNativePoolEnv()
-# initMySQLNativePoolEnv()
-# initPostgresNativePoolEnv()
-
-placeholder = Record.database__.placeholder()
-#================================================================================#
-class __Record(Record): pass
-
-class Regions(Record): pass
-class Countries(Record): pass
-class Departments(Record): pass
-class Jobs(Record): pass
-class Job_History(Record): pass
-class Locations(Record): pass
+Record.database__ = SQLite3(connection) # Oracle() | MySQL() | Postgres() | MicrosoftSQL()
 class Employees(Record): pass
-class Dependents(__Record): pass
 
-class RegionsAlias(Regions): pass
-class CountriesAlias(Countries): pass
-class DepartmentsAlias(Departments): pass
-class JobsAlias(Jobs): pass
-class Job_HistoryAlias(Job_History): pass
-class LocationsAlias(Locations): pass
-class EmployeesAlias(Employees): pass
-class DependentsAlias(Dependents): pass
+employees = Employees().where(employee_id > 100).select()
+for emp in employees:
+    print(emp.first_name)
+```
 
-class Managers(Employees): pass
+# Official Website:
+https://cartonnage-orm.com
 
-class EXCLUDED(Record): pass # used for upsert
-class S(Record): pass # used for upsert
-class T(Record): pass # used for upsert
+# Github page:
+https://akelsaman.github.io/Cartonnage
 
-employeeManagerRelation = (Employees.manager_id == Managers.employee_id)
+# What is Cartonnage ?
+**The Database-First ORM** that speaks your database fluently-live and runtime-bound, built for exisitng databases.
 
-# ================================================================================
-# Recursive depth column
-# Lateral
-#================================================================================#
-print("------------------------------------00------------------------------------")
-#================================================================================#
-jobSubQuery = (Jobs().where(Jobs.job_title.in_(['Programmer', 'Purchasing Clerk'])))
-departmentExistsQuery = (
-	Departments().where(
-		(Employees.department_id == Departments.department_id) &
-		Departments.department_name.in_(['IT', 'Purchasing'])
-	)
-)
+# For whom ?
+Software Engineers, DevOps Engineers, Data Engineers, ... who wants to speak to database fluently from Python without hassles and with zero schema definition, maintenance, or migration.
 
-EmployeesConditions = (
-	(Employees.employee_id.in_([115, 103])) &
-	(Employees.last_name.in_(['Khoo', 'Hunold'])) &
-	(Employees.department_id.not_in([12])) &
-	(Employees.commission_pct.is_null()) &
-	(Employees.phone_number.is_not_null()) &
-	(Employees.email.like('alexander%')) &
-	(Employees.employee_id.between(103, 116)) &
-	(Employees.employee_id > 102) &
-	(Employees.employee_id >= 103) &
-	(Employees.employee_id <= 115) &
-	(Employees.employee_id < 116) &
-	(Employees.hire_date.between(datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d'))) &
-	(Employees.hire_date > datetime.strptime('1990-01-02', '%Y-%m-%d')) &
-	(Employees.hire_date >= datetime.strptime('1990-01-02', '%Y-%m-%d')) &
-	(Employees.hire_date <= datetime.strptime('1995-05-18', '%Y-%m-%d')) &
-	(Employees.hire_date < datetime.strptime('1995-05-19', '%Y-%m-%d')) &
-	(Employees.job_id.in_subquery(jobSubQuery, selected="job_id")) &
-	(Employees._.exists(departmentExistsQuery))
-)
-
-employee = (
-	Employees().join(Managers, employeeManagerRelation)
-	.join(Jobs, (Employees.job_id == Jobs.job_id))
-	.join(Departments, (Employees.department_id == Departments.department_id))
-	.join(Locations, (Departments.location_id == Locations.location_id))
-	.join(Countries, (Locations.country_id == Countries.country_id))
-	.join(Regions, (Countries.region_id == Regions.region_id))
-
-	.where(Jobs.job_title.in_(['Programmer', 'Purchasing Clerk']))
-	.where(Departments.department_name.in_(['IT', 'Purchasing']))
-
-	.where(EmployeesConditions | EmployeesConditions).where(EmployeesConditions & EmployeesConditions)
-	
-	.in_(employee_id = [115, 103], last_name = ['Khoo', 'Hunold'])
-	.not_in(department_id = [12])
-	.is_null(commission_pct = None)
-	.is_not_null(phone_number = None)
-	.like(email = 'alexander%')
-	.gt(employee_id = 102)
-	.ge(employee_id = 103)
-	.le(employee_id = 115)
-	.lt(employee_id = 116)
-	.between(employee_id = (103, 116))
-	.between(hire_date = (datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d')))
-	.gt(hire_date = datetime.strptime('1990-01-01', '%Y-%m-%d'))
-	.ge(hire_date = datetime.strptime('1990-01-02', '%Y-%m-%d'))
-	.le(hire_date = datetime.strptime('1995-05-18', '%Y-%m-%d'))
-	.lt(hire_date = datetime.strptime('1995-05-19', '%Y-%m-%d'))
-	.in_subquery(job_id = jobSubQuery, selected="job_id")
-	.exists(_=departmentExistsQuery)
-
-	.filter_.where(EmployeesConditions | EmployeesConditions).where(EmployeesConditions & EmployeesConditions)
-
-	.filter_.in_(employee_id = [115, 103], last_name = ['Khoo', 'Hunold'])
-	.not_in(department_id = [12])
-	.is_null(commission_pct = None)
-	.is_not_null(phone_number = None)
-	.like(email = 'alexander%')
-	.between(employee_id = (103, 116))
-	.gt(employee_id = 102)
-	.ge(employee_id = 103)
-	.le(employee_id = 115)
-	.lt(employee_id = 116)
-	.between(hire_date = (datetime.strptime('1990-01-02', '%Y-%m-%d'), datetime.strptime('1995-05-18', '%Y-%m-%d')))
-	.gt(hire_date = datetime.strptime('1990-01-01', '%Y-%m-%d'))
-	.ge(hire_date = datetime.strptime('1990-01-02', '%Y-%m-%d'))
-	.le(hire_date = datetime.strptime('1995-05-18', '%Y-%m-%d'))
-	.lt(hire_date = datetime.strptime('1995-05-19', '%Y-%m-%d'))
-	.in_subquery(job_id = jobSubQuery, selected="job_id")
-	.exists(_=departmentExistsQuery)
-)
+**Why get caught in the SQL vs ORM debate while simply you can use Cartonnage ?**
 
 
+### Note:
 
-employee.value(first_name='Alex') # set the first_name field/column exact value to search by.
-employee.value(first_name='Alexander') # override first_name field/column exact value to search by.
+**I have started to write Cartonnage 8 years ago with more than 126 commits till the moment.**
 
-# '%Y-%m-%d %H:%M:%S'
+**All the examples** used in **cartonnage_test.py**, **official website**, or in this **README.md** documentation is written by human developer :) and **AI didn't** contribute to it.
+**AI only** helped me to **copy and format** the examples **from cartonnage_test.py into this README.md.**
 
-employee.select(selected='Employees.*, Jobs.*, Departments.*, Locations.*, Countries.*, Regions.*, Managers.employee_id AS "manager_employee_id"', order_by="Employees.employee_id", limit=employee.limit(1,2)) # page_number, records_per_page
+# Show Case:
 
-for emp in employee.recordset.iterate():
-	# oracle # 'hire_date': datetime(1994, 6, 7, 0, 0)
-	# mysql | postgres | microsoft azure/sql # 'hire_date': date(1994, 6, 7)
-	# microsoft azure/sql # 'salary': Decimal('8300.00')
-	emp.hire_date = str(emp.hire_date)[:10] # convert datetime to str # emp.hire_date.strftime('%Y-%m-%d')
-	emp.salary = float(emp.salary)
-	emp.min_salary = float(emp.min_salary)
-	emp.max_salary = float(emp.max_salary)
+### Scenario:
+Suppose you need to connect to an app db on production/test environment using Python and an ORM for any development purpose.
 
-assert employee.columns == ['employee_id', 'first_name', 'last_name', 'email', 'phone_number', 'hire_date', 'job_id', 'salary', 'commission_pct', 'manager_id', 'department_id', 'job_id', 'job_title', 'min_salary', 'max_salary', 'department_id', 'department_name', 'manager_id', 'location_id', 'location_id', 'street_address', 'postal_code', 'city', 'state_province', 'country_id', 'country_id', 'country_name', 'region_id', 'region_id', 'region_name', 'manager_employee_id']
-assert employee.recordset.data == [{'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': None, 'department_id': 6, 'job_title': 'Programmer', 'min_salary': 4000, 'max_salary': 10000, 'department_name': 'IT', 'location_id': 1400, 'street_address': '2014 Jabberwocky Rd', 'postal_code': '26192', 'city': 'Southlake', 'state_province': 'Texas', 'country_id': 'US', 'country_name': 'United States of America', 'region_id': 2, 'region_name': 'Americas', 'manager_employee_id': 102}, {'employee_id': 115, 'first_name': 'Alexander', 'last_name': 'Khoo', 'email': 'alexander.khoo@sqltutorial.org', 'phone_number': '515.127.4562', 'hire_date': '1995-05-18', 'job_id': 13, 'salary': 3100, 'commission_pct': None, 'manager_id': None, 'department_id': 3, 'job_title': 'Purchasing Clerk', 'min_salary': 2500, 'max_salary': 5500, 'department_name': 'Purchasing', 'location_id': 1700, 'street_address': '2004 Charade Rd', 'postal_code': '98199', 'city': 'Seattle', 'state_province': 'Washington', 'country_id': 'US', 'country_name': 'United States of America', 'region_id': 2, 'region_name': 'Americas', 'manager_employee_id': 114}]
-assert employee.recordset.toLists() == [[103, 'Alexander', 'Hunold', 'alexander.hunold@sqltutorial.org', '590.423.4567', '1990-01-03', 9, 9000, None, None, 6, 'Programmer', 4000, 10000, 'IT', 1400, '2014 Jabberwocky Rd', '26192', 'Southlake', 'Texas', 'US', 'United States of America', 2, 'Americas', 102], [115, 'Alexander', 'Khoo', 'alexander.khoo@sqltutorial.org', '515.127.4562', '1995-05-18', 13, 3100, None, None, 3, 'Purchasing Clerk', 2500, 5500, 'Purchasing', 1700, '2004 Charade Rd', '98199', 'Seattle', 'Washington', 'US', 'United States of America', 2, 'Americas', 114]]
-assert employee.recordset.toDicts() == employee.recordset.data
-assert employee.recordset.columns() == employee.columns
-assert employee.rowsCount() == 2
-#================================================================================#
-print("------------------------------------01------------------------------------")
-#================================================================================#
-# read section 00 in sql_cartonnage_test.py and write a test scenatio for each feature included in this section:
-# Expressive filtering:
-# Join two tables
-# Join Same table
-# like()
-# is_null()
-# is_not_null()
-# in_
-# not_in
-# between
-# gt
-# ge
-# le
-# lt
-# filter using multiple kwargs
-# & | expressions
-# & | filters
+Maybe an ERP system db, hospital system, ...
 
+### How we are going to simulate that:
+1. go to create a free account to work as our app db: freesql.com
+2. go to, download, and install oracle instant client : https://www.oracle.com/middleeast/database/technologies/instant-client/downloads.html
+3. download this hr_oracle.sql file: https://github.com/akelsaman/Cartonnage/blob/main/hr/hr_oracle.sql
+4. login to your freesql.com account and got to "My Schema", copy, paste, and run to create the tables and populate the data.
+
+```
+pip install cartonnage oracledb
+```
+
+save the following code to freesql_app_db.py
+fill in your user and password
+
+```python
+import oracledb
+from timeit import timeit
+
+user = ''
+password = ''
+host = 'db.freesql.com'
+port = 1521
+service_name = '23ai_34ui2'
+client_lib_dir = './instantclient_23_3'
+
+# Initialize Oracle client
+oracledb.init_oracle_client(lib_dir=client_lib_dir)
+# ================================================================================ #
+from cartonnage import *
+oracleConnection = oracledb.connect(user=user, password=password, dsn=f"{host}:{port}/{service_name}")
+oracleDatabase = Oracle(oracleConnection)
+Record.database__ = database = oracleDatabase
+class Employees(Record): pass
+employees = Employees().all()
+for emp in employees:
+  print(f"{emp.employee_id}: {emp.first_name} {emp.last_name}")
+```
+run/execute using
+```
+python3 freesql_app_db.py
+```
+
+**Note:**
+
+Some ORMs **fail** to work with existing DBs if table(s) have **no declared primary key**, **Cartonnage is work seemlessly** because it doesn't need to DB schema definition/generation at all.
+
+There are **many business apps/solutions** that have many tables with **no declared primary key**.
+
+## Congratulations ! you get the work done easily, effieciently, and effectively !
+
+# Cartonnage Documentation
+
+---
+
+## Section 01 — Expressive Filtering
+
+<!-- read section 00 in sql_cartonnage_test.py and write a test scenatio for each feature included in this section: -->
+<!-- Expressive filtering: -->
+<!-- Join two tables -->
+<!-- Join Same table -->
+<!-- like() -->
+<!-- is_null() -->
+<!-- is_not_null() -->
+<!-- in_ -->
+<!-- not_in -->
+<!-- between -->
+<!-- gt -->
+<!-- ge -->
+<!-- le -->
+<!-- lt -->
+<!-- filter using multiple kwargs -->
+<!-- & | expressions -->
+<!-- & | filters -->
+
+### filter using Record.field = exact value
+
+```python
 # filter using Record.field = exact value
 employee = Employees().value(employee_id=100).select()
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Employees WHERE employee_id = ?
+```
+
+**Used Parameters:**
+```
+(100,)
+```
+
+**Assertions:**
+```python
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
+
+---
+
+### filter using Record.where(expression)
+
+```python
 # filter using Record.where(expression)
 employee = (Employees().where(Employees.employee_id == 100).select())
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Employees WHERE Employees.employee_id = ?
+```
+
+**Used Parameters:**
+```
+(100,)
+```
+
+**Assertions:**
+```python
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
+
+---
+
+### join two tables
+
+```python
 # join two tables
 employee = (
 	Employees()
@@ -218,8 +182,30 @@ employee = (
 )
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
 
+**Generated SQL:**
+```sql
+SELECT Employees.* FROM Employees
+JOIN Dependents ON Employees.employee_id = Dependents.employee_id
+WHERE Dependents.first_name = ?
+```
+
+**Used Parameters:**
+```
+('Jennifer',)
+```
+
+**Assertions:**
+```python
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
+
+---
+
+### join same table
+
+```python
 # join same table
 employee = (
 	Employees()
@@ -229,8 +215,31 @@ employee = (
 )
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert employee.data == {'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6, 'manager_employee_id': 102, 'manager_email': 'lex.de haan@sqltutorial.org'}
+```
 
+**Generated SQL:**
+```sql
+SELECT Employees.*, Managers.employee_id AS "manager_employee_id", Managers.email AS "manager_email"
+FROM Employees
+JOIN Employees AS Managers ON Employees.manager_id = Managers.employee_id
+WHERE Managers.first_name = ?
+```
+
+**Used Parameters:**
+```
+('Lex',)
+```
+
+**Assertions:**
+```python
+assert employee.data == {'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6, 'manager_employee_id': 102, 'manager_email': 'lex.de haan@sqltutorial.org'}
+```
+
+---
+
+### filter using like()
+
+```python
 # filter using like() # use two diffent filteration methods
 employee = (
 	Employees()
@@ -240,8 +249,29 @@ employee = (
 )
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Employees
+WHERE Employees.first_name LIKE ? AND Employees.first_name LIKE ?
+```
+
+**Used Parameters:**
+```
+('Stev%', 'Stev%')
+```
+
+**Assertions:**
+```python
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
+
+---
+
+### filter using is_null()
+
+```python
 # filter using is_null() # use two diffent filteration methods
 employee = (
 	Employees()
@@ -251,8 +281,29 @@ employee = (
 )
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Employees
+WHERE Employees.manager_id IS NULL AND Employees.manager_id IS NULL
+```
+
+**Used Parameters:**
+```
+(none)
+```
+
+**Assertions:**
+```python
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
+
+---
+
+### filter using is_not_null()
+
+```python
 # filter using is_not_null() # use two diffent filteration methods
 employee = (
 	Employees()
@@ -263,8 +314,29 @@ employee = (
 )
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert employee.data == {'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Employees
+WHERE Employees.employee_id = ? AND Employees.manager_id IS NOT NULL AND Employees.manager_id IS NOT NULL
+```
+
+**Used Parameters:**
+```
+(101,)
+```
+
+**Assertions:**
+```python
+assert employee.data == {'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}
+```
+
+---
+
+### filter using in_()
+
+```python
 # filter using in_() # use two diffent filteration methods
 employee = (
 	Employees()
@@ -274,8 +346,29 @@ employee = (
 )
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Employees
+WHERE Employees.employee_id IN (?) AND Employees.employee_id IN (?)
+```
+
+**Used Parameters:**
+```
+(100, 100)
+```
+
+**Assertions:**
+```python
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
+```
+
+---
+
+### filter using not_in()
+
+```python
 # filter using not_in() # use two diffent filteration methods
 employee = (
 	Employees()
@@ -286,8 +379,29 @@ employee = (
 )
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert employee.data == {'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6}
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Employees
+WHERE Employees.first_name LIKE ? AND Employees.employee_id NOT IN (?) AND Employees.employee_id NOT IN (?)
+```
+
+**Used Parameters:**
+```
+('Alex%', 115, 115)
+```
+
+**Assertions:**
+```python
+assert employee.data == {'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6}
+```
+
+---
+
+### filter using between()
+
+```python
 # filter using between() # use two diffent filteration methods
 employee = (
 	Employees()
@@ -298,11 +412,32 @@ employee = (
 for e in employee:
 	e.hire_date = str(e.hire_date)[:10] # convert datetime to str
 	e.salary = float(e.salary)
+```
+
+**Generated SQL:**
+```sql
+SELECT * FROM Employees
+WHERE Employees.employee_id BETWEEN ? AND ? AND Employees.employee_id BETWEEN ? AND ?
+```
+
+**Used Parameters:**
+```
+(100, 101, 100, 101)
+```
+
+**Assertions:**
+```python
 assert employee.recordset.data == [
 	{'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9},
 	{'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}
 ]
+```
 
+---
+
+### filter using gt(), ge(), le(), and lt()
+
+```python
 # filter using gt(), ge(), le(), and lt() # use two diffent filteration methods
 # use filter chaining # use & expressions
 employee = (
@@ -319,11 +454,33 @@ employee = (
 for e in employee:
 	e.hire_date = str(e.hire_date)[:10] # convert datetime to str
 	e.salary = float(e.salary)
+```
+
+**Generated SQL:**
+```sql
+SELECT * FROM Employees
+WHERE Employees.employee_id > ? AND Employees.employee_id >= ? AND Employees.employee_id <= ? AND Employees.employee_id < ?
+  AND Employees.employee_id > ? AND Employees.employee_id >= ? AND Employees.employee_id <= ? AND Employees.employee_id < ?
+```
+
+**Used Parameters:**
+```
+(99, 100, 101, 102, 99, 100, 101, 102)
+```
+
+**Assertions:**
+```python
 assert employee.recordset.data == [
-	{'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, 
+	{'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9},
 	{'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}
 ]
+```
 
+---
+
+### & | filters and expressions
+
+```python
 # & | filters and expressions
 f1 = (
 	((Employees.employee_id == 100) & (Employees.first_name == "Steven")) |
@@ -343,13 +500,38 @@ employee = (
 for e in employee:
 	e.hire_date = str(e.hire_date)[:10] # convert datetime to str
 	e.salary = float(e.salary)
+```
+
+**Generated SQL:**
+```sql
+SELECT * FROM Employees
+WHERE (
+  ((Employees.employee_id = ? AND Employees.first_name = ?) OR (Employees.employee_id = ? AND Employees.first_name = ?))
+  OR
+  ((Employees.employee_id = ? AND Employees.first_name = ?) OR (Employees.employee_id = ? AND Employees.first_name = ?))
+)
+```
+
+**Used Parameters:**
+```
+(100, 'Steven', 101, 'Neena', 102, 'Lex', 103, 'Alexander')
+```
+
+**Assertions:**
+```python
 assert employee.recordset.data == [
-	{'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, 
-	{'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}, 
-	{'employee_id': 102, 'first_name': 'Lex', 'last_name': 'De Haan', 'email': 'lex.de haan@sqltutorial.org', 'phone_number': '515.123.4569', 'hire_date': '1993-01-13', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}, 
+	{'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9},
+	{'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9},
+	{'employee_id': 102, 'first_name': 'Lex', 'last_name': 'De Haan', 'email': 'lex.de haan@sqltutorial.org', 'phone_number': '515.123.4569', 'hire_date': '1993-01-13', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9},
 	{'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6}
 ]
+```
 
+---
+
+### filter using multiple kwargs
+
+```python
 # filter using multiple kwargs # use two diffent filteration methods
 employee = (
 	Employees()
@@ -358,26 +540,81 @@ employee = (
 )
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
+```
+
+**Generated SQL:**
+```sql
+SELECT * FROM Employees
+WHERE Employees.first_name LIKE ? AND Employees.last_name LIKE ?
+```
+
+**Used Parameters:**
+```
+('Stev%', 'Ki%')
+```
+
+**Assertions:**
+```python
 assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}
-#================================================================================#
-print("------------------------------------02------------------------------------")
-#================================================================================#
+```
+
+---
+
+## Section 02 — Select All & Recordset Operations
+
+```python
 # select all and get recordset [all records] count, convert them to list of Dictionaries/lists
 reg = Regions().all()
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Regions
+```
+
+**Used Parameters:**
+```
+(none)
+```
+
+**Assertions:**
+```python
 assert reg.recordset.count() == 4
 assert reg.columns == ['region_id', 'region_name']
 assert reg.recordset.toDicts() == [{'region_id': 1, 'region_name': 'Europe'}, {'region_id': 2, 'region_name': 'Americas'}, {'region_id': 3, 'region_name': 'Asia'}, {'region_id': 4, 'region_name': 'Middle East and Africa'}]
 assert reg.recordset.toLists() == [[1, 'Europe'], [2, 'Americas'], [3, 'Asia'], [4, 'Middle East and Africa']]
-#================================================================================#
-print("------------------------------------03------------------------------------")
-#================================================================================#
+```
+
+---
+
+## Section 03 — Insert, Update, Delete Single Record
+
+### insert single record
+
+```python
 # insert single record
 emp1 = Employees()
 emp1.data = {'employee_id': 19950519, 'first_name': 'William', 'last_name': 'Wallace', 'email': None, 'phone_number': '555.666.777'}
 emp1.insert()
 # assert emp1.rowsCount() == 1 # confirm number of inserted rows
+```
 
+**Generated SQL:**
+```sql
+INSERT INTO Employees (employee_id, first_name, last_name, email, phone_number)
+VALUES (?, ?, ?, ?, ?)
+```
+
+**Used Parameters:**
+```
+(19950519, 'William', 'Wallace', None, '555.666.777')
+```
+
+---
+
+### update single record
+
+```python
 # update single record
 emp1 = (
 	Employees()
@@ -386,14 +623,51 @@ emp1 = (
 	.update()
 )
 # assert emp1.rowsCount() == 1 # confirm number of updated rows
+```
 
+**Generated SQL:**
+```sql
+UPDATE Employees SET email = ?, phone_number = ?
+WHERE employee_id = ?
+```
+
+**Used Parameters:**
+```
+('william.wallace@sqltutorial.org', None, 19950519)
+```
+
+---
+
+### check updated record
+
+```python
 # check updated record
 emp1 = Employees()
 emp1.value(employee_id=19950519).select()
 employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
 employee.salary = float(employee.salary)
-assert emp1.data == {'employee_id': 19950519, 'first_name': 'William', 'last_name': 'Wallace', 'email': 'william.wallace@sqltutorial.org', 'phone_number': None, 'hire_date': None, 'job_id': None, 'salary': None, 'commission_pct': None, 'manager_id': None, 'department_id': None}
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Employees WHERE employee_id = ?
+```
+
+**Used Parameters:**
+```
+(19950519,)
+```
+
+**Assertions:**
+```python
+assert emp1.data == {'employee_id': 19950519, 'first_name': 'William', 'last_name': 'Wallace', 'email': 'william.wallace@sqltutorial.org', 'phone_number': None, 'hire_date': None, 'job_id': None, 'salary': None, 'commission_pct': None, 'manager_id': None, 'department_id': None}
+```
+
+---
+
+### delete by exists and subquery
+
+```python
 # delete by exists and subquery
 emp1 = (
 	EmployeesAlias()
@@ -414,13 +688,38 @@ dep1 = (
 	.where(Dependents.employee_id.in_subquery(emp2, selected="employee_id"))
 	.delete()
 )
+```
 
+**Generated SQL:**
+```sql
+DELETE FROM Dependents
+WHERE EXISTS (SELECT * FROM Employees AS EmployeesAlias WHERE Dependents.employee_id = EmployeesAlias.employee_id AND EmployeesAlias.email = ? AND EmployeesAlias.employee_id IN (?))
+  AND Dependents.employee_id IN (SELECT employee_id FROM Employees WHERE Employees.manager_id = ?)
+  AND EXISTS (SELECT * FROM Employees AS EmployeesAlias WHERE Dependents.employee_id = EmployeesAlias.employee_id AND EmployeesAlias.email = ? AND EmployeesAlias.employee_id IN (?))
+  AND Dependents.employee_id IN (SELECT employee_id FROM Employees WHERE Employees.manager_id = ?)
+```
+
+**Used Parameters:**
+```
+('william.gietz@sqltutorial.org', 206, 205, 'william.gietz@sqltutorial.org', 206, 205)
+```
+
+**Assertions:**
+```python
 assert dep1.rowsCount() == 1
+```
 
+```python
 dep1 = Dependents()
 dep1.where(Dependents.employee_id == 206).select()
 assert dep1.data == {}
+```
 
+---
+
+### insert single record (with exception)
+
+```python
 # insert single record
 try:
 	emp = (
@@ -434,17 +733,42 @@ except Exception as e:
 	print(e)
 
 Record.database__.rollback()  # Force rollback
-#================================================================================#
-print("------------------------------------04------------------------------------")
-#================================================================================#
+```
+
+---
+
+## Section 04 — Filter & Fetchmany, Recordset Iterate/Update/Delete
+
+### filter and fetchmany records into recordset
+
+```python
 # filter and fetchmany records into recordset
 jobs = Jobs().where(Jobs.job_title.like('%Accountant%')).select()
+```
 
+**Generated SQL:**
+```sql
+SELECT * FROM Jobs WHERE Jobs.job_title LIKE ?
+```
+
+**Used Parameters:**
+```
+('%Accountant%',)
+```
+
+**Assertions:**
+```python
 assert jobs.recordset.count() == 2
 assert jobs.columns == ['job_id', 'job_title', 'min_salary', 'max_salary']
 assert jobs.recordset.toLists() == [[1, 'Public Accountant', 4200, 9000], [6, 'Accountant', 4200, 9000]]
 assert jobs.recordset.toDicts() == [{'job_id': 1, 'job_title': 'Public Accountant', 'min_salary': 4200, 'max_salary': 9000}, {'job_id': 6, 'job_title': 'Accountant', 'min_salary': 4200, 'max_salary': 9000}]
-print("----------04A----------")
+```
+
+---
+
+### iterate over recordset and update records one by one
+
+```python
 # iterate over recordset and update records one by one: (not recommended if you can update with one predicate)
 for job in jobs:
 	job.set(min_salary=4500)
@@ -454,36 +778,75 @@ jobs.recordset.set(min_salary=5000)
 for job in jobs.recordset: # iterate over recordset
 	assert job.job_id in [1,6], job.job_id
 
+
 jobs.recordset.update()
 recordsetLen = len(jobs.recordset) # get len() of a Recordset
-assert recordsetLen == 2, recordsetLen
+```
 
+**Generated SQL (per record in recordset):**
+```sql
+UPDATE Jobs SET min_salary = ? WHERE job_id = ? AND job_title = ? AND min_salary = ? AND max_salary = ?
+```
+
+<!-- it works because no field in any record of the recordset's records is set to Null. -->
+<!-- but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter. -->
+```python
 ### it works because no field in any record of the recordset's records is set to Null.
 ### but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter.
 # jobs.recordset.update(onColumns=['job_id'])
+```
 
+**Assertions:**
+```python
+assert recordsetLen == 2, recordsetLen
+```
+
+**Confirm recordset update:**
+```python
 jobs = Jobs().where(Jobs.job_title.like('%Accountant%')).select()
 assert jobs.recordset.toLists() == [[1, 'Public Accountant', 5000, 9000], [6, 'Accountant', 5000, 9000]], jobs.recordset.toLists() # confirm recordset update
 
 secondJobInRecordset = jobs.recordset[1] # access record instance by index
 assert secondJobInRecordset.job_id == 6, secondJobInRecordset.job_id
+```
 
-print("----------04B----------")
+---
+
+### recordset delete
+
+```python
 jobs.recordset.delete()
+```
 
+**Generated SQL (per record in recordset):**
+```sql
+DELETE FROM Jobs WHERE job_id = ? AND job_title = ? AND min_salary = ? AND max_salary = ?
+```
+
+<!-- it works because no field in any record of the recordset's records is set to Null. -->
+<!-- but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter. -->
+```python
 ### it works because no field in any record of the recordset's records is set to Null.
 ### but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter.
 # jobs.recordset.delete(onColumns=['job_id'])
+```
 
-print("----------04C----------")
+**Confirm recordset delete:**
+```python
 jobs = Jobs().where(Jobs.job_title.like('%Accountant%')).select()
 
 assert jobs.recordset.toLists() == []  # confirm recordset delete
 
 Record.database__.rollback()  # Force rollback
-#================================================================================#
-print("------------------------------------05------------------------------------")
-#================================================================================#
+```
+
+---
+
+## Section 05 — Recordset from List of Dicts & Recordset Insert/Update/Delete
+
+### recordset from list of dicts
+
+```python
 # recordset from list of dicts
 
 recordset = Recordset.fromDicts(Employees,
@@ -492,9 +855,18 @@ recordset = Recordset.fromDicts(Employees,
 		{'employee_id': 6, 'first_name': "Donald", 'last_name': "Duck"}
 	]
 )
+```
 
+**Assertions:**
+```python
 assert recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck'}], recordset.toDicts()
+```
 
+---
+
+### instantiate recordset and add records
+
+```python
 # instantiate recordset
 recordset = Recordset()
 
@@ -504,14 +876,46 @@ e2 = Employees().value(employee_id=6, first_name="Donald", last_name="Duck")
 
 # add employee(s)/record(s) instances to the previously instantiated Recordset
 recordset.add(e1, e2)
+```
 
+---
+
+### Recordset insert
+
+```python
 # Recordset insert:
 recordset.insert()
 if Record.database__.name == "MicrosoftSQL":
 	pass
 else:
 	assert recordset.rowsCount() == 2, recordset.rowsCount() # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+```
 
+**Generated SQL (per record):**
+```sql
+INSERT INTO Employees (employee_id, first_name, last_name) VALUES (?, ?, ?)
+```
+
+**Used Parameters (record 1):**
+```
+(5, 'Mickey', 'Mouse')
+```
+
+**Used Parameters (record 2):**
+```
+(6, 'Donald', 'Duck')
+```
+
+**Assertions:**
+```python
+assert recordset.rowsCount() == 2, recordset.rowsCount() # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+```
+
+---
+
+### Recordset update
+
+```python
 e1.set(manager_id=77)
 e2.set(manager_id=88)
 e1.where(Employees.employee_id > 4) # add general condition to all records of the recordset
@@ -524,7 +928,19 @@ if Record.database__.name == "MicrosoftSQL":
 	assert employees.recordset.toLists() == [[5, 'Mickey', 'Mouse', None, None, None, None, None, None, 77, None], [6, 'Donald', 'Duck', None, None, None, None, None, None, 88, None]]
 else:
 	assert recordset.rowsCount() == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+```
 
+**Generated SQL (per record):**
+```sql
+UPDATE Employees SET manager_id = ?
+WHERE employee_id = ? AND first_name = ? AND last_name = ? AND Employees.employee_id > ?
+```
+
+---
+
+### Recordset delete
+
+```python
 # Recordset delete:
 e1.where(Employees.manager_id < 100) # add general condition to all records of the recordset
 recordset.delete()
@@ -536,41 +952,140 @@ else:
 	assert recordset.rowsCount() == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
 
 Record.database__.rollback()  # Force rollback
-#================================================================================#
-print("------------------------------------06------------------------------------")
-#================================================================================#
+```
+
+**Generated SQL (per record):**
+```sql
+DELETE FROM Employees
+WHERE employee_id = ? AND first_name = ? AND last_name = ? AND Employees.employee_id > ? AND Employees.manager_id < ?
+```
+
+---
+
+## Section 06 — Raw SQL & Parameterized Statements
+
+### Execute raw sql statement
+
+```python
 # Execute raw sql statement and get recordset of the returned rows
 records = Record(statement="SELECT * FROM Employees WHERE employee_id IN(100, 101, 102) ", operation=Database.select)
+```
+
+**Generated SQL:**
+```sql
+SELECT * FROM Employees WHERE employee_id IN(100, 101, 102)
+```
+
+**Used Parameters:**
+```
+(none)
+```
+
+**Assertions:**
+```python
 assert records.recordset.count() == 3
 for record in records:
 	assert record.employee_id in [100, 101, 102]
+```
 
+---
+
+### Execute parameterized sql statement
+
+```python
 # Execute parameterized sql statement and get recordset of the returned rows
 placeholder = Record.database__.placeholder()
 records = Record(statement=f"SELECT * FROM Employees WHERE employee_id IN({placeholder}, {placeholder}, {placeholder})", parameters=(100, 101, 102), operation=Database.select)
+```
+
+**Generated SQL:**
+```sql
+SELECT * FROM Employees WHERE employee_id IN(?, ?, ?)
+```
+
+**Used Parameters:**
+```
+(100, 101, 102)
+```
+
+**Assertions:**
+```python
 assert records.recordset.count() == 3
 for record in records:
 	assert record.employee_id in [100, 101, 102]
+```
 
+---
+
+### instantiating Class's instance with fields' values
+
+```python
 # instantiating Class's instance with fields' values
 employee = Employees(statement=None, parameters=None, employee_id=1000, first_name="Super", last_name="Man", operation=Database.select)
 employee.insert()
 
 employee = Employees().value(employee_id=1000).select()
+```
+
+**Generated SQL (insert):**
+```sql
+INSERT INTO Employees (employee_id, first_name, last_name) VALUES (?, ?, ?)
+```
+
+**Used Parameters (insert):**
+```
+(1000, 'Super', 'Man')
+```
+
+**Generated SQL (select):**
+```sql
+SELECT * FROM Employees WHERE employee_id = ?
+```
+
+**Used Parameters (select):**
+```
+(1000,)
+```
+
+**Assertions:**
+```python
 assert employee.data == {'employee_id': 1000, 'first_name': 'Super', 'last_name': 'Man', 'email': None, 'phone_number': None, 'hire_date': None, 'job_id': None, 'salary': None, 'commission_pct': None, 'manager_id': None, 'department_id': None}
-#================================================================================#
-print("------------------------------------07------------------------------------")
-#================================================================================#
+```
+
+---
+
+## Section 07 — Group By with HAVING
+
+```python
 # group_by with HAVING clause
 employees = Employees().select(selected='manager_id, count(1) AS "count"', group_by='manager_id HAVING count(1) > 4', order_by='manager_id ASC')
+```
 
+**Generated SQL:**
+```sql
+SELECT manager_id, count(1) AS "count" FROM Employees
+GROUP BY manager_id HAVING count(1) > 4
+ORDER BY manager_id ASC
+```
+
+**Used Parameters:**
+```
+(none)
+```
+
+**Assertions:**
+```python
 assert employees.recordset.data == [
-	{'manager_id': 100, 'count': 14}, {'manager_id': 101, 'count': 5}, 
+	{'manager_id': 100, 'count': 14}, {'manager_id': 101, 'count': 5},
 	{'manager_id': 108, 'count': 5}, {'manager_id': 114, 'count': 5}
 ], employees.recordset.data
-#================================================================================#
-print("----------------------------------upsert----------------------------------")
-#================================================================================#
+```
+
+---
+
+## Section — Upsert
+
+```python
 emp = Employees().where(Employees.first_name.in_(['Steven', 'Neena']))
 
 emp1 = Employees().set(**{'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000})
@@ -586,20 +1101,47 @@ rs.add(emp1, emp2)
 if(Record.database__.name in ["SQLite3", "Postgres"]):
 	### SQLite3 and Postgres
 	emp1.where(
-		(EXCLUDED.salary < Employees.salary) & 
+		(EXCLUDED.salary < Employees.salary) &
 		(Employees.last_name.in_subquery(emp, selected='last_name'))
 	)
 if(Record.database__.name in ["Oracle", "MicrosoftSQL"]):
 	## Oracle and MicroftSQL
 	emp1.where(
-		(S.salary < T.salary) & 
+		(S.salary < T.salary) &
 		(T.last_name.in_subquery(emp, selected='last_name'))
 	)
 
 rs.upsert(onColumns='employee_id')
 # print(emp1.query__.statement)
 # print(emp1.query__.parameters)
+```
 
+**Generated SQL (SQLite3):**
+```sql
+INSERT INTO Employees (employee_id, first_name, salary)
+VALUES (?, ?, ?)
+ON CONFLICT (employee_id) DO UPDATE SET employee_id = ?, first_name = ?, salary = ?
+WHERE EXCLUDED.salary < Employees.salary
+  AND Employees.last_name IN (SELECT last_name FROM Employees WHERE Employees.first_name IN (?, ?))
+```
+
+**Generated SQL (Oracle):**
+```sql
+MERGE INTO Employees T USING (SELECT ? AS employee_id, ? AS first_name, ? AS salary FROM DUAL) S
+ON (T.employee_id = S.employee_id)
+WHEN MATCHED THEN UPDATE SET T.first_name = S.first_name, T.salary = S.salary
+WHERE S.salary < T.salary
+  AND T.last_name IN (SELECT last_name FROM Employees WHERE Employees.first_name IN (?, ?))
+WHEN NOT MATCHED THEN INSERT (employee_id, first_name, salary) VALUES (S.employee_id, S.first_name, S.salary)
+```
+
+**Used Parameters:**
+```
+(100, 'Ahmed', 4000, ..., 'Steven', 'Neena')
+```
+
+**Verify upsert results:**
+```python
 emp = Employees().where(Employees.employee_id.in_([100,101])).select()
 
 if(Record.database__.name == "SQLite3"):
@@ -613,18 +1155,29 @@ if(Record.database__.name in ["MySQL", "Postgres", "MicrosoftSQL"]):
 	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
 
 Record.database__.rollback()
-#================================================================================#
-print("--------------------------------- Session --------------------------------")
-#================================================================================#
+```
+
+---
+
+## Section — Session
+
+```python
 recordset = Recordset.fromDicts(Employees,
 	[
 		{'employee_id': 5, 'first_name': "Mickey", 'last_name': "Mouse"},
 		{'employee_id': 6, 'first_name': "Donald", 'last_name': "Duck"}
 	]
 )
+```
 
+**Assertions:**
+```python
 assert recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck'}], recordset.toDicts()
+```
 
+### Session workflow: insert, update, commit, select, delete, savepoint
+
+```python
 # Instanitiate a session with a database instance
 session = Session(Record.database__)
 # Set Recordset insert query to current Session
@@ -639,7 +1192,32 @@ session.commit()
 insertedEmployeesAfterUpdate = (
 	Employees().where(Employees.employee_id.in_([5,6])).select(selected="employee_id, first_name, last_name, phone_number")
 )
+```
+
+**Generated SQL (insert per record):**
+```sql
+INSERT INTO Employees (employee_id, first_name, last_name) VALUES (?, ?, ?)
+```
+
+**Generated SQL (update per record):**
+```sql
+UPDATE Employees SET phone_number = ? WHERE employee_id = ? AND first_name = ? AND last_name = ?
+```
+
+**Generated SQL (select):**
+```sql
+SELECT employee_id, first_name, last_name, phone_number FROM Employees
+WHERE Employees.employee_id IN (?, ?)
+```
+
+**Assertions:**
+```python
 assert insertedEmployeesAfterUpdate.recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse', 'phone_number': '+201011223344'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck', 'phone_number': '+201011223344'}], insertedEmployeesAfterUpdate.recordset.data
+```
+
+### Session delete, savepoint, rollbackTo, releaseSavepoint
+
+```python
 # Set Recordset delete query to current Session
 session.set(recordset.delete_(onColumns=["employee_id"]))
 # Commit the session
@@ -648,9 +1226,15 @@ session.savepoint("sp1")
 session.set(recordset.insert_())
 session.rollbackTo('sp1')
 session.releaseSavepoint('sp1')
-#================================================================================#
-print("-----------------------------------From-----------------------------------")
-#================================================================================#
+```
+
+---
+
+## Section — From
+
+### From multiple tables
+
+```python
 # From multiple tables
 (
 	Employees()
@@ -662,7 +1246,25 @@ print("-----------------------------------From----------------------------------
 	.select(selected="Employees.*, Departments.department_name")
 )
 # → SELECT ... FROM Employees Employees, Departments Departments WHERE ...
+```
 
+**Generated SQL:**
+```sql
+SELECT Employees.*, Departments.department_name
+FROM Employees Employees, Departments Departments
+WHERE Employees.employee_id = ? AND Employees.department_id = Departments.department_id
+```
+
+**Used Parameters:**
+```
+(100,)
+```
+
+---
+
+### From multiples tables and subqueries
+
+```python
 # From multiples tables and subqueries
 class EmployeesGt1000(Employees): pass
 sub = Employees().where(Employees.salary > 1000).select_().alias('EmployeesGt1000')
@@ -671,11 +1273,31 @@ sub = Employees().where(Employees.salary > 1000).select_().alias('EmployeesGt100
 	.where(Employees.employee_id == EmployeesGt1000.employee_id)
 	.select(selected="Employees.*, EmployeesGt1000.salary")
 )
+# → SELECT ... FROM Employees Employees, (SELECT * FROM Employees WHERE salary > 1000) AS high_paid WHERE ...
+```
 
+**Generated SQL:**
+```sql
+SELECT Employees.*, EmployeesGt1000.salary
+FROM Employees Employees, (SELECT * FROM Employees WHERE Employees.salary > ?) AS EmployeesGt1000
+WHERE Employees.employee_id = EmployeesGt1000.employee_id
+```
+
+**Used Parameters:**
+```
+(1000,)
+```
+
+```python
+# Raw strings # not implemented
 # Employees().from_("Employees e", "Departments d").select()
-#================================================================================#
-print("-------------------------------Expressions-------------------------------")
-#================================================================================#
+```
+
+---
+
+## Section — Expressions
+
+```python
 emp = (
 	Employees()
 	.set(
@@ -690,17 +1312,49 @@ emp = (
 	)
 	.value(employee_id=100)
 	.where(
-		(Employees.salary == Employees.salary) &
-		(Employees.salary == Employees.salary + 0)
+		(Employees.salary == Expression('salary')) &
+		(Employees.salary == Expression('salary + 0'))
 	)
 	.update()
 	.select(selected="first_name, last_name, email, salary, commission_pct")
 )
 emp.data['salary'] = int(emp.data['salary'])
+```
+
+**Generated SQL (update):**
+```sql
+UPDATE Employees SET
+  first_name = UPPER(first_name),
+  last_name = LOWER(last_name),
+  email = UPPER(first_name) || '.' || LOWER(last_name) || '@test.com',
+  salary = Employees.salary + 100,
+  commission_pct = COALESCE(commission_pct, 1)
+WHERE employee_id = ? AND Employees.salary = salary AND Employees.salary = salary + 0
+```
+
+**Used Parameters:**
+```
+(100,)
+```
+
+**Generated SQL (select):**
+```sql
+SELECT first_name, last_name, email, salary, commission_pct FROM Employees
+WHERE employee_id = ?
+```
+
+**Assertions:**
+```python
 assert emp.data == {'first_name': 'STEVEN', 'last_name': 'king', 'email': 'STEVEN.king@test.com', 'salary': 24100, 'commission_pct': 1}, emp.data
-#================================================================================#
-print("----------- SELECT, INSERT, UPDATE, and DELETE Record WithCTE -----------")
-#================================================================================#
+```
+
+---
+
+## Section — SELECT, INSERT, UPDATE, and DELETE Record WithCTE
+
+### CTE class definitions
+
+```python
 class Hierarchy(Record): pass # for recursive CTE
 class P(Employees): pass
 class C(Employees): pass
@@ -708,7 +1362,13 @@ class ExecutivesDepartment(Departments): pass
 class AdministrationJobs(Jobs): pass
 
 hierarchy = Hierarchy() # used as subquery ... IN (SELECT * FROM Hierarchy) # Hierarchy is Recursive CTE
+```
 
+---
+
+### CTE definitions
+
+```python
 # Oracle: use hints after SELECT
 # 'MySQL': Not support 'Default Behavior'
 # 'MicrosoftSQL': Not supported directly, Uses temp tables instead.
@@ -741,8 +1401,13 @@ if Record.database__.name in ['SQLite3', 'Postgres']:
 	cte2.materialization=True
 	cte3.materialization=False
 	cte4.materialization=True
+```
 
+---
 
+### Recursive CTE construction
+
+```python
 # ^ union: recursive_cte = (cte1 ^ cte2)
 # Recursive CTE wit UINION only supported by: SQLite3, MySQL, Postgres.
 recursive_cte = (cte1 + cte2)
@@ -766,7 +1431,43 @@ elif Record.database__.name in ['Postgres']:
 	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='SEARCH DEPTH FIRST BY employee_id SET ordercol')
 else:# ['SQLite3', 'MySQL']
 	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True)
+```
 
+**Generated SQL (SQLite3 — WITH CTE portion):**
+```sql
+WITH RECURSIVE
+  ExecutivesDepartment AS NOT MATERIALIZED (
+    SELECT /*+ INLINE */ ExecutivesDepartment.*
+    FROM Departments AS ExecutivesDepartment
+    WHERE ExecutivesDepartment.department_name = ?
+  ),
+  AdministrationJobs AS MATERIALIZED (
+    SELECT /*+ MATERIALIZE */ AdministrationJobs.*
+    FROM Jobs AS AdministrationJobs
+    WHERE AdministrationJobs.job_title LIKE ?
+  ),
+  Hierarchy(employee_id, manager_id, first_name) AS (
+    SELECT /*+ INLINE */ employee_id, manager_id, first_name
+    FROM Employees AS P
+    WHERE P.manager_id IS NULL
+    UNION ALL
+    SELECT /*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name
+    FROM Employees AS C
+    JOIN Hierarchy ON C.manager_id = Hierarchy.employee_id
+    WHERE C.first_name = ?
+  )
+```
+
+**Used Parameters (CTE):**
+```
+('Executive', 'Administration%', 'Neena')
+```
+
+---
+
+### Run SELECT WITH CTE as raw/plain SQL
+
+```python
 sql_query = f"{with_cte.value} SELECT * FROM Hierarchy" # build on top of generated WITH CTE
 # print(sql_query)
 
@@ -775,7 +1476,13 @@ print("Raw SQL:")
 rec = Record(statement=sql_query, parameters=with_cte.parameters, operation=Database.select)
 for r in rec:
 	print(r.data)
+```
 
+---
+
+### Cartonnage: UPDATE with CTE
+
+```python
 print("Cartonnage:")
 
 if(Record.database__.name not in ['Oracle']):
@@ -796,7 +1503,34 @@ if(Record.database__.name not in ['Oracle']):
 	# print(f"{'-'*80}")
 	# print(emp.query__.statement)
 	# print(emp.query__.parameters)
+```
 
+**Generated SQL (UPDATE with CTE):**
+```sql
+WITH RECURSIVE ... (same CTE as above)
+UPDATE Employees SET salary = ?
+WHERE Employees.employee_id IN (SELECT employee_id FROM Hierarchy)
+```
+
+**Used Parameters:**
+```
+('Executive', 'Administration%', 'Neena', 2000)
+```
+
+**Assertions:**
+```python
+# sqlite3 returns -1 for complex operations not the real affected rows count
+if(Record.database__.name in ['SQLite3']):
+	assert emp.rowsCount() == -1, emp.rowsCount()
+else:
+	assert emp.rowsCount() == 2, emp.rowsCount()
+```
+
+---
+
+### Cartonnage: SELECT with CTE and JOINs
+
+```python
 emp = (
 	Employees()
 	.with_cte(with_cte)
@@ -816,7 +1550,22 @@ for r in emp:
 # print(f"{'-'*80}")
 # print(emp.query__.statement)
 # print(emp.query__.parameters)
+```
 
+**Generated SQL (SELECT with CTE and JOINs):**
+```sql
+WITH RECURSIVE ... (same CTE as above)
+SELECT * FROM Employees
+JOIN Hierarchy ON Employees.employee_id = Hierarchy.employee_id
+JOIN Departments AS ExecutivesDepartment ON Employees.department_id = ExecutivesDepartment.department_id
+JOIN Jobs AS AdministrationJobs ON Employees.job_id = AdministrationJobs.job_id
+```
+
+---
+
+### Cartonnage: DELETE with CTE
+
+```python
 if(Record.database__.name not in ['Oracle']):
 	emp = (
 		Employees()
@@ -834,13 +1583,37 @@ if(Record.database__.name not in ['Oracle']):
 	# print(f"{'-'*80}")
 	# print(emp.query__.statement)
 	# print(emp.query__.parameters)
+```
 
+**Generated SQL (DELETE with CTE):**
+```sql
+WITH RECURSIVE ... (same CTE as above)
+DELETE FROM Employees
+WHERE Employees.employee_id IN (SELECT employee_id FROM Hierarchy)
+```
+
+**Assertions:**
+```python
+# sqlite3 returns -1 for complex operations not the real affected rows count
+if(Record.database__.name in ['SQLite3']):
+	assert emp.rowsCount() == -1, emp.rowsCount()
+else:
+	assert emp.rowsCount() == 2, emp.rowsCount()
+```
+
+```python
 # print("After delete - checking if in transaction:")
 # print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
 Record.database__.rollback()  # Force rollback
-#================================================================================#
-print("--------------------------- Recordset WithCTE ---------------------------")
-#================================================================================#
+```
+
+
+---
+
+## Section — Recordset WithCTE
+
+```python
+# Recordset WithCTE
 employees = Recordset()
 emp1 = (
 	Employees()
@@ -854,25 +1627,54 @@ emp2 = (
 ).set(last_name='kamal')
 
 employees.add(emp1, emp2)
+```
 
+### Recordset update with CTE
+
+```python
 if not (Record.database__.name == "Oracle"):
 	# add with_cte and filters to Recordset through it's first Record instance
 	emp1.with_cte(with_cte).where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
 	# use onColumns if you are not sure all columns are null free
 	employees.update(onColumns=["employee_id"])
+```
 
+**Generated SQL (per record, UPDATE with CTE):**
+```sql
+WITH RECURSIVE ... (same CTE as above)
+UPDATE Employees SET last_name = ?
+WHERE employee_id = ? AND Employees.employee_id IN (SELECT employee_id FROM Hierarchy)
+```
+
+**Assertions:**
+```python
 	# Insert, Update, and Delete with Recursive CTE is not tracked on SQLite3 and MicrosoftSQL
 	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
 		assert employees.rowsCount() == -1, employees.rowsCount
 	else:
 		assert employees.rowsCount() == 2, employees.rowsCount
+```
 
+---
+
+### Recordset delete with CTE
+
+```python
 	# This will delete only 100, But 101 will not be deleted ? why because database will evaluate CTE after each deletion !
 	# after deleteing 100 which is the only parent with manager_id=null will be no parent qualified with manager_id=null
 	# so when no parent then no childs ! so 101 will not available with the second iteration to be deleted.
 	employees.delete(onColumns=["employee_id"])
+```
 
+**Generated SQL (per record, DELETE with CTE):**
+```sql
+WITH RECURSIVE ... (same CTE as above)
+DELETE FROM Employees
+WHERE employee_id = ? AND Employees.employee_id IN (SELECT employee_id FROM Hierarchy)
+```
 
+**Assertions:**
+```python
 	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
 		assert employees.rowsCount() == -1, employees.rowsCount
 	else:
@@ -885,35 +1687,76 @@ if not (Record.database__.name == "Oracle"):
 	)
 	availableEmployees = [{'employee_id': 101}]
 	assert availableEmployeesAfterDeletion.recordset.data == availableEmployees, availableEmployeesAfterDeletion.recordset.data
+```
 
+```python
 	# now I will delete 101 to test Recordset insertion WithCTE
 	# use onColumns if you are not sure all columns are null free
 	availableEmployeesAfterDeletion.delete()
+```
 
+---
+
+### Recordset insert with CTE
+
+```python
 # Record.database__._Database__cursor.execute("SELECT employee_id FROM Employees WHERE employee_id IN (100, 101)")
 # print("RAW CHECK:", Record.database__._Database__cursor.fetchall())
 
 if (Record.database__.name not in ["Oracle", "MySQL"]):
 
 	employees.insert()
+```
 
+**Assertions:**
+```python
 	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
 		assert employees.rowsCount() == -1, employees.rowsCount
 	else:
 		assert employees.rowsCount() == 2, employees.rowsCount
+```
 
+```python
 Record.database__.rollback()  # Force rollback
-#==============================================================================#
-Record.database__.rollback() # Record.database__.commit()
-Record.database__.close()
-#==============================================================================#
-print("--------------------------ALL FEATURES TESTED--------------------------")
-#==============================================================================#
-print(f"{Record.database__.name} Operations Count: {Record.database__.operationsCount}")
-# assert Record.database__.operationsCount == 13
+```
 
-end = time.time()
-print(end - start)
-#==============================================================================#
-print("---------------------------COMPREHENSIVE TEST---------------------------")
-#==============================================================================#
+---
+
+# Design notes:
+
+**Schema definition and migration:**
+**Design Philosophy**
+
+Not all people believe in making ORM to manage the schema definition and migration for them because they see it as burden in many cases
+
+So I always believe that should be an ORM let people do **DDL in SQL and DML by the ORM**.
+
+**Cartonnage doesn't enforce anything on you**
+
+**Relationship loading:** it is intentionally left to architecture and developers responsibility **-Cartonnage philosophy-**, So **no eager/lazy load** in Cartonnage it **lets you decide what to load and when.**
+
+**Override/intercept/interrupt access attributes:** it override/intercepts/interrupts fields access and do work.
+
+**Changes track:** it explicitly tracks changes and reflect it back on record after successful updates.
+
+**Session transaction:** Cartonnage design is follow Active Records pattern you can CRUD **just now or control transaction manually** but it also has a **tiny Session class** to make you **submit**, **collect**, **flush** and **control commits/rollbacks**
+
+**"This is the last added one and it sure needs more enhancements"**.
+
+**Unit of work pattern and Identity map:** **Cartonnage** is planning to have some/not all feature(s) of unit of pattern and identity map patterns achieved through session class to have **hybrid design** between active record and unit of work pattern.
+
+**Signal/hooks:** it has a different approach in Cartonnage, rather than **listening to an event** like or using **simple hooks** it can be achieved by many ways, for example:
+
+Overload Record CRUD methods like:
+```
+def read():
+some work before
+crud()
+some work after
+```
+
+---
+
+# Support Cartonnage!
+
+---
