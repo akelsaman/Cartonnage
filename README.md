@@ -1,7 +1,7 @@
-Installation:
+# Installation:
 pip install cartonnage
 
-Basic usage:
+# Basic usage:
 
 import sqlite3
 connection = sqlite3.connect(AKESQLiteConfig.DATABASE_PATH, check_same_thread=True, autocommit=False)
@@ -12,10 +12,10 @@ class Employees(Record): pass
 emp = Employees().where(employee_id = 100).select()
 print(emp.first_name)
 
-For comprehensive documentation:
+# For comprehensive documentation:
 
-Official Website:
+# Official Website:
 https://cartonnage-orm.com
 
-Github page:
+# Github page:
 https://akelsaman.github.io/Cartonnage/#Documentation
