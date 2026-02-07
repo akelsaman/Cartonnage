@@ -27,6 +27,11 @@ https://akelsaman.github.io/Cartonnage/#Documentation
 # Show Case:
 
 ### Note:
+
+**I have started to write Cartonnage 8 years ago, AI has no contribution to this ORM,** every class or method I have developed my self, you can review the code and you find the humanity in it.
+
+> Where's the development commits?! I have started this since 8 years ago, I wasn't know that I will continue to this extent in this project, I was commit it in another private repo with other projects I play around in the same repo :D, this repo is still exists and it has many other projects/folders/sensitive information/..., so I decided to create a new clean repo for this project and I have moved the last commit/state from the development repo to this repo.
+
 I have enhanced this post as much as I can according to your previously feedbacks.
 
 So I decided to run this showcase using SQLAlchemy, because I have to show the case first using an ORM and the SQLAlchemy is the best to use.
@@ -36,8 +41,6 @@ So it's not a comparison with SQLAlchemy.
 Actually no space for comparison as SQLAlchemy is the benchmark/best with full implementation Data Mapper and Work of Unit patterns.
 
 The purpose is to say Cartonnage -which is follow Active Pattern- may be useful in some use/show cases.
-
-I have started to write Cartonnage 8 years ago.
 
 AI didn't contriute to this post.
 
