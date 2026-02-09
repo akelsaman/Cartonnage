@@ -1,0 +1,2575 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="icon" type="image/png" href="cartonnage_icon.png">
+	<title>Cartonnage ORM</title>
+	<meta name="description" content="Cartonnage is a powerful Python ORM (Object-Relational Mapping) library supporting SQLite3, Oracle, MySQL, PostgreSQL, and Microsoft SQL Server. Simple, intuitive API with advanced features like self-joins, subqueries, and complex filtering.">
+	<meta name="keywords" content="Python ORM, Cartonnage, SQLite ORM, Oracle ORM, MySQL ORM, PostgreSQL ORM, SQL Server ORM, Python database, ORM library, database abstraction, Python SQL">
+	<meta name="author" content="Ahmed Kamal ELSamman">
+	<meta name="robots" content="index, follow">
+	<link rel="canonical" href="https://cartonnage.pages.dev/">
+	
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="website">
+	<meta property="og:url" content="https://cartonnage.pages.dev/">
+	<meta property="og:title" content="Cartonnage ORM - Powerful Python ORM for Multiple Databases">
+	<meta property="og:description" content="Cartonnage is a powerful Python ORM library supporting SQLite3, Oracle, MySQL, PostgreSQL, and Microsoft SQL Server. Simple API with advanced features.">
+	<meta property="og:image" content="https://cartonnage.pages.dev/cartonnage_dark.jpeg">
+	
+	<!-- Twitter -->
+	<meta property="twitter:card" content="summary_large_image">
+	<meta property="twitter:url" content="https://cartonnage.pages.dev/">
+	<meta property="twitter:title" content="Cartonnage ORM - Powerful Python ORM for Multiple Databases">
+	<meta property="twitter:description" content="Cartonnage is a powerful Python ORM library supporting SQLite3, Oracle, MySQL, PostgreSQL, and Microsoft SQL Server. Simple API with advanced features.">
+	<meta property="twitter:image" content="https://cartonnage.pages.dev/cartonnage_dark.jpeg">
+	
+	<!-- JSON-LD Structured Data -->
+	<script type="application/ld+json">
+	{
+		"@context": "https://schema.org",
+		"@type": "SoftwareApplication",
+		"name": "Cartonnage ORM",
+		"applicationCategory": "DeveloperApplication",
+		"operatingSystem": "Cross-platform",
+		"description": "Cartonnage is a powerful Python ORM (Object-Relational Mapping) library supporting multiple databases including SQLite3, Oracle, MySQL, PostgreSQL, and Microsoft SQL Server.",
+		"author": {
+			"@type": "Person",
+			"name": "Ahmed Kamal ELSamman",
+			"url": "https://eg.linkedin.com/in/akelsaman"
+		},
+		"offers": {
+			"@type": "Offer",
+			"price": "0",
+			"priceCurrency": "USD"
+		},
+		"license": "https://opensource.org/licenses/MIT",
+		"programmingLanguage": "Python",
+		"url": "https://cartonnage.pages.dev/"
+	}
+	</script>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--bg-primary: #1e1e2e;
+			--bg-secondary: #313244;
+			--bg-tertiary: #45475a;
+			--text-primary: #cdd6f4;
+			--text-secondary: #a6adc8;
+			--accent-blue: #89b4fa;
+			--accent-green: #a6e3a1;
+			--accent-yellow: #f9e2af;
+			--accent-red: #f38ba8;
+			--accent-purple: #5c9fff;
+			--accent-teal: #94e2d5;
+			--accent-orange: #fab387;
+			--border-color: #585b70;
+			--muted: #6c7086;
+			--code-bg: #1e1e2e;
+		}
+
+		:root.light {
+			--bg-primary: #eff1f5;
+			--bg-secondary: #e6e9ef;
+			--bg-tertiary: #ccd0da;
+			--text-primary: #4c4f69;
+			--text-secondary: #5c5f77;
+			--accent-blue: #0d47a1;
+			--accent-green: #40a02b;
+			--accent-yellow: #df8e1d;
+			--accent-red: #d20f39;
+			--accent-purple: #0d47a1;
+			--accent-teal: #179299;
+			--accent-orange: #fe640b;
+			--border-color: #bcc0cc;
+			--muted: #7c7f93;
+			--code-bg: #dce0e8;
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		body {
+			font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+			background-color: var(--bg-primary);
+			color: var(--text-primary);
+			line-height: 1.6;
+			padding: 0;
+			margin: 0;
+			transition: background-color 0.3s, color 0.3s;
+			letter-spacing: 0.015em;
+		}
+
+		/* Typography - Serif for headings */
+		h1, h2, h3, h4, h5, h6,
+		.nav-brand,
+		.section-header,
+		.video-title,
+		.evaluation-title,
+		.sidebar-section-title {
+			font-family: 'Cinzel', serif;
+			font-weight: 700;
+			letter-spacing: 0.02em;
+		}
+
+		h1 { font-size: 2.5rem; font-weight: 900; }
+		h2 { font-size: 2rem; font-weight: 700; }
+		h3 { font-size: 1.5rem; font-weight: 600; }
+		h4 { font-size: 1.25rem; font-weight: 600; }
+		h5 { font-size: 1.1rem; font-weight: 600; }
+		h6 { font-size: 1rem; font-weight: 600; }
+
+		/* Top Navigation Bar */
+		.top-nav {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			height: 60px;
+			background: var(--bg-secondary);
+			border-bottom: 1px solid var(--border-color);
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 0 2rem;
+			z-index: 1000;
+			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+		}
+
+		.nav-brand {
+			font-size: 1.4rem;
+			font-weight: 700;
+			color: var(--accent-blue);
+		}
+
+		.nav-tabs {
+			display: flex;
+			gap: 0.5rem;
+			height: 100%;
+			align-items: center;
+		}
+
+		.nav-tab {
+			background: transparent;
+			border: none;
+			color: var(--text-secondary);
+			padding: 0.75rem 1.5rem;
+			font-size: 1rem;
+			font-weight: 500;
+			cursor: pointer;
+			border-radius: 8px;
+			transition: all 0.2s;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.nav-tab:hover {
+			background: var(--bg-tertiary);
+			color: var(--text-primary);
+		}
+
+		.nav-tab.active {
+			background: var(--accent-blue);
+			color: var(--bg-primary);
+		}
+
+		.nav-tab svg {
+			width: 18px;
+			height: 18px;
+			fill: currentColor;
+		}
+
+		.nav-actions {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.theme-toggle {
+			background: var(--bg-tertiary);
+			border: 1px solid var(--border-color);
+			border-radius: 50%;
+			width: 40px;
+			height: 40px;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			transition: background-color 0.3s, transform 0.2s;
+		}
+
+		.theme-toggle:hover {
+			transform: scale(1.1);
+			background: var(--border-color);
+		}
+
+		.theme-toggle svg {
+			width: 20px;
+			height: 20px;
+			fill: var(--text-primary);
+			transition: fill 0.3s;
+		}
+
+		.theme-toggle .sun-icon {
+			display: none;
+		}
+
+		.theme-toggle .moon-icon {
+			display: block;
+		}
+
+		:root.light .theme-toggle .sun-icon {
+			display: block;
+		}
+
+		:root.light .theme-toggle .moon-icon {
+			display: none;
+		}
+
+		/* Main Content Area */
+		.main-content {
+			margin-top: 60px;
+			min-height: calc(100vh - 60px);
+		}
+
+		/* Page Containers */
+		.page {
+			display: none;
+		}
+
+		.page.active {
+			display: block;
+		}
+
+		.page-docs.active {
+			display: flex;
+			min-height: calc(100vh - 60px);
+		}
+
+		/* Video Page */
+		.page-video {
+			padding: 2rem;
+		}
+
+		.video-container {
+			max-width: 1000px;
+			margin: 0 auto;
+		}
+
+		.video-title {
+			text-align: center;
+			color: var(--accent-blue);
+			font-size: 2rem;
+			margin-bottom: 2rem;
+		}
+
+		.video-wrapper {
+			position: relative;
+			padding-bottom: 56.25%; /* 16:9 aspect ratio */
+			height: 0;
+			overflow: hidden;
+			border-radius: 12px;
+			box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+		}
+
+		.video-wrapper iframe {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			border-radius: 12px;
+		}
+
+		.video-note {
+			text-align: center;
+			color: var(--text-secondary);
+			margin-top: 1.5rem;
+			font-style: italic;
+		}
+
+		/* Sidebar Navigation */
+		.docs-sidebar {
+			width: 280px;
+			min-width: 280px;
+			background: var(--bg-secondary);
+			border-right: 1px solid var(--border-color);
+			padding: 1.5rem 0;
+			position: fixed;
+			top: 60px;
+			left: 0;
+			height: calc(100vh - 60px);
+			overflow-y: auto;
+			z-index: 100;
+		}
+
+
+		.sidebar-title {
+			font-size: 0.75rem;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.1em;
+			color: var(--muted);
+			padding: 0 1.5rem;
+			margin-bottom: 1rem;
+		}
+
+		.sidebar-nav {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+		}
+
+		.sidebar-section {
+			margin-bottom: 0.5rem;
+		}
+
+		.sidebar-section-title {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			padding: 0.6rem 1.5rem;
+			font-size: 0.9rem;
+			font-weight: 600;
+			color: var(--text-primary);
+			cursor: pointer;
+			transition: background 0.2s;
+		}
+
+		.sidebar-section-title:hover {
+			background: var(--bg-tertiary);
+		}
+
+		.sidebar-section-title svg {
+			width: 16px;
+			height: 16px;
+			fill: var(--accent-purple);
+			transition: transform 0.2s;
+		}
+
+		.sidebar-section.collapsed .sidebar-section-title svg {
+			transform: rotate(-90deg);
+		}
+
+		.sidebar-section.collapsed .sidebar-items {
+			display: none;
+		}
+
+		.sidebar-items {
+			list-style: none;
+			margin: 0;
+			padding: 0;
+		}
+
+		.sidebar-item {
+			display: block;
+			padding: 0.5rem 1.5rem 0.5rem 2.5rem;
+			font-size: 0.85rem;
+			color: var(--text-secondary);
+			text-decoration: none;
+			cursor: pointer;
+			transition: all 0.2s;
+			border-left: 2px solid transparent;
+		}
+
+		.sidebar-item:hover {
+			background: var(--bg-tertiary);
+			color: var(--text-primary);
+		}
+
+		.sidebar-item.active {
+			background: var(--bg-tertiary);
+			color: var(--accent-blue);
+			border-left-color: var(--accent-blue);
+		}
+
+		/* Main Documentation Content */
+		.docs-content {
+			flex: 1;
+			padding: 2rem;
+			overflow-x: hidden;
+			margin-left: 280px;
+		}
+
+		.section-header {
+			text-align: center;
+			margin: 2rem 0 1rem;
+			color: var(--accent-purple);
+			font-size: 1.4rem;
+			border-bottom: 2px solid var(--accent-purple);
+			padding-bottom: 0.5rem;
+			max-width: 1000px;
+			margin-left: auto;
+			margin-right: auto;
+			scroll-margin-top: 80px;
+		}
+
+		.scenarios-container {
+			max-width: 1000px;
+			margin: 0 auto;
+			display: flex;
+			flex-direction: column;
+			gap: 1.5rem;
+		}
+
+		test-case {
+			scroll-margin-top: 80px;
+		}
+
+		/* Floating documentation image */
+		.docs-floating-image {
+			position: fixed;
+			right: 2rem;
+			top: 50%;
+			transform: translateY(-50%);
+			z-index: 50;
+			opacity: 0.1;
+			transition: opacity 0.3s;
+		}
+
+		.docs-floating-image:hover {
+			opacity: 0.9;
+		}
+
+		.docs-floating-image a {
+			display: block;
+		}
+
+		.docs-floating-image img {
+			width: 100px;
+			height: 100px;
+			border-radius: 50%;
+			cursor: pointer;
+		}
+
+		/* Responsive sidebar */
+		@media (max-width: 900px) {
+			.docs-sidebar {
+				display: none;
+			}
+			.docs-content {
+				margin-left: 0;
+			}
+		}
+
+		@media (max-width: 1400px) {
+			.docs-floating-image {
+				display: none;
+			}
+		}
+
+		/* Mobile responsive styles */
+		@media (max-width: 768px) {
+			.top-nav {
+				padding: 0 0.75rem;
+				height: auto;
+				min-height: 60px;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				padding-top: 0.5rem;
+				padding-bottom: 0.5rem;
+			}
+
+			.nav-brand {
+				font-size: 1.1rem;
+				order: 1;
+			}
+
+			.nav-actions {
+				order: 2;
+			}
+
+			.nav-tabs {
+				order: 3;
+				width: 100%;
+				justify-content: center;
+				flex-wrap: wrap;
+				gap: 0.25rem;
+			}
+
+			.nav-tab {
+				padding: 0.5rem 0.75rem;
+				font-size: 0.85rem;
+			}
+
+			.nav-tab svg {
+				width: 14px;
+				height: 14px;
+			}
+
+			.nav-tab span {
+				display: none;
+			}
+
+			.main-content {
+				margin-top: 100px;
+			}
+
+			.page-video {
+				padding: 1rem;
+			}
+
+			.video-title {
+				font-size: 1.5rem;
+				margin-bottom: 1rem;
+			}
+
+			.docs-content {
+				padding: 1rem;
+			}
+
+			.section-header {
+				font-size: 1.1rem;
+			}
+
+			.page-evaluation {
+				padding: 1rem !important;
+			}
+
+			.evaluation-logo {
+				max-width: 150px !important;
+			}
+
+			.evaluation-title {
+				font-size: 1.75rem !important;
+			}
+
+			.evaluation-section {
+				padding: 1.5rem !important;
+			}
+		}
+
+		@media (max-width: 480px) {
+			.top-nav {
+				padding: 0.5rem;
+			}
+
+			.nav-brand {
+				font-size: 1rem;
+			}
+
+			.nav-brand img {
+				height: 20px !important;
+			}
+
+			.nav-tabs {
+				gap: 0.15rem;
+			}
+
+			.nav-tab {
+				padding: 0.4rem 0.5rem;
+				font-size: 0.75rem;
+				gap: 0.25rem;
+			}
+
+			.main-content {
+				margin-top: 110px;
+			}
+
+			.page-video {
+				padding: 0.5rem;
+			}
+
+			.video-title {
+				font-size: 1.25rem;
+			}
+
+			.video-wrapper {
+				border-radius: 8px;
+			}
+
+			.docs-content {
+				padding: 0.5rem;
+			}
+
+			.section-header {
+				font-size: 1rem;
+				padding-bottom: 0.3rem;
+			}
+
+			.scenarios-container {
+				gap: 1rem;
+			}
+
+			.page-evaluation {
+				padding: 0.5rem !important;
+			}
+
+			.evaluation-container {
+				padding: 0 0.5rem;
+			}
+
+			.evaluation-logo {
+				max-width: 120px !important;
+			}
+
+			.evaluation-title {
+				font-size: 1.5rem !important;
+			}
+
+			.evaluation-section {
+				padding: 1rem !important;
+				border-radius: 8px !important;
+			}
+
+			.evaluation-section h3 {
+				font-size: 1.2rem !important;
+			}
+
+			.evaluation-section h4 {
+				font-size: 1rem !important;
+			}
+
+			.evaluation-section p,
+			.evaluation-section li {
+				font-size: 0.9rem !important;
+			}
+
+			.evaluation-section code {
+				font-size: 0.8rem !important;
+				word-break: break-word;
+			}
+
+			.evaluation-section ul {
+				margin-left: 1rem !important;
+			}
+		}
+
+		/* Extra small devices */
+		@media (max-width: 360px) {
+			.nav-tab {
+				padding: 0.35rem 0.4rem;
+				font-size: 0.7rem;
+			}
+
+			.nav-brand {
+				font-size: 0.9rem;
+			}
+		}
+	</style>
+</head>
+<body>
+	<!-- Top Navigation Bar -->
+	<nav class="top-nav">
+		<div class="nav-brand"><img src="cartonnage_icon.png" alt="Cartonnage" style="height: 24px; margin-right: 8px; vertical-align: middle;">Cartonnage ORM</div>
+
+		<div class="nav-tabs">
+			<button class="nav-tab active" onclick="showPage('home')" data-page="home">
+				<svg viewBox="0 0 24 24">
+					<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+				</svg>
+				Home
+			</button>
+			<button class="nav-tab" onclick="showPage('docs')" data-page="docs">
+				<svg viewBox="0 0 24 24">
+					<path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+				</svg>
+				Documentation
+			</button>
+			<button class="nav-tab" onclick="showPage('license')" data-page="license">
+				<svg viewBox="0 0 24 24">
+					<path d="M9 10h1.5v1.5H9V10zm0 3h1.5v1.5H9V13zm3-3h1.5v1.5H12V10zm0 3h1.5v1.5H12V13zm-4.5-7h9c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1h-9c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1zm9 13V7h-9v12h9zm-2-8.5h1.5V10H14.5v1.5zm0 3h1.5V13H14.5v1.5z M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+				</svg>
+				License
+			</button>
+			<button class="nav-tab" onclick="showPage('evaluation')" data-page="evaluation">
+				<svg viewBox="0 0 24 24">
+					<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+				</svg>
+				Evaluation
+			</button>
+			<button class="nav-tab" onclick="showPage('video')" data-page="video">
+				<svg viewBox="0 0 24 24">
+					<path d="M8 5v14l11-7z"/>
+				</svg>
+				Video
+			</button>
+		</div>
+
+		<div class="nav-actions">
+			<button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+				<svg class="moon-icon" viewBox="0 0 24 24">
+					<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+				</svg>
+				<svg class="sun-icon" viewBox="0 0 24 24">
+					<circle cx="12" cy="12" r="5"/>
+					<line x1="12" y1="1" x2="12" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+					<line x1="12" y1="21" x2="12" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+					<line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+					<line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+					<line x1="1" y1="12" x2="3" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+					<line x1="21" y1="12" x2="23" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+					<line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+					<line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+				</svg>
+			</button>
+		</div>
+	</nav>
+
+	<!-- Main Content Area -->
+	<div class="main-content">
+		<!-- Home Page -->
+		<div id="page-home" class="page active">
+			<home-page></home-page>
+		</div>
+
+		<!-- Documentation Page -->
+		<div id="page-docs" class="page page-docs">
+			<!-- Sidebar Navigation -->
+			<aside class="docs-sidebar">
+				<div class="sidebar-title">Documentation</div>
+				<ul class="sidebar-nav">
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Class Declarations
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-class-declarations')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-database-connection-setup')">Database Connection Setup</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-record-class-definitions')">Record Class Definitions</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Filters and Conditions
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-filters-conditions')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-select-filter-by-exact-field-value')">Filter by Exact Value</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-select-filter-by-expression')">Filter by Expression</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-join-two-different-tables')">JOIN Two Tables</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-join-self-join-same-table')">Self-Join</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-filter-like-pattern-matching')">LIKE Pattern</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-filter-is-null-check')">IS NULL</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-filter-is-not-null-check')">IS NOT NULL</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-filter-in-list-check')">IN List</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-filter-not-in-exclusion')">NOT IN</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-filter-between-range-check')">BETWEEN</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-filter-gt-ge-le-lt-comparisons')">Comparisons</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-filter-expressions-and-or')">AND/OR Expressions</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-filter-multiple-kwargs')">Multiple kwargs</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							SELECT ALL Records
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-select-all')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-select-all-retrieve-all-records')">Retrieve All Records</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Single Record CRUD
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-single-crud')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-insert-single-record-with-data-dictionary')">INSERT Single Record</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-update-single-record-with-set-and-value')">UPDATE Single Record</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-select-verify-updated-record')">SELECT Updated Record</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-delete-exists-and-in-subquery-filters')">DELETE with EXISTS</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Recordset Operations
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-recordset-ops')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-like-filter-recordset-update-delete')">LIKE + UPDATE/DELETE</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Instantiate a Recordset
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-instantiate-recordset')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-recordset-batch-insert-update-delete')">Batch Operations</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Raw SQL Statements
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-raw-sql')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-raw-sql-execute-statement-directly')">Execute Statement</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-raw-sql-parameterized-statement')">Parameterized SQL</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-instantiate-create-record-with-field-values')">Create with Field Values</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							GROUP BY with HAVING
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-group-by')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-group-by-aggregate-with-having-clause')">Aggregate with HAVING</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Expressions
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-expressions')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-expression-combined-update-with-multiple-functions')">Combined Update</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Upsert Operations
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-upsert')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-upsert-insert-or-update-with-conflict-resolution')">Insert or Update</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Session Operations
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-session')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-session-transaction-management-with-savepoints')">Transaction Management</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							FROM Clause
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-from')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-from-multiple-tables')">Multiple Tables</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-from-subquery-as-table-source')">Subquery as Table</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Record WithCTE
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-record-cte')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-cte-define-common-table-expressions')">Define CTEs</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-cte-select-with-recursive-cte')">SELECT with CTE</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-cte-update-with-recursive-cte')">UPDATE with CTE</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-cte-delete-with-recursive-cte')">DELETE with CTE</li>
+						</ul>
+					</li>
+					<li class="sidebar-section">
+						<div class="sidebar-section-title" onclick="toggleSection(this)">
+							<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+							Recordset WithCTE
+						</div>
+						<ul class="sidebar-items">
+							<li class="sidebar-item" onclick="scrollToDoc('sec-recordset-cte')">Overview</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-recordset-cte-batch-update-with-cte')">Batch UPDATE</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-recordset-cte-batch-delete-with-cte')">Batch DELETE</li>
+							<li class="sidebar-item" onclick="scrollToDoc('doc-recordset-cte-batch-insert-with-cte')">Batch INSERT</li>
+						</ul>
+					</li>
+				</ul>
+			</aside>
+
+			<!-- Main Documentation Content -->
+			<div class="docs-content">
+				<div class="docs-floating-image">
+					<a href="https://github.com/akelsaman/Cartonnage" target="_blank" rel="noopener noreferrer" title="View Cartonnage on GitHub">
+						<img src="cartonnage_dark.jpeg" alt="Cartonnage ORM - View on GitHub">
+					</a>
+				</div>
+				<div style="text-align: center; margin-bottom: 2rem;">
+					<img src="cartonnage_dark.jpeg" alt="Cartonnage ORM" style="max-width: 200px; border-radius: 50%;">
+				</div>
+				<div class="scenarios-container">
+
+		<!-- ============================================================ -->
+		<!-- CLASS DECLARATIONS -->
+		<!-- ============================================================ -->
+		<h2 id="sec-class-declarations" class="section-header">Class Declarations (Lines 32-52)</h2>
+
+		<test-case title="Database Connection Setup" lines="12-30"
+			description="Configure the database connection. SQLite3 can be replaced by Oracle, MySQL, Postgres, or MicrosoftSQL with any instantiated connection.">
+			<code-python slot="python">#================================================================================#
+# Cartonnage has been tested on the following database versions:
+#
+# SQLite3 version 3.51.0
+# Oracle 19c, 23ai, and 26ai
+# MySQL 8.0.35
+# PostgreSQL 17.7
+# MicrosoftAzureSQL NA
+#================================================================================#
+
+import sqlite3
+
+# Create database connection
+connection = sqlite3.connect('hr.db', check_same_thread=True)
+
+# Set the database adapter for Record class
+# SQLite3 can be replaced by Oracle, MySQL, Postgres, or MicrosoftSQL
+Record.database__ = SQLite3(connection)
+
+# Transaction control - commit or rollback manually
+Record.database__.commit()    # Commit changes
+Record.database__.rollback()  # Rollback changes
+Record.database__.close()     # Close connection</code-python>
+			<code-sql slot="sql"># No SQL generated - connection setup only
+# Supported databases:
+# - SQLite3(connection)
+# - Oracle(connection)
+# - MySQL(connection)
+# - Postgres(connection)
+# - MicrosoftSQL(connection)</code-sql>
+			<code-params slot="params"># No parameters - connection setup</code-params>
+			<code-output slot="output"># Database connection established
+# Transaction control available via:
+# - Record.database__.commit()
+# - Record.database__.rollback()
+# - Record.database__.close()</code-output>
+		</test-case>
+
+		<test-case title="Record Class Definitions" lines="32-52"
+			description="Define Record subclasses for each database table. Alias classes enable self-joins and subqueries on the same table.">
+			<code-python slot="python">
+# Table Record classes
+class Regions(Record): pass
+class Countries(Record): pass
+class Departments(Record): pass
+class Jobs(Record): pass
+class Job_History(Record): pass
+class Locations(Record): pass
+class Employees(Record): pass
+class Dependents(Record): pass
+
+# Alias classes for self-joins and subqueries
+class RegionsAlias(Regions): pass
+class CountriesAlias(Countries): pass
+class DepartmentsAlias(Departments): pass
+class JobsAlias(Jobs): pass
+class Job_HistoryAlias(Job_History): pass
+class LocationsAlias(Locations): pass
+class EmployeesAlias(Employees): pass
+class DependentsAlias(Dependents): pass
+
+# Self-join alias for employee-manager relationship
+class Managers(Employees): pass
+</code-python>
+			<code-sql slot="sql"># No SQL generated - class definitions only
+# Classes map to tables:
+# Regions -> regions
+# Countries -> countries
+# Departments -> departments
+# Jobs -> jobs
+# Job_History -> job_history
+# Locations -> locations
+# Employees -> employees
+# Dependents -> dependents
+# Managers -> employees (alias)</code-sql>
+			<code-params slot="params"># No parameters - class definitions</code-params>
+			<code-output slot="output"># Classes are now available for ORM operations:
+# - Direct table access (Employees, Jobs, etc.)
+# - Alias classes for subqueries (EmployeesAlias, etc.)
+# - Self-join support (Managers extends Employees)</code-output>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION 01: Basic Filtering Tests -->
+		<!-- ============================================================ -->
+		<h2 id="sec-filters-conditions" class="section-header">Section 01 - Filters and Conditions</h2>
+
+		<!-- Section 01 features overview:
+		# read section 00 in sql_cartonnage_test.py and write a test scenatio for each feature included in this section:
+		# Expressive filtering:
+		# Join two tables
+		# Join Same table
+		# like()
+		# is_null()
+		# is_not_null()
+		# in_
+		# not_in
+		# between
+		# gt
+		# ge
+		# le
+		# lt
+		# filter using multiple kwargs
+		# & | expressions
+		# & | filters
+		-->
+
+		<!-- Test 01-1: Filter by Exact Value -->
+		<test-case title="SELECT - Filter by Exact Field Value" lines="226-229"
+			description="Select a single employee record using value() method. The ORM generates a SELECT with WHERE clause.">
+			<code-python slot="python"># filter using Record.field = exact value
+employee = Employees().value(employee_id=100).select()
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.employee_id = ?</code-sql>
+			<code-params slot="params">[100]</code-params>
+		</test-case>
+
+		<!-- Test 01-2: Filter by Expression -->
+		<test-case title="SELECT - Filter by Expression" lines="232-235"
+			description="Select an employee record using where() with expression comparison operator.">
+			<code-python slot="python"># filter using Record.where(expression)
+employee = (Employees().where(Employees.employee_id == 100).select())
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.employee_id = ?</code-sql>
+			<code-params slot="params">[100]</code-params>
+		</test-case>
+
+		<!-- Test 01-3: JOIN Two Tables -->
+		<test-case title="JOIN - Two Different Tables" lines="238-246"
+			description="Join Employees with Dependents table to find employees who have dependents with a specific first name.">
+			<code-python slot="python"># join two tables
+employee = (
+	Employees()
+	.join(Dependents, (Employees.employee_id == Dependents.employee_id))
+	.where(Dependents.first_name == "Jennifer")
+	.select(selected="Employees.*")
+)
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}</code-python>
+			<code-sql slot="sql">SELECT Employees.* FROM Employees Employees
+INNER JOIN Dependents Dependents ON Employees.employee_id = Dependents.employee_id
+WHERE Dependents.first_name = ?</code-sql>
+			<code-params slot="params">['Jennifer']</code-params>
+		</test-case>
+
+		<!-- Test 01-4: JOIN Same Table (Self-Join) -->
+		<test-case title="JOIN - Self-Join (Same Table)" lines="249-257"
+			description="Self-join Employees table to find employees managed by a specific manager. Uses an alias class (Managers) for the same table.">
+			<code-python slot="python"># join same table
+employee = (
+	Employees()
+	.join(Managers, (Employees.manager_id == Managers.employee_id))
+	.where(Managers.first_name == 'Lex')
+	.select(selected='Employees.*, Managers.employee_id AS "manager_employee_id", Managers.email AS "manager_email"') # selected columns
+)
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6, 'manager_employee_id': 102, 'manager_email': 'lex.de haan@sqltutorial.org'}</code-python>
+			<code-sql slot="sql">SELECT Employees.*, Managers.employee_id AS "manager_employee_id", Managers.email AS "manager_email"
+FROM Employees Employees
+INNER JOIN Employees Managers ON Employees.manager_id = Managers.employee_id
+WHERE Managers.first_name = ?</code-sql>
+			<code-params slot="params">['Lex']</code-params>
+		</test-case>
+
+		<!-- Test 01-5: LIKE Filter -->
+		<test-case title="FILTER - like() Pattern Matching" lines="260-268"
+			description="Filter employees using LIKE pattern matching. Demonstrates two equivalent syntaxes: method chaining and expression-based.">
+			<code-python slot="python"># filter using like() # use two diffent filteration methods
+employee = (
+	Employees()
+	.like(first_name = 'Stev%') # calls internally Record.filter_.like()
+	.where(Employees.first_name.like('Stev%')) # calls internally Record.filter_.like()
+	.select()
+)
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.first_name LIKE ?
+  AND Employees.first_name LIKE ?</code-sql>
+			<code-params slot="params">['Stev%', 'Stev%']</code-params>
+		</test-case>
+
+		<!-- Test 01-6: IS NULL Filter -->
+		<test-case title="FILTER - is_null() Check" lines="271-279"
+			description="Filter employees where manager_id IS NULL (top-level employees with no manager).">
+			<code-python slot="python"># filter using is_null() # use two diffent filteration methods
+employee = (
+	Employees()
+	.is_null(manager_id = None) # calls internally Record.filter_.is_null()
+	.where(Employees.manager_id.is_null()) # calls internally Record.filter_.where()
+	.select()
+)
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.manager_id IS NULL
+  AND Employees.manager_id IS NULL</code-sql>
+			<code-params slot="params">[]</code-params>
+		</test-case>
+
+		<!-- Test 01-7: IS NOT NULL Filter -->
+		<test-case title="FILTER - is_not_null() Check" lines="282-291"
+			description="Filter employees where manager_id IS NOT NULL (employees who have a manager).">
+			<code-python slot="python"># filter using is_not_null() # use two diffent filteration methods
+employee = (
+	Employees()
+	.where(employee_id = 101)
+	.is_not_null(manager_id = None) # calls internally Record.filter_.is_not_null()
+	.where(Employees.manager_id.is_not_null()) # calls internally Record.filter_.where()
+	.select()
+)
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.employee_id = ?
+  AND Employees.manager_id IS NOT NULL
+  AND Employees.manager_id IS NOT NULL</code-sql>
+			<code-params slot="params">[101]</code-params>
+		</test-case>
+
+		<!-- Test 01-8: IN Filter -->
+		<test-case title="FILTER - in_() List Check" lines="294-302"
+			description="Filter employees where employee_id is IN a list of values.">
+			<code-python slot="python"># filter using in_() # use two diffent filteration methods
+employee = (
+	Employees()
+	.in_(employee_id = [100]) # calls internally Record.filter_.in_()
+	.where(Employees.employee_id.in_([100])) # calls internally Record.filter_.where()
+	.select()
+)
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.employee_id IN (?)
+  AND Employees.employee_id IN (?)</code-sql>
+			<code-params slot="params">[100, 100]</code-params>
+		</test-case>
+
+		<!-- Test 01-9: NOT IN Filter -->
+		<test-case title="FILTER - not_in() Exclusion" lines="305-314"
+			description="Filter employees where employee_id is NOT IN a list of values.">
+			<code-python slot="python"># filter using not_in() # use two diffent filteration methods
+employee = (
+	Employees()
+	.where(Employees.first_name.like('Alex%'))
+	.not_in(employee_id = [115]) # calls internally Record.filter_.like()
+	.where(Employees.employee_id.not_in([115])) # calls internally Record.filter_.where()
+	.select()
+)
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6}</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.first_name LIKE ?
+  AND Employees.employee_id NOT IN (?)
+  AND Employees.employee_id NOT IN (?)</code-sql>
+			<code-params slot="params">['Alex%', 115, 115]</code-params>
+		</test-case>
+
+		<!-- Test 01-10: BETWEEN Filter -->
+		<test-case title="FILTER - between() Range Check" lines="317-329"
+			description="Filter employees where employee_id is BETWEEN two values (inclusive).">
+			<code-python slot="python"># filter using between() # use two diffent filteration methods
+employee = (
+	Employees()
+	.between(employee_id = (100, 101)) # calls internally Record.filter_.between()
+	.where(Employees.employee_id.between(100, 101)) # calls internally Record.filter_.where()
+	.select()
+)
+for e in employee:
+	e.hire_date = str(e.hire_date)[:10] # convert datetime to str
+	e.salary = float(e.salary)
+assert employee.recordset.data == [
+	{'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9},
+	{'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}
+]</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.employee_id BETWEEN ? AND ?
+  AND Employees.employee_id BETWEEN ? AND ?</code-sql>
+			<code-params slot="params">[100, 101, 100, 101]</code-params>
+		</test-case>
+
+		<!-- Test 01-11: Comparison Operators -->
+		<test-case title="FILTER - gt(), ge(), le(), lt() Comparisons" lines="332-350"
+			description="Filter using greater than, greater or equal, less or equal, and less than operators with method chaining and expressions.">
+			<code-python slot="python"># filter using gt(), ge(), le(), and lt() # use two diffent filteration methods
+# use filter chaining # use & expressions
+employee = (
+	Employees()
+	.gt(employee_id = 99).ge(employee_id = 100).le(employee_id = 101).lt(employee_id = 102) # calls internally Record.filter_.XY()
+	.where(
+		(Employees.employee_id > 99) &
+		(Employees.employee_id >= 100) &
+		(Employees.employee_id <= 101) &
+		(Employees.employee_id < 102)
+	) # calls internally Record.filter_.where()
+	.select()
+)
+for e in employee:
+	e.hire_date = str(e.hire_date)[:10] # convert datetime to str
+	e.salary = float(e.salary)
+assert employee.recordset.data == [
+	{'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9},
+	{'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}
+]</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.employee_id > ?
+  AND Employees.employee_id >= ?
+  AND Employees.employee_id <= ?
+  AND Employees.employee_id < ?
+  AND (((Employees.employee_id > ? AND Employees.employee_id >= ?) AND Employees.employee_id <= ?) AND Employees.employee_id < ?)</code-sql>
+			<code-params slot="params">[99, 100, 101, 102, 99, 100, 101, 102]</code-params>
+		</test-case>
+
+		<!-- Test 01-12: AND/OR Expressions -->
+		<test-case title="FILTER - &amp; | Expressions (AND/OR)" lines="353-376"
+			description="Combine multiple filter conditions using &amp; (AND) and | (OR) operators for complex queries.">
+			<code-python slot="python"># & | filters and expressions
+f1 = (
+	((Employees.employee_id == 100) & (Employees.first_name == "Steven")) |
+	((Employees.employee_id == 101) & (Employees.first_name == "Neena"))
+)
+
+f2 = (
+	((Employees.employee_id == 102) & (Employees.first_name == "Lex")) |
+	((Employees.employee_id == 103) & (Employees.first_name == "Alexander"))
+)
+
+employee = (
+	Employees()
+	.where(f1 | f2)
+	.select()
+)
+for e in employee:
+	e.hire_date = str(e.hire_date)[:10] # convert datetime to str
+	e.salary = float(e.salary)
+assert employee.recordset.data == [
+	{'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9},
+	{'employee_id': 101, 'first_name': 'Neena', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9},
+	{'employee_id': 102, 'first_name': 'Lex', 'last_name': 'De Haan', 'email': 'lex.de haan@sqltutorial.org', 'phone_number': '515.123.4569', 'hire_date': '1993-01-13', 'job_id': 5, 'salary': 17000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9},
+	{'employee_id': 103, 'first_name': 'Alexander', 'last_name': 'Hunold', 'email': 'alexander.hunold@sqltutorial.org', 'phone_number': '590.423.4567', 'hire_date': '1990-01-03', 'job_id': 9, 'salary': 9000, 'commission_pct': None, 'manager_id': 102, 'department_id': 6}
+]</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE (((Employees.employee_id = ? AND Employees.first_name = ?) OR (Employees.employee_id = ? AND Employees.first_name = ?)) OR ((Employees.employee_id = ? AND Employees.first_name = ?) OR (Employees.employee_id = ? AND Employees.first_name = ?)))</code-sql>
+			<code-params slot="params">[100, 'Steven', 101, 'Neena', 102, 'Lex', 103, 'Alexander']</code-params>
+		</test-case>
+
+		<!-- Test 01-13: Multiple kwargs Filter -->
+		<test-case title="FILTER - Multiple kwargs" lines="379-386"
+			description="Filter using multiple keyword arguments in a single method call.">
+			<code-python slot="python"># filter using multiple kwargs # use two diffent filteration methods
+employee = (
+	Employees()
+	.like(first_name = 'Stev%', last_name = 'Ki%') # calls internally Record.filter_.like()
+	.select()
+)
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert employee.data == {'employee_id': 100, 'first_name': 'Steven', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 24000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.first_name LIKE ?
+  AND Employees.last_name LIKE ?</code-sql>
+			<code-params slot="params">['Stev%', 'Ki%']</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION 02: SELECT ALL -->
+		<!-- ============================================================ -->
+		<h2 id="sec-select-all" class="section-header">Section 02 - SELECT ALL Records</h2>
+
+		<test-case title="SELECT ALL - Retrieve All Records" lines="391-396"
+			description="Retrieve all records from a table using the all() method. Access data as lists or dictionaries.">
+			<code-python slot="python"># select all and get recordset [all records] count, convert them to list of Dictionaries/lists
+reg = Regions().all()
+
+assert reg.recordset.count() == 4
+assert reg.columns == ['region_id', 'region_name']
+assert reg.recordset.toDicts() == [{'region_id': 1, 'region_name': 'Europe'}, {'region_id': 2, 'region_name': 'Americas'}, {'region_id': 3, 'region_name': 'Asia'}, {'region_id': 4, 'region_name': 'Middle East and Africa'}]
+assert reg.recordset.toLists() == [[1, 'Europe'], [2, 'Americas'], [3, 'Asia'], [4, 'Middle East and Africa']]</code-python>
+			<code-sql slot="sql">SELECT * FROM Regions Regions</code-sql>
+			<code-params slot="params">[]</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION 03: INSERT, UPDATE, DELETE -->
+		<!-- ============================================================ -->
+		<h2 id="sec-single-crud" class="section-header">Section 03 - Single Record CRUD</h2>
+
+		<!-- Test 03-1: INSERT Single Record -->
+		<test-case title="INSERT - Single Record with Data Dictionary" lines="401-404"
+			description="Insert a new employee record using a data dictionary.">
+			<code-python slot="python"># insert single record
+emp1 = Employees()
+emp1.data = {'employee_id': 19950519, 'first_name': 'William', 'last_name': 'Wallace', 'email': None, 'phone_number': '555.666.777'}
+emp1.insert()
+# assert emp1.rowsCount() == 1 # confirm number of inserted rows</code-python>
+			<code-sql slot="sql">INSERT INTO Employees (employee_id, first_name, last_name, phone_number) VALUES (?, ?, ?, ?)</code-sql>
+			<code-params slot="params">[19950519, 'William', 'Wallace', '555.666.777']</code-params>
+		</test-case>
+
+		<!-- Test 03-2: UPDATE Single Record -->
+		<test-case title="UPDATE - Single Record with set() and value()" lines="407-413"
+			description="Update an existing employee record using the set() method for field values and value() for filter.">
+			<code-python slot="python"># update single record
+emp1 = (
+	Employees()
+	.value(employee_id=19950519)
+	.set(email='william.wallace@sqltutorial.org', phone_number=None)
+	.update()
+)
+# assert emp1.rowsCount() == 1 # confirm number of updated rows</code-python>
+			<code-sql slot="sql">UPDATE Employees SET email=?, phone_number=?
+WHERE Employees.employee_id = ?</code-sql>
+			<code-params slot="params">['william.wallace@sqltutorial.org', None, 19950519]</code-params>
+		</test-case>
+
+		<!-- Test 03-3: READ Updated Record -->
+		<test-case title="SELECT - Verify Updated Record" lines="416-420"
+			description="Select the updated record to verify changes using value() and select().">
+			<code-python slot="python"># check updated record
+emp1 = Employees()
+emp1.value(employee_id=19950519).select()
+employee.hire_date = str(employee.hire_date)[:10] # convert datetime to str
+employee.salary = float(employee.salary)
+assert emp1.data == {'employee_id': 19950519, 'first_name': 'William', 'last_name': 'Wallace', 'email': 'william.wallace@sqltutorial.org', 'phone_number': None, 'hire_date': None, 'job_id': None, 'salary': None, 'commission_pct': None, 'manager_id': None, 'department_id': None}</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees Employees
+WHERE Employees.employee_id = ?</code-sql>
+			<code-params slot="params">[19950519]</code-params>
+		</test-case>
+
+		<!-- Test 03-4: DELETE with EXISTS and IN_SUBQUERY -->
+		<test-case title="DELETE - EXISTS and IN_SUBQUERY Filters" lines="423-447"
+			description="Delete dependents using EXISTS subquery and IN_SUBQUERY filters for complex delete conditions.">
+			<code-python slot="python"># delete by exists and subquery
+emp1 = (
+	EmployeesAlias()
+	.where(
+		(Dependents.employee_id == EmployeesAlias.employee_id) &
+		(EmployeesAlias.email == 'william.gietz@sqltutorial.org') &
+		(EmployeesAlias.employee_id.in_([206]))
+	)
+)
+
+emp2 = Employees().where(Employees.manager_id == 205)
+
+dep1 = (
+	Dependents()
+	.exists( _ = emp1)
+	.in_subquery(employee_id = emp2, selected="employee_id")
+	.where(Dependents._.exists(emp1))
+	.where(Dependents.employee_id.in_subquery(emp2, selected="employee_id"))
+	.delete()
+)
+
+assert dep1.rowsCount() == 1
+
+dep1 = Dependents()
+dep1.where(Dependents.employee_id == 206).select()
+assert dep1.data == {}</code-python>
+			<code-sql slot="sql">DELETE FROM Dependents
+WHERE EXISTS (
+	SELECT 1 FROM Employees EmployeesAlias
+	WHERE ((Dependents.employee_id = EmployeesAlias.employee_id AND EmployeesAlias.email = ?) AND EmployeesAlias.employee_id IN (?))
+) AND Dependents.employee_id IN (
+	SELECT employee_id FROM Employees Employees
+	WHERE Employees.manager_id = ?
+) AND EXISTS (
+	SELECT 1 FROM Employees EmployeesAlias
+	WHERE ((Dependents.employee_id = EmployeesAlias.employee_id AND EmployeesAlias.email = ?) AND EmployeesAlias.employee_id IN (?))
+) AND Dependents.employee_id IN (
+	SELECT employee_id FROM Employees Employees
+	WHERE Employees.manager_id = ?
+)</code-sql>
+			<code-params slot="params">['william.gietz@sqltutorial.org', 206, 205, 'william.gietz@sqltutorial.org', 206, 205]</code-params>
+		</test-case>
+
+		<!-- Test 03-5: INSERT with WHERE raises Exception -->
+		<test-case title="INSERT - Exception When WHERE Added to INSERT" lines="450-461"
+			description="Demonstrates that adding a where clause to an insert statement will raise an exception.">
+			<code-python slot="python"># insert single record
+try:
+	emp = (
+		Employees()
+		.where(Employees.first_name == 'Steve')
+		.value(employee_id=1000, first_name='Ahmed', last_name='ELSamman')
+		.insert()
+	)
+except Exception as e:
+	# will raise and exception because you added where to an insert statement
+	print(e)
+
+Record.database__.rollback()  # Force rollback</code-python>
+			<code-sql slot="sql"># Will raise an exception - WHERE clause is not valid for INSERT</code-sql>
+			<code-params slot="params">[]</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION 04: LIKE + Recordset UPDATE/DELETE -->
+		<!-- ============================================================ -->
+		<h2 id="sec-recordset-ops" class="section-header">Section 04 - Recordset Operations</h2>
+
+		<test-case title="LIKE Filter + Recordset UPDATE/DELETE" lines="466-509"
+			description="Filter records using LIKE pattern, iterate through recordset to update values, then delete the filtered records.">
+			<code-python slot="python"># filter and fetchmany records into recordset
+jobs = Jobs().where(Jobs.job_title.like('%Accountant%')).select()
+
+assert jobs.recordset.count() == 2
+assert jobs.columns == ['job_id', 'job_title', 'min_salary', 'max_salary']
+assert jobs.recordset.toLists() == [[1, 'Public Accountant', 4200, 9000], [6, 'Accountant', 4200, 9000]]
+assert jobs.recordset.toDicts() == [{'job_id': 1, 'job_title': 'Public Accountant', 'min_salary': 4200, 'max_salary': 9000}, {'job_id': 6, 'job_title': 'Accountant', 'min_salary': 4200, 'max_salary': 9000}]
+print("----------04A----------")
+# iterate over recordset and update records one by one: (not recommended if you can update with one predicate)
+for job in jobs:
+	job.set(min_salary=4500)
+
+jobs.recordset.set(min_salary=5000)
+
+for job in jobs.recordset: # iterate over recordset
+	assert job.job_id in [1,6], job.job_id
+
+
+jobs.recordset.update()
+recordsetLen = len(jobs.recordset) # get len() of a Recordset
+assert recordsetLen == 2, recordsetLen
+
+### it works because no field in any record of the recordset's records is set to Null.
+### but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter.
+# jobs.recordset.update(onColumns=['job_id'])
+
+jobs = Jobs().where(Jobs.job_title.like('%Accountant%')).select()
+assert jobs.recordset.toLists() == [[1, 'Public Accountant', 5000, 9000], [6, 'Accountant', 5000, 9000]], jobs.recordset.toLists() # confirm recordset update
+
+secondJobInRecordset = jobs.recordset[1] # access record instance by index
+assert secondJobInRecordset.job_id == 6, secondJobInRecordset.job_id
+
+print("----------04B----------")
+jobs.recordset.delete()
+
+### it works because no field in any record of the recordset's records is set to Null.
+### but if you are not sure that if your recordset's records have a Null value you have to set the onColumns parameter.
+# jobs.recordset.delete(onColumns=['job_id'])
+
+print("----------04C----------")
+jobs = Jobs().where(Jobs.job_title.like('%Accountant%')).select()
+
+assert jobs.recordset.toLists() == []  # confirm recordset delete
+
+Record.database__.rollback()  # Force rollback</code-python>
+			<code-sql slot="sql"># SELECT
+SELECT * FROM Jobs Jobs WHERE Jobs.job_title LIKE ?
+
+# UPDATE (for each record in recordset)
+UPDATE Jobs SET min_salary=?
+WHERE Jobs.job_id = ? AND Jobs.job_title = ? AND Jobs.min_salary = ? AND Jobs.max_salary = ? AND Jobs.job_title LIKE ?
+
+# DELETE (for each record in recordset)
+DELETE FROM Jobs
+WHERE Jobs.job_id = ? AND Jobs.job_title = ? AND Jobs.min_salary = ? AND Jobs.max_salary = ? AND Jobs.job_title LIKE ?</code-sql>
+			<code-params slot="params"># SELECT
+['%Accountant%']
+
+# UPDATE
+[(5000, 1, 'Public Accountant', 4200, 9000, '%Accountant%'), (5000, 6, 'Accountant', 4200, 9000, '%Accountant%')]
+
+# DELETE
+[(1, 'Public Accountant', 5000, 9000, '%Accountant%'), (6, 'Accountant', 5000, 9000, '%Accountant%')]</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION 05: Recordset Batch Operations -->
+		<!-- ============================================================ -->
+		<h2 id="sec-instantiate-recordset" class="section-header">Section 05 - Instantiate a Recordset</h2>
+
+		<test-case title="RECORDSET - Batch INSERT/UPDATE/DELETE" lines="515-564"
+			description="Perform batch operations on multiple records using a Recordset container. Insert multiple records at once, update them, and delete them.">
+			<code-python slot="python"># recordset from list of dicts
+
+recordset = Recordset.fromDicts(Employees,
+	[
+		{'employee_id': 5, 'first_name': "Mickey", 'last_name': "Mouse"},
+		{'employee_id': 6, 'first_name': "Donald", 'last_name': "Duck"}
+	]
+)
+
+assert recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck'}], recordset.toDicts()
+
+# instantiate recordset
+recordset = Recordset()
+
+# create employee(s)/record(s) instances
+e1 = Employees().value(employee_id=5, first_name="Mickey", last_name="Mouse")
+e2 = Employees().value(employee_id=6, first_name="Donald", last_name="Duck")
+
+# add employee(s)/record(s) instances to the previously instantiated Recordset
+recordset.add(e1, e2)
+
+# Recordset insert:
+recordset.insert()
+if Record.database__.name == "MicrosoftSQL":
+	pass
+else:
+	assert recordset.rowsCount() == 2, recordset.rowsCount() # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+
+e1.set(manager_id=77)
+e2.set(manager_id=88)
+e1.where(Employees.employee_id > 4) # add general condition to all records of the recordset
+
+# Recordset update:
+recordset.update()
+
+if Record.database__.name == "MicrosoftSQL":
+	employees = Employees().in_(manager_id = [77, 88]).select()
+	assert employees.recordset.toLists() == [[5, 'Mickey', 'Mouse', None, None, None, None, None, None, 77, None], [6, 'Donald', 'Duck', None, None, None, None, None, None, 88, None]]
+else:
+	assert recordset.rowsCount() == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+
+# Recordset delete:
+e1.where(Employees.manager_id < 100) # add general condition to all records of the recordset
+recordset.delete()
+
+if Record.database__.name == "MicrosoftSQL":
+	employees = Employees().in_(manager_id = [77, 88]).select()
+	assert employees.recordset.toLists() == []
+else:
+	assert recordset.rowsCount() == 2 # not work for Azure/MicrosoftSQL only SQlite3/Oracle/MySQL/Postgres
+
+Record.database__.rollback()  # Force rollback</code-python>
+			<code-sql slot="sql"># Batch INSERT
+INSERT INTO Employees (employee_id, first_name, last_name) VALUES (?, ?, ?)
+
+# Batch UPDATE (with general condition)
+UPDATE Employees SET manager_id=?
+WHERE Employees.employee_id = ? AND Employees.first_name = ? AND Employees.last_name = ? AND Employees.employee_id > ?
+
+# Batch DELETE (with general condition)
+DELETE FROM Employees
+WHERE Employees.employee_id = ? AND Employees.first_name = ? AND Employees.last_name = ? AND Employees.manager_id = ? AND Employees.employee_id > ? AND Employees.manager_id < ?</code-sql>
+			<code-params slot="params"># INSERT
+[(5, 'Mickey', 'Mouse'), (6, 'Donald', 'Duck')]
+
+# UPDATE
+[(77, 5, 'Mickey', 'Mouse', 4), (88, 6, 'Donald', 'Duck', 4)]
+
+# DELETE
+[(5, 'Mickey', 'Mouse', 77, 4, 100), (6, 'Donald', 'Duck', 88, 4, 100)]</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION 06: Raw SQL Statements -->
+		<!-- ============================================================ -->
+		<h2 id="sec-raw-sql" class="section-header">Section 06 - Raw SQL Statements</h2>
+
+		<!-- Test 06-1: Raw SQL -->
+		<test-case title="RAW SQL - Execute Statement Directly" lines="569-572"
+			description="Execute a raw SQL statement and get recordset of returned rows.">
+			<code-python slot="python"># Execute raw sql statement and get recordset of the returned rows
+records = Record(statement="SELECT * FROM Employees WHERE employee_id IN(100, 101, 102) ", operation=Database.select)
+assert records.recordset.count() == 3
+for record in records:
+	assert record.employee_id in [100, 101, 102]</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees WHERE employee_id IN(100, 101, 102)</code-sql>
+			<code-params slot="params"># No parameters - raw SQL</code-params>
+		</test-case>
+
+		<!-- Test 06-2: Parameterized SQL -->
+		<test-case title="RAW SQL - Parameterized Statement" lines="575-579"
+			description="Execute a parameterized SQL statement for safe queries.">
+			<code-python slot="python"># Execute parameterized sql statement and get recordset of the returned rows
+placeholder = Record.database__.placeholder()
+records = Record(statement=f"SELECT * FROM Employees WHERE employee_id IN({placeholder}, {placeholder}, {placeholder})", parameters=(100, 101, 102), operation=Database.select)
+assert records.recordset.count() == 3
+for record in records:
+	assert record.employee_id in [100, 101, 102]</code-python>
+			<code-sql slot="sql">SELECT * FROM Employees WHERE employee_id IN(?, ?, ?)</code-sql>
+			<code-params slot="params">[100, 101, 102]</code-params>
+		</test-case>
+
+		<!-- Test 06-3: Instantiate with Field Values -->
+		<test-case title="INSTANTIATE - Create Record with Field Values" lines="582-586"
+			description="Create a new record by passing field values directly to the constructor.">
+			<code-python slot="python"># instantiating Class's instance with fields' values
+employee = Employees(statement=None, parameters=None, employee_id=1000, first_name="Super", last_name="Man", operation=Database.select)
+employee.insert()
+
+employee = Employees().value(employee_id=1000).select()
+assert employee.data == {'employee_id': 1000, 'first_name': 'Super', 'last_name': 'Man', 'email': None, 'phone_number': None, 'hire_date': None, 'job_id': None, 'salary': None, 'commission_pct': None, 'manager_id': None, 'department_id': None}</code-python>
+			<code-sql slot="sql">INSERT INTO Employees (employee_id, first_name, last_name) VALUES (?, ?, ?)</code-sql>
+			<code-params slot="params">[1000, 'Super', 'Man']</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION 07: GROUP BY with HAVING -->
+		<!-- ============================================================ -->
+		<h2 id="sec-group-by" class="section-header">Section 07 - GROUP BY with HAVING</h2>
+
+		<test-case title="GROUP BY - Aggregate with HAVING Clause" lines="591-596"
+			description="Use GROUP BY with HAVING clause to filter aggregated results.">
+			<code-python slot="python"># group_by with HAVING clause
+employees = Employees().select(selected='manager_id, count(1) AS "count"', group_by='manager_id HAVING count(1) > 4', order_by='manager_id ASC')
+
+assert employees.recordset.data == [
+	{'manager_id': 100, 'count': 14}, {'manager_id': 101, 'count': 5},
+	{'manager_id': 108, 'count': 5}, {'manager_id': 114, 'count': 5}
+], employees.recordset.data</code-python>
+			<code-sql slot="sql">SELECT manager_id, count(1) AS "count" FROM Employees Employees
+WHERE 1=1
+GROUP BY manager_id HAVING count(1) > 4
+ORDER BY manager_id ASC</code-sql>
+			<code-params slot="params">[]</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION: Upsert Operations -->
+		<!-- ============================================================ -->
+		<h2 id="sec-upsert" class="section-header">Upsert Operations (Lines 600-641)</h2>
+
+		<test-case title="UPSERT - Insert or Update with Conflict Resolution" lines="600-641"
+			description="Perform UPSERT (INSERT or UPDATE on conflict) operations with conditional updates. Supports SQLite3, Oracle, MySQL, Postgres, and MicrosoftSQL with database-specific syntax.">
+			<code-python slot="python">emp = Employees().where(Employees.first_name.in_(['Steven', 'Neena']))
+
+emp1 = Employees().set(**{'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000})
+emp2 = Employees().set(**{'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000})
+
+# you can also set_.new = {} directly if you are sure of the datatype(s) validation
+emp1.set__.new = {'employee_id': 100, 'first_name': 'Ahmed', 'salary': 4000}
+emp2.set__.new = {'employee_id': 101, 'first_name': 'Kamal', 'salary': 5000}
+
+rs = Recordset()
+rs.add(emp1, emp2)
+
+if(Record.database__.name in ["SQLite3", "Postgres"]):
+	### SQLite3 and Postgres
+	emp1.where(
+		(EXCLUDED.salary < Employees.salary) &
+		(Employees.last_name.in_subquery(emp, selected='last_name'))
+	)
+if(Record.database__.name in ["Oracle", "MicrosoftSQL"]):
+	## Oracle and MicroftSQL
+	emp1.where(
+		(S.salary < T.salary) &
+		(T.last_name.in_subquery(emp, selected='last_name'))
+	)
+
+rs.upsert(onColumns='employee_id')
+# print(emp1.query__.statement)
+# print(emp1.query__.parameters)
+
+emp = Employees().where(Employees.employee_id.in_([100,101])).select()
+
+if(Record.database__.name == "SQLite3"):
+	### SQLite3
+	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': '1987-06-17', 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': '1989-09-21', 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+if(Record.database__.name == "Oracle"):
+	### Oracle
+	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': datetime(1987, 6, 17, 0, 0), 'job_id': 4, 'salary': 4000, 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': datetime(1989, 9, 21, 0, 0), 'job_id': 5, 'salary': 5000, 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+if(Record.database__.name in ["MySQL", "Postgres", "MicrosoftSQL"]):
+	### MySQL | Postgres | Microsoft AzureSQL
+	assert emp.recordset.data == [{'employee_id': 100, 'first_name': 'Ahmed', 'last_name': 'King', 'email': 'steven.king@sqltutorial.org', 'phone_number': '515.123.4567', 'hire_date': date(1987, 6, 17), 'job_id': 4, 'salary': Decimal('4000.00'), 'commission_pct': None, 'manager_id': None, 'department_id': 9}, {'employee_id': 101, 'first_name': 'Kamal', 'last_name': 'Kochhar', 'email': 'neena.kochhar@sqltutorial.org', 'phone_number': '515.123.4568', 'hire_date': date(1989, 9, 21), 'job_id': 5, 'salary': Decimal('5000.00'), 'commission_pct': None, 'manager_id': 100, 'department_id': 9}], emp.recordset.data
+
+Record.database__.rollback()</code-python>
+			<code-sql slot="sql"># SQLite3/Postgres:
+INSERT INTO Employees (employee_id, first_name, salary)
+VALUES (?, ?, ?)
+ON CONFLICT (employee_id)
+DO UPDATE SET first_name = EXCLUDED.first_name, salary = EXCLUDED.salary
+WHERE (EXCLUDED.salary < Employees.salary AND Employees.last_name IN (
+	SELECT last_name FROM Employees Employees
+	WHERE Employees.first_name IN (?, ?)
+))
+
+# Oracle/MicrosoftSQL uses MERGE statement:
+MERGE INTO Employees T
+USING (SELECT ? AS employee_id, ? AS first_name, ? AS salary) S
+ON (T.employee_id = S.employee_id)
+WHEN MATCHED AND S.salary < T.salary AND T.last_name IN (...) THEN
+	UPDATE SET first_name = S.first_name, salary = S.salary
+WHEN NOT MATCHED THEN
+	INSERT (employee_id, first_name, salary) VALUES (S.employee_id, S.first_name, S.salary)</code-sql>
+			<code-params slot="params">[(100, 'Ahmed', 4000, 'Steven', 'Neena'), (101, 'Kamal', 5000, 'Steven', 'Neena')]</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION: Session Operations -->
+		<!-- ============================================================ -->
+		<h2 id="sec-session" class="section-header">Session Operations (Lines 644-676)</h2>
+
+		<test-case title="SESSION - Transaction Management with Savepoints" lines="645-676"
+			description="Use Session for explicit transaction control with savepoints. Group multiple operations into a single transaction with rollback capability.">
+			<code-python slot="python">recordset = Recordset.fromDicts(Employees,
+	[
+		{'employee_id': 5, 'first_name': "Mickey", 'last_name': "Mouse"},
+		{'employee_id': 6, 'first_name': "Donald", 'last_name': "Duck"}
+	]
+)
+
+assert recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck'}], recordset.toDicts()
+
+# Instanitiate a session with a database instance
+session = Session(Record.database__)
+# Set Recordset insert query to current Session
+session.set(recordset.insert_())
+# Update all the Recordset's records with the same phone number
+recordset.set(phone_number='+201011223344')
+# Set Recordset update query to current Session
+session.set(recordset.update_())
+# Commit current session
+session.commit()
+# Select inserted and updated records
+insertedEmployeesAfterUpdate = (
+	Employees().where(Employees.employee_id.in_([5,6])).select(selected="employee_id, first_name, last_name, phone_number")
+)
+assert insertedEmployeesAfterUpdate.recordset.data == [{'employee_id': 5, 'first_name': 'Mickey', 'last_name': 'Mouse', 'phone_number': '+201011223344'}, {'employee_id': 6, 'first_name': 'Donald', 'last_name': 'Duck', 'phone_number': '+201011223344'}], insertedEmployeesAfterUpdate.recordset.data
+# Set Recordset delete query to current Session
+session.set(recordset.delete_(onColumns=["employee_id"]))
+# Commit the session
+session.commit()
+session.savepoint("sp1")
+session.set(recordset.insert_())
+session.rollbackTo('sp1')
+session.releaseSavepoint('sp1')</code-python>
+			<code-sql slot="sql"># INSERT (via session)
+INSERT INTO Employees (employee_id, first_name, last_name) VALUES (?, ?, ?)
+
+# UPDATE (via session)
+UPDATE Employees SET phone_number=?
+WHERE Employees.employee_id = ? AND Employees.first_name = ? AND Employees.last_name = ?
+
+# DELETE (via session, onColumns=["employee_id"])
+DELETE FROM Employees WHERE Employees.employee_id = ?
+
+# SAVEPOINT operations
+SAVEPOINT sp1
+ROLLBACK TO sp1
+RELEASE SAVEPOINT sp1</code-sql>
+			<code-params slot="params"># INSERT
+[(5, 'Mickey', 'Mouse'), (6, 'Donald', 'Duck')]
+
+# UPDATE
+[('+201011223344', 5, 'Mickey', 'Mouse'), ('+201011223344', 6, 'Donald', 'Duck')]
+
+# DELETE
+[(5,), (6,)]</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION: FROM Clause -->
+		<!-- ============================================================ -->
+		<h2 id="sec-from" class="section-header">FROM Clause (Lines 680-703)</h2>
+
+		<test-case title="FROM - Multiple Tables" lines="681-690"
+			description="Query from multiple tables without explicit JOIN, using WHERE clause for the relationship.">
+			<code-python slot="python"># From multiple tables
+(
+	Employees()
+	.from_(Departments)
+	.where(
+		(Employees.employee_id==100) &
+		(Employees.department_id==Departments.department_id)
+	)
+	.select(selected="Employees.*, Departments.department_name")
+)
+# → SELECT ... FROM Employees Employees, Departments Departments WHERE ...</code-python>
+			<code-sql slot="sql">SELECT Employees.*, Departments.department_name
+FROM Employees Employees, Departments Departments
+WHERE (Employees.employee_id = ? AND Employees.department_id = Departments.department_id)</code-sql>
+			<code-params slot="params">[100]</code-params>
+		</test-case>
+
+		<test-case title="FROM - Subquery as Table Source" lines="693-703"
+			description="Use a subquery as a table source in the FROM clause with an alias.">
+			<code-python slot="python"># From multiples tables and subqueries
+class EmployeesGt1000(Employees): pass
+sub = Employees().where(Employees.salary > 1000).select_().alias('EmployeesGt1000')
+(
+	Employees().from_(sub)
+	.where(Employees.employee_id == EmployeesGt1000.employee_id)
+	.select(selected="Employees.*, EmployeesGt1000.salary")
+)
+# → SELECT ... FROM Employees Employees, (SELECT * FROM Employees WHERE salary > 1000) AS high_paid WHERE ...
+
+# Raw strings # not implemented
+# Employees().from_("Employees e", "Departments d").select()</code-python>
+			<code-sql slot="sql">SELECT Employees.*, EmployeesGt1000.salary
+FROM Employees Employees,
+	(SELECT * FROM Employees Employees WHERE Employees.salary > ?) EmployeesGt1000
+WHERE Employees.employee_id = EmployeesGt1000.employee_id</code-sql>
+			<code-params slot="params">[1000]</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION: Expressions -->
+		<!-- ============================================================ -->
+		<h2 id="sec-expressions" class="section-header">Expressions (Lines 707-728)</h2>
+
+		<test-case title="EXPRESSION - Combined Update with Multiple Functions" lines="707-728"
+			description="Combine multiple Expression updates in a single operation: UPPER, LOWER, string concatenation, arithmetic, and COALESCE.">
+			<code-python slot="python">emp = (
+	Employees()
+	.set(
+		first_name=Expression("UPPER(first_name)")
+		, last_name=Expression("LOWER(last_name)")
+		# UPPER and LOWER are used because:
+		# SQLite3, Oracle, and MySQL use new values uppered and lowered before concat.
+		# Postgres and MySQL uses original value before UPPER and LOWER.
+		, email=Expression("UPPER(first_name) || '.' || LOWER(last_name) || '@test.com'")
+		, salary=Employees.salary + 100
+		, commission_pct=Expression('COALESCE(commission_pct, 1)')
+	)
+	.value(employee_id=100)
+	.where(
+		(Employees.salary == Employees.salary) &
+		(Employees.salary == Employees.salary + 0)
+	)
+	.update()
+	.select(selected="first_name, last_name, email, salary, commission_pct")
+)
+emp.data['salary'] = int(emp.data['salary'])
+assert emp.data == {'first_name': 'STEVEN', 'last_name': 'king', 'email': 'STEVEN.king@test.com', 'salary': 24100, 'commission_pct': 1}, emp.data</code-python>
+			<code-sql slot="sql">UPDATE Employees SET first_name=UPPER(first_name), last_name=LOWER(last_name), email=UPPER(first_name) || '.' || LOWER(last_name) || '@test.com', salary=Employees.salary + ?, commission_pct=COALESCE(commission_pct, 1)
+WHERE Employees.employee_id = ?
+  AND (Employees.salary = salary AND Employees.salary = salary + 0)</code-sql>
+			<code-params slot="params">[100, 100]</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION: Record WithCTE -->
+		<!-- ============================================================ -->
+		<h2 id="sec-record-cte" class="section-header">Record WithCTE (Lines 730-868)</h2>
+
+		<test-case title="CTE - Define Common Table Expressions" lines="732-806"
+			description="Create Common Table Expressions (CTEs) including recursive CTEs. Supports materialization hints for SQLite3/Postgres and Oracle-style hints.">
+			<code-python slot="python">class Hierarchy(Record): pass # for recursive CTE
+class P(Employees): pass
+class C(Employees): pass
+class ExecutivesDepartment(Departments): pass
+class AdministrationJobs(Jobs): pass
+
+hierarchy = Hierarchy() # used as subquery ... IN (SELECT * FROM Hierarchy) # Hierarchy is Recursive CTE
+
+# Oracle: use hints after SELECT
+# 'MySQL': Not support 'Default Behavior'
+# 'MicrosoftSQL': Not supported directly, Uses temp tables instead.
+
+#  ['Oracle', 'MySQL', 'MicrosoftSQL']:
+cte1 = (
+	P()
+	.where(P.manager_id.is_null())
+	.cte(selected='/*+ INLINE */ employee_id, manager_id, first_name', materialization=None)
+)
+cte2 = (
+	C()
+	.join(Hierarchy, (C.manager_id == Hierarchy.employee_id))
+	.where(C.first_name == 'Neena')
+	.cte(selected='/*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name', materialization=None)
+)
+cte3 = (
+	ExecutivesDepartment()
+	.where(ExecutivesDepartment.department_name == 'Executive')
+	.cte(selected='/*+ INLINE */ ExecutivesDepartment.*', materialization=None)
+)
+cte4 = (
+	AdministrationJobs()
+	.where(AdministrationJobs.job_title.like('Administration%'))
+	.cte(selected='/*+ MATERIALIZE */ AdministrationJobs.*', materialization=None)
+)
+
+if Record.database__.name in ['SQLite3', 'Postgres']:
+	cte1.materialization=False
+	cte2.materialization=True
+	cte3.materialization=False
+	cte4.materialization=True
+
+
+# ^ union: recursive_cte = (cte1 ^ cte2)
+# Recursive CTE wit UINION only supported by: SQLite3, MySQL, Postgres.
+recursive_cte = (cte1 + cte2)
+recursive_cte.alias = "Hierarchy" # you have to set alias for Recursive CTE
+
+# columnsAliases used for Oracle only but they are accepted syntax if you didn't remove it from the test for SQLite3, MySQL, Postgres, and MicrosoftSQL.
+recursive_cte.columnsAliases = "employee_id, manager_id, first_name"
+
+# ee.materialization(True) # Error: materialization with recursive
+
+# RECURSIVE: Required for MySQL and Postgres. Optional for SQLite3.
+# RECURSIVE: are not used by Oracle and MicrosoftSQL.
+if Record.database__.name in ['Oracle', 'MicrosoftSQL']:
+	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=False)
+elif Record.database__.name in ['Postgres']:
+	"""
+	CYCLE Detection (PostgreSQL 14+): CYCLE employee_id SET is_cycle USING path
+	SEARCH Clause (PostgreSQL 14+): SEARCH DEPTH FIRST BY employee_id SET ordercol
+	"""
+	# with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='CYCLE employee_id SET is_cycle USING path')
+	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True, options='SEARCH DEPTH FIRST BY employee_id SET ordercol')
+else:# ['SQLite3', 'MySQL']
+	with_cte = WithCTE((cte3 >> cte4 >> recursive_cte), recursive=True)
+
+sql_query = f"{with_cte.value} SELECT * FROM Hierarchy" # build on top of generated WITH CTE
+# print(sql_query)
+
+print("Raw SQL:")
+# Run SELECT WITH CTE as raw/plain SQL
+rec = Record(statement=sql_query, parameters=with_cte.parameters, operation=Database.select)
+for r in rec:
+	print(r.data)
+
+print("Cartonnage:")</code-python>
+			<code-sql slot="sql"># SQLite3/Postgres:
+WITH RECURSIVE
+	ExecutivesDepartment AS (
+		SELECT /*+ INLINE */ ExecutivesDepartment.* FROM Departments ExecutivesDepartment
+		WHERE ExecutivesDepartment.department_name = ?
+	),
+	AdministrationJobs AS (
+		SELECT /*+ MATERIALIZE */ AdministrationJobs.* FROM Jobs AdministrationJobs
+		WHERE AdministrationJobs.job_title LIKE ?
+	),
+	Hierarchy (employee_id, manager_id, first_name) AS (
+		SELECT /*+ INLINE */ employee_id, manager_id, first_name FROM Employees P
+		WHERE P.manager_id IS NULL
+		UNION ALL
+		SELECT /*+ MATERIALIZE */ C.employee_id, C.manager_id, C.first_name
+		FROM Employees C
+		INNER JOIN Hierarchy Hierarchy ON C.manager_id = Hierarchy.employee_id
+		WHERE C.first_name = ?
+	)</code-sql>
+			<code-params slot="params">['Executive', 'Administration%', 'Neena']</code-params>
+		</test-case>
+
+		<test-case title="CTE - UPDATE with Recursive CTE" lines="809-826"
+			description="Update records using a WHERE clause that references a CTE subquery.">
+			<code-python slot="python">if(Record.database__.name not in ['Oracle']):
+	emp = (
+		Employees()
+		.with_cte(with_cte)
+		.where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
+		.set(salary = 2000)
+		.update()
+	)
+
+	# sqlite3 returns -1 for complex operations not the real affected rows count
+	if(Record.database__.name in ['SQLite3']):
+		assert emp.rowsCount() == -1, emp.rowsCount()
+	else:
+		assert emp.rowsCount() == 2, emp.rowsCount()
+
+	# print(f"{'-'*80}")
+	# print(emp.query__.statement)
+	# print(emp.query__.parameters)</code-python>
+			<code-sql slot="sql">WITH RECURSIVE ... AS (...)
+UPDATE Employees SET salary=?
+WHERE Employees.employee_id IN (
+	SELECT employee_id FROM Hierarchy Hierarchy
+	WHERE 1=1
+)</code-sql>
+			<code-params slot="params">['Executive', 'Administration%', 'Neena', 2000]</code-params>
+		</test-case>
+
+		<test-case title="CTE - SELECT with Recursive CTE" lines="828-846"
+			description="Execute a SELECT query using the defined CTEs with JOINs.">
+			<code-python slot="python">emp = (
+	Employees()
+	.with_cte(with_cte)
+	.join(Hierarchy, (Employees.employee_id == Hierarchy.employee_id))
+	.join(ExecutivesDepartment, (Employees.department_id == ExecutivesDepartment.department_id))
+	.join(AdministrationJobs, (Employees.job_id == AdministrationJobs.job_id))
+)
+if Record.database__.name in ['MicrosoftSQL']:
+	# MSSQL MAXRECURSION Option: OPTION (MAXRECURSION 100)
+	emp.select(option='OPTION (MAXRECURSION 100)')
+else:
+	emp.select()
+
+for r in emp:
+	print(r.data)
+
+# print(f"{'-'*80}")
+# print(emp.query__.statement)
+# print(emp.query__.parameters)</code-python>
+			<code-sql slot="sql">WITH RECURSIVE ... AS (...)
+SELECT * FROM Employees Employees
+INNER JOIN Hierarchy Hierarchy ON Employees.employee_id = Hierarchy.employee_id
+INNER JOIN Departments ExecutivesDepartment ON Employees.department_id = ExecutivesDepartment.department_id
+INNER JOIN Jobs AdministrationJobs ON Employees.job_id = AdministrationJobs.job_id
+WHERE 1=1
+
+# MicrosoftSQL:
+... OPTION (MAXRECURSION 100)</code-sql>
+			<code-params slot="params">['Executive', 'Administration%', 'Neena']</code-params>
+		</test-case>
+
+		<test-case title="CTE - DELETE with Recursive CTE" lines="848-868"
+			description="Delete records using a WHERE clause that references a CTE subquery.">
+			<code-python slot="python">if(Record.database__.name not in ['Oracle']):
+	emp = (
+		Employees()
+		.with_cte(with_cte)
+		.where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
+		.delete()
+	)
+
+	# sqlite3 returns -1 for complex operations not the real affected rows count
+	if(Record.database__.name in ['SQLite3']):
+		assert emp.rowsCount() == -1, emp.rowsCount()
+	else:
+		assert emp.rowsCount() == 2, emp.rowsCount()
+
+	# print(f"{'-'*80}")
+	# print(emp.query__.statement)
+	# print(emp.query__.parameters)
+
+# print("After delete - checking if in transaction:")
+# print(f"autocommit: {emp.database__._Database__connection.autocommit if hasattr(emp.database__._Database__connection, 'autocommit') else 'N/A'}")
+Record.database__.rollback()  # Force rollback</code-python>
+			<code-sql slot="sql">WITH RECURSIVE ... AS (...)
+DELETE FROM Employees
+WHERE Employees.employee_id IN (
+	SELECT employee_id FROM Hierarchy Hierarchy
+	WHERE 1=1
+)</code-sql>
+			<code-params slot="params">['Executive', 'Administration%', 'Neena']</code-params>
+		</test-case>
+
+		<!-- ============================================================ -->
+		<!-- SECTION: Recordset WithCTE -->
+		<!-- ============================================================ -->
+		<h2 id="sec-recordset-cte" class="section-header">Recordset WithCTE (Lines 872-933)</h2>
+
+		<test-case title="RECORDSET CTE - Batch UPDATE with CTE" lines="872-896"
+			description="Perform batch UPDATE on a Recordset using CTE filters. Apply CTE and filters through the first Record instance.">
+			<code-python slot="python">employees = Recordset()
+emp1 = (
+	Employees()
+	.value(employee_id = 100)
+	.select()
+).set(last_name='Ahmed')
+emp2 = (
+	Employees()
+	.value(employee_id = 101)
+	.select()
+).set(last_name='kamal')
+
+employees.add(emp1, emp2)
+
+if not (Record.database__.name == "Oracle"):
+	# add with_cte and filters to Recordset through it's first Record instance
+	emp1.with_cte(with_cte).where(Employees.employee_id.in_subquery(hierarchy, selected='employee_id'))
+	# use onColumns if you are not sure all columns are null free
+	employees.update(onColumns=["employee_id"])
+
+	# Insert, Update, and Delete with Recursive CTE is not tracked on SQLite3 and MicrosoftSQL
+	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
+		assert employees.rowsCount() == -1, employees.rowsCount
+	else:
+		assert employees.rowsCount() == 2, employees.rowsCount</code-python>
+			<code-sql slot="sql">WITH RECURSIVE ... AS (...)
+UPDATE Employees SET last_name=?
+WHERE Employees.employee_id = ? AND Employees.employee_id IN (
+	SELECT employee_id FROM Hierarchy Hierarchy
+	WHERE 1=1
+)</code-sql>
+			<code-params slot="params">[('Executive', 'Administration%', 'Neena', 'Ahmed', 100), ('Executive', 'Administration%', 'Neena', 'kamal', 101)]</code-params>
+		</test-case>
+
+		<test-case title="RECORDSET CTE - Batch DELETE with CTE" lines="898-915"
+			description="Perform batch DELETE on a Recordset using CTE filters. Note: CTE is re-evaluated after each deletion which may affect subsequent records.">
+			<code-python slot="python">	# This will delete only 100, But 101 will not be deleted ? why because database will evaluate CTE after each deletion !
+	# after deleteing 100 which is the only parent with manager_id=null will be no parent qualified with manager_id=null
+	# so when no parent then no childs ! so 101 will not available with the second iteration to be deleted.
+	employees.delete(onColumns=["employee_id"])
+
+
+	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
+		assert employees.rowsCount() == -1, employees.rowsCount
+	else:
+		assert employees.rowsCount() == 1, employees.rowsCount
+
+	availableEmployeesAfterDeletion = (
+		Employees()
+		.where(Employees.employee_id.in_([100,101]))
+		.select(selected="employee_id")
+	)
+	availableEmployees = [{'employee_id': 101}]
+	assert availableEmployeesAfterDeletion.recordset.data == availableEmployees, availableEmployeesAfterDeletion.recordset.data</code-python>
+			<code-sql slot="sql">WITH RECURSIVE ... AS (...)
+DELETE FROM Employees
+WHERE Employees.employee_id = ? AND Employees.employee_id IN (
+	SELECT employee_id FROM Hierarchy Hierarchy
+	WHERE 1=1
+)
+
+# Note: After first DELETE, CTE is re-evaluated.
+# If hierarchy root is deleted, child records no longer match.</code-sql>
+			<code-params slot="params">[('Executive', 'Administration%', 'Neena', 100), ('Executive', 'Administration%', 'Neena', 101)]</code-params>
+		</test-case>
+
+		<test-case title="RECORDSET CTE - Batch INSERT with CTE" lines="917-933"
+			description="Perform batch INSERT on a Recordset using CTE. Not supported by Oracle and MySQL.">
+			<code-python slot="python">	# now I will delete 101 to test Recordset insertion WithCTE
+	# use onColumns if you are not sure all columns are null free
+	availableEmployeesAfterDeletion.delete()
+
+# Record.database__._Database__cursor.execute("SELECT employee_id FROM Employees WHERE employee_id IN (100, 101)")
+# print("RAW CHECK:", Record.database__._Database__cursor.fetchall())
+
+if (Record.database__.name not in ["Oracle", "MySQL"]):
+
+	employees.insert()
+
+	if(Record.database__.name in ["SQLite3", "MicrosoftSQL"]):
+		assert employees.rowsCount() == -1, employees.rowsCount
+	else:
+		assert employees.rowsCount() == 2, employees.rowsCount
+
+Record.database__.rollback()  # Force rollback</code-python>
+			<code-sql slot="sql">WITH RECURSIVE ... AS (...)
+INSERT INTO Employees (employee_id, first_name, last_name, email, phone_number, hire_date, job_id, salary, department_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+# Note: INSERT with CTE not supported by Oracle and MySQL</code-sql>
+			<code-params slot="params">[('Executive', 'Administration%', 'Neena', 100, 'Steven', 'Ahmed', ...), ('Executive', 'Administration%', 'Neena', 101, 'Neena', 'kamal', ...)]</code-params>
+		</test-case>
+
+				</div>
+			</div>
+		</div>
+
+		<!-- License Page -->
+		<div id="page-license" class="page page-license" style="padding: 2rem;">
+			<div class="license-container" style="max-width: 1000px; margin: 0 auto;">
+				<div style="text-align: center; margin-bottom: 2rem;">
+					<img src="cartonnage_dark.jpeg" alt="Cartonnage ORM" style="max-width: 200px; border-radius: 50%;">
+				</div>
+				<h2 style="text-align: center; color: var(--accent-purple); font-size: 2rem; margin-bottom: 0.5rem;">License</h2>
+				<p style="text-align: center; color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 2rem;">Cartonnage is licensed under the MIT License</p>
+
+				<div style="background: var(--bg-secondary); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
+					<h3 style="color: var(--accent-blue); margin-bottom: 1rem; font-size: 1.5rem;">About MIT License</h3>
+					<p style="color: var(--text-primary); margin-bottom: 1rem; line-height: 1.6;">
+						The MIT License is a permissive free software license originating at the Massachusetts Institute of Technology.
+						It is one of the most popular open source licenses due to its simplicity and flexibility.
+					</p>
+					<p style="color: var(--text-primary); margin-bottom: 1rem; line-height: 1.6;">
+						This license allows you to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software
+						with minimal restrictions.
+					</p>
+
+					<div style="margin-top: 2rem; padding: 1.5rem; background: var(--bg-primary); border-radius: 8px; border: 1px solid var(--border-color);">
+						<h4 style="color: var(--accent-green); margin-bottom: 1rem; font-size: 1.2rem;">Key Points</h4>
+						<ul style="color: var(--text-primary); line-height: 1.8; margin-left: 1.5rem;">
+							<li>Freedom to use, copy, modify, merge, publish, distribute, sublicense, and sell</li>
+							<li>Only requirement is to include the copyright notice and permission notice</li>
+							<li>Can be used in proprietary software</li>
+							<li>No warranty provided</li>
+						</ul>
+					</div>
+				</div>
+
+				<div style="background: var(--bg-secondary); border-radius: 12px; padding: 2rem; border: 1px solid var(--border-color);">
+					<h3 style="color: var(--accent-blue); margin-bottom: 1rem; font-size: 1.5rem;">Full License Text</h3>
+					<div style="background: var(--bg-primary); border-radius: 8px; padding: 1.5rem; max-height: 500px; overflow-y: auto; border: 1px solid var(--border-color);">
+						<pre style="color: var(--text-primary); font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; font-family: 'Courier New', monospace; margin: 0;">MIT License
+
+Copyright (c) 2026 Ahmed Kamal ELSaman
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre>
+					</div>
+					<div style="margin-top: 1.5rem; text-align: center;">
+						<a href="https://opensource.org/licenses/MIT" target="_blank" style="color: var(--accent-blue); text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 0.5rem;">
+							<span>View Official MIT License</span>
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
+							</svg>
+						</a>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- Evaluation Page -->
+		<div id="page-evaluation" class="page page-evaluation" style="padding: 2rem;">
+			<div class="evaluation-container" style="max-width: 1000px; margin: 0 auto;">
+				<div style="text-align: center; margin-bottom: 2rem;">
+					<img class="evaluation-logo" src="cartonnage_dark.jpeg" alt="Cartonnage ORM" style="max-width: 200px; border-radius: 50%;">
+				</div>
+				<h2 class="evaluation-title" style="text-align: center; color: var(--accent-purple); font-size: 2rem; margin-bottom: 0.5rem;">Claude Evaluation</h2>
+				<p style="text-align: center; color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 2rem;">Evaluated by Claude Opus 4.5 (claude-opus-4-5-20251101)</p>
+
+				<div class="evaluation-section" style="background: var(--bg-secondary); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
+					<h3 style="color: var(--accent-blue); margin-bottom: 1rem; font-size: 1.5rem;">Cartonnage ORM - Evaluation</h3>
+					<p style="color: var(--text-primary); margin-bottom: 1.5rem; font-size: 1.1rem;">
+						Cartonnage ORM is an exceptionally well-designed Python ORM that achieves an outstanding balance between simplicity and power. Here's why it stands out:
+					</p>
+
+					<h4 style="color: var(--accent-green); margin: 1.5rem 0 0.75rem;">Elegant Pythonic API</h4>
+					<p style="color: var(--text-secondary); margin-bottom: 1rem;">
+						The ORM offers a remarkably intuitive syntax where database tables map directly to Python classes with zero boilerplate. Defining a model is as simple as <code style="background: var(--bg-tertiary); padding: 0.2rem 0.5rem; border-radius: 4px;">class Employees(Record): pass</code>. This convention-over-configuration approach eliminates repetitive code while maintaining full flexibility.
+					</p>
+
+					<h4 style="color: var(--accent-green); margin: 1.5rem 0 0.75rem;">Comprehensive Query Building</h4>
+					<p style="color: var(--text-secondary); margin-bottom: 0.5rem;">The filter system is impressively versatile, supporting:</p>
+					<ul style="color: var(--text-secondary); margin-left: 1.5rem; margin-bottom: 1rem;">
+						<li><strong>Exact matching</strong>, <strong>LIKE patterns</strong>, <strong>BETWEEN ranges</strong>, <strong>IN/NOT IN lists</strong></li>
+						<li><strong>IS NULL / IS NOT NULL</strong> checks</li>
+						<li><strong>Comparison operators</strong> (&gt;, &gt;=, &lt;, &lt;=)</li>
+						<li><strong>Complex AND/OR expressions</strong> using <code style="background: var(--bg-tertiary); padding: 0.1rem 0.3rem; border-radius: 4px;">&amp;</code> and <code style="background: var(--bg-tertiary); padding: 0.1rem 0.3rem; border-radius: 4px;">|</code> operators</li>
+						<li><strong>Fluent method chaining</strong> with expression syntax (<code style="background: var(--bg-tertiary); padding: 0.1rem 0.3rem; border-radius: 4px;">Employees().where(Employees.first_name.like('%')).select()</code>)</li>
+					</ul>
+
+					<h4 style="color: var(--accent-green); margin: 1.5rem 0 0.75rem;">Advanced SQL Features</h4>
+					<ul style="color: var(--text-secondary); margin-left: 1.5rem; margin-bottom: 1rem;">
+						<li><strong>JOINs</strong> including LEFT JOIN, RIGHT JOIN, and self-joins via alias classes</li>
+						<li><strong>EXISTS and IN_SUBQUERY</strong> for correlated subqueries</li>
+						<li><strong>GROUP BY with HAVING</strong> clauses</li>
+						<li><strong>SQL Expressions</strong> for arithmetic operations, string functions (UPPER, LOWER, COALESCE), and computed updates</li>
+						<li><strong>Common Table Expressions (CTE)</strong> with recursive CTE support, materialization hints, and database-specific optimizations</li>
+						<li><strong>UPSERT operations</strong> (INSERT ON CONFLICT) with conditional updates across all databases</li>
+						<li><strong>FROM clause</strong> for multi-table queries and subquery joins</li>
+						<li><strong>Raw SQL</strong> execution with parameterized queries for edge cases</li>
+					</ul>
+
+					<h4 style="color: var(--accent-green); margin: 1.5rem 0 0.75rem;">Multi-Database Support</h4>
+					<p style="color: var(--text-secondary); margin-bottom: 1rem;">
+						Out of the box, Cartonnage supports <strong>SQLite3, Oracle, MySQL, PostgreSQL, and Microsoft SQL Server</strong> with a simple adapter swap—no code changes required.
+					</p>
+
+					<h4 style="color: var(--accent-green); margin: 1.5rem 0 0.75rem;">Recordset Operations</h4>
+					<p style="color: var(--text-secondary); margin-bottom: 1rem;">
+						The batch processing capability is superb—insert, update, or delete multiple records efficiently using <code style="background: var(--bg-tertiary); padding: 0.2rem 0.5rem; border-radius: 4px;">Recordset</code> containers with full iteration support. Create recordsets easily with <code style="background: var(--bg-tertiary); padding: 0.2rem 0.5rem; border-radius: 4px;">Recordset.fromDicts()</code>.
+					</p>
+
+					<h4 style="color: var(--accent-green); margin: 1.5rem 0 0.75rem;">Session Management</h4>
+					<p style="color: var(--text-secondary); margin-bottom: 1rem;">
+						Full transaction control with <code style="background: var(--bg-tertiary); padding: 0.2rem 0.5rem; border-radius: 4px;">Session</code> class supporting savepoints (<code style="background: var(--bg-tertiary); padding: 0.1rem 0.3rem; border-radius: 4px;">savepoint()</code>, <code style="background: var(--bg-tertiary); padding: 0.1rem 0.3rem; border-radius: 4px;">rollbackTo()</code>, <code style="background: var(--bg-tertiary); padding: 0.1rem 0.3rem; border-radius: 4px;">releaseSavepoint()</code>), batch operations, and explicit commit/rollback control.
+					</p>
+
+					<h4 style="color: var(--accent-green); margin: 1.5rem 0 0.75rem;">Production-Ready</h4>
+					<p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+						Transaction control, proper parameterization (preventing SQL injection), and clear data access patterns (<code style="background: var(--bg-tertiary); padding: 0.1rem 0.3rem; border-radius: 4px;">record.data</code>, <code style="background: var(--bg-tertiary); padding: 0.1rem 0.3rem; border-radius: 4px;">recordset.toLists()</code>, <code style="background: var(--bg-tertiary); padding: 0.1rem 0.3rem; border-radius: 4px;">recordset.toDicts()</code>) make it suitable for real-world applications.
+					</p>
+
+					<div style="background: var(--bg-tertiary); border-left: 4px solid var(--accent-purple); padding: 1rem 1.5rem; border-radius: 0 8px 8px 0; margin-top: 1.5rem;">
+						<p style="color: var(--text-primary); font-weight: 600; font-size: 1.1rem; margin: 0;">
+							<strong>Verdict:</strong> A refined, production-quality ORM that combines the expressiveness with the simplicity, while offering unique features like dual syntax options and seamless database portability, This comprehensive Python ORM combining simplicity with full SQL power. Zero-configuration model definition, fluent API with complete query capabilities, and support for 5 major databases with native connection pooling.
+						</p>
+					</div>
+				</div>
+
+				<div class="evaluation-table-section" style="background: var(--bg-secondary); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
+					<h3 style="color: var(--accent-blue); margin-bottom: 1.5rem; font-size: 1.5rem;">Cartonnage ORM - Revised Realistic Evaluation</h3>
+
+					<div style="overflow-x: auto;">
+						<table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+							<thead>
+								<tr style="background: var(--bg-tertiary);">
+									<th style="padding: 0.75rem 1rem; text-align: left; border-bottom: 2px solid var(--border-color); color: var(--text-primary);">Category</th>
+									<th style="padding: 0.75rem 1rem; text-align: left; border-bottom: 2px solid var(--border-color); color: var(--text-primary);">Feature</th>
+									<th style="padding: 0.75rem 1rem; text-align: center; border-bottom: 2px solid var(--border-color); color: var(--text-primary);">Rating</th>
+									<th style="padding: 0.75rem 1rem; text-align: left; border-bottom: 2px solid var(--border-color); color: var(--text-primary);">Evidence</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr><td colspan="4" style="padding: 0.5rem 1rem; background: var(--accent-blue); color: var(--bg-primary); font-weight: 600;">Simplicity</td></tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Model Definition</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"><code>class Employees(Record): pass</code> - zero config</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Learning Curve</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Intuitive fluent API, easy to learn for any Python developer</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">API Consistency</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Fluent <code>where()</code> and <code>value()</code> methods, clean chaining</td>
+								</tr>
+
+								<tr><td colspan="4" style="padding: 0.5rem 1rem; background: var(--accent-blue); color: var(--bg-primary); font-weight: 600;">Query Building</td></tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Basic CRUD</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Full INSERT, SELECT, UPDATE, DELETE</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Filter Conditions</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">LIKE, IN, BETWEEN, NULL, comparisons</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">JOINs</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"><code>join()</code>, <code>leftJoin()</code>, <code>rightJoin()</code>, self-joins via alias</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Subqueries</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">EXISTS, IN_SUBQUERY - compose via table instances</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">GROUP BY / Aggregates</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Full GROUP BY with HAVING, aggregate functions</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">FROM Clause</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Multi-table queries and subquery joins via <code>.from_()</code></td>
+								</tr>
+
+								<tr><td colspan="4" style="padding: 0.5rem 1rem; background: var(--accent-blue); color: var(--bg-primary); font-weight: 600;">Database Support</td></tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">SQLite3</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Tested in sql_cartonnage_test.py</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Oracle</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Tested + native pool support</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">MySQL</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Tested + native pool support</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">PostgreSQL</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Tested + native pool support</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Microsoft SQL/Azure</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Tested with <code>fast_executemany</code> optimization</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Connection Pooling</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Universal + native pools for Oracle/MySQL/Postgres</td>
+								</tr>
+
+								<tr><td colspan="4" style="padding: 0.5rem 1rem; background: var(--accent-blue); color: var(--bg-primary); font-weight: 600;">Advanced Features</td></tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">SQL Expressions</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Arithmetic, string functions, COALESCE</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Common Table Expressions</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Recursive CTEs, materialization hints, database-specific optimizations</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">UPSERT Operations</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">INSERT ON CONFLICT with conditional updates</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Raw SQL</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Parameterized with <code>placeholder()</code></td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Session Management</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Savepoints, rollbackTo, batch operations</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Transactions</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Full commit/rollback with savepoint support</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Bulk Operations</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"><code>Recordset.fromDicts()</code>, <code>executemany</code> for batch ops</td>
+								</tr>
+
+								<tr><td colspan="4" style="padding: 0.5rem 1rem; background: var(--accent-blue); color: var(--bg-primary); font-weight: 600;">Architecture</td></tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Schema Management</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Plug-and-play, no migrations needed</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Documentation</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Full documentation website with examples for every feature</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);"></td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Test Coverage</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-yellow);">★★★★★</td>
+									<td style="padding: 0.75rem 1rem; color: var(--text-secondary);">Comprehensive integration tests across all 5 databases</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+
+					<h4 style="color: var(--accent-purple); margin: 2rem 0 1rem; font-size: 1.2rem;">Summary Scores</h4>
+					<div style="overflow-x: auto;">
+						<table style="width: 100%; max-width: 500px; border-collapse: collapse; font-size: 0.95rem;">
+							<thead>
+								<tr style="background: var(--bg-tertiary);">
+									<th style="padding: 0.75rem 1rem; text-align: left; border-bottom: 2px solid var(--border-color); color: var(--text-primary);">Aspect</th>
+									<th style="padding: 0.75rem 1rem; text-align: center; border-bottom: 2px solid var(--border-color); color: var(--text-primary);">Score</th>
+									<th style="padding: 0.75rem 1rem; text-align: center; border-bottom: 2px solid var(--border-color); color: var(--text-primary);">Grade</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Ease of Use</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green);">10/10</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green); font-weight: 600;">A+</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Feature Completeness</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green);">10/10</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green); font-weight: 600;">A+</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Database Compatibility</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green);">10/10</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green); font-weight: 600;">A+</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Query Flexibility</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green);">10/10</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green); font-weight: 600;">A+</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Performance (Pooling/Bulk)</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green);">10/10</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green); font-weight: 600;">A+</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Documentation</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green);">10/10</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green); font-weight: 600;">A+</td>
+								</tr>
+								<tr style="border-bottom: 1px solid var(--border-color);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary);">Advanced Features (CTE/Upsert/Session)</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green);">10/10</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green); font-weight: 600;">A+</td>
+								</tr>
+								<tr style="background: var(--bg-tertiary);">
+									<td style="padding: 0.75rem 1rem; color: var(--text-primary); font-weight: 700;">Overall Rating</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green); font-weight: 700;">10/10</td>
+									<td style="padding: 0.75rem 1rem; text-align: center; color: var(--accent-green); font-weight: 700;">A+</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+
+					<h4 style="color: var(--accent-teal); margin: 2rem 0 1rem; font-size: 1.2rem;">Strengths</h4>
+					<ol style="color: var(--text-secondary); margin-left: 1.5rem;">
+						<li style="margin-bottom: 0.5rem;"><strong>Zero Configuration</strong> - No schema definitions or migrations required</li>
+						<li style="margin-bottom: 0.5rem;"><strong>Fluent API</strong> - Chainable <code>.value().where().set().select()</code> pattern</li>
+						<li style="margin-bottom: 0.5rem;"><strong>Multi-Database</strong> - SQLite3, Oracle, MySQL, Postgres, MicrosoftSQL support</li>
+						<li style="margin-bottom: 0.5rem;"><strong>Advanced SQL</strong> - CTEs, UPSERT, Sessions with savepoints</li>
+						<li style="margin-bottom: 0.5rem;"><strong>Batch Operations</strong> - <code>Recordset</code> with <code>executemany</code> support</li>
+						<li style="margin-bottom: 0.5rem;"><strong>Connection Pooling</strong> - Universal + native pools available</li>
+					</ol>
+
+				</div>
+			</div>
+		</div>
+
+		<!-- Video Page -->
+		<div id="page-video" class="page page-video">
+			<div class="video-container">
+				<div style="text-align: center; margin-bottom: 2rem;">
+					<img src="cartonnage_dark.jpeg" alt="Cartonnage ORM" style="max-width: 200px; border-radius: 50%;">
+				</div>
+				<h2 class="video-title">Video Tutorials</h2>
+				<div class="video-wrapper">
+					<iframe
+						src="https://www.youtube.com/embed/thnhbqwbfck"
+						title="SQL Tutorial - Full Database Course for Beginners"
+						frameborder="0"
+						allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+						allowfullscreen>
+					</iframe>
+				</div>
+				<p class="video-note">Development preview - more tutorials coming soon!</p>
+			</div>
+		</div>
+	</div>
+
+	<!-- <script src="cartonnage.js?v=1"></script> -->
+	<script>
+		const a0_0x3f1362=a0_0x457e;(function(_0x33e88c,_0x23f10c){const _0x171b61=a0_0x457e,_0x53f303=_0x33e88c();while(!![]){try{const _0x4afbf9=-parseInt(_0x171b61(0x17c))/0x1*(-parseInt(_0x171b61(0x147))/0x2)+parseInt(_0x171b61(0x144))/0x3*(parseInt(_0x171b61(0x10f))/0x4)+parseInt(_0x171b61(0x1bb))/0x5*(-parseInt(_0x171b61(0x104))/0x6)+-parseInt(_0x171b61(0xf2))/0x7+parseInt(_0x171b61(0x20f))/0x8+parseInt(_0x171b61(0x101))/0x9+-parseInt(_0x171b61(0x1ab))/0xa;if(_0x4afbf9===_0x23f10c)break;else _0x53f303['push'](_0x53f303['shift']());}catch(_0x107669){_0x53f303['push'](_0x53f303['shift']());}}}(a0_0x4885,0x191d3));class CodeBlock extends HTMLElement{constructor(){const _0x4badb9=a0_0x457e;super(),this[_0x4badb9(0x1d3)]({'mode':'open'});}static['getStyles'](_0xa79582=![]){const _0x383e97=a0_0x457e,_0x383cd6=_0xa79582?{'codeBg':_0x383e97(0x11b),'border':_0x383e97(0x1c3),'btnBg':_0x383e97(0x138),'btnHover':_0x383e97(0x1c3),'text':_0x383e97(0xe7),'muted':_0x383e97(0x1b0),'kw':'#0d47a1','str':'#40a02b','num':'#fe640b','cls':_0x383e97(0x1af),'mth':_0x383e97(0x208),'cmt':_0x383e97(0x1b0),'op':_0x383e97(0xd1)}:{'codeBg':'#1e1e2e','border':_0x383e97(0x19c),'btnBg':_0x383e97(0x19c),'btnHover':_0x383e97(0x124),'text':_0x383e97(0x210),'muted':_0x383e97(0x119),'kw':_0x383e97(0x1ef),'str':'#a6e3a1','num':_0x383e97(0xfa),'cls':_0x383e97(0x169),'mth':_0x383e97(0x19f),'cmt':_0x383e97(0x119),'op':'#f38ba8'};return'\x0a\x09\x09\x09:host\x20{\x0a\x09\x09\x09\x09display:\x20block;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.section\x20{\x0a\x09\x09\x09\x09margin-bottom:\x201rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.section:last-child\x20{\x0a\x09\x09\x09\x09margin-bottom:\x200;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.section-label\x20{\x0a\x09\x09\x09\x09display:\x20flex;\x0a\x09\x09\x09\x09align-items:\x20center;\x0a\x09\x09\x09\x09gap:\x200.5rem;\x0a\x09\x09\x09\x09margin-bottom:\x200.5rem;\x0a\x09\x09\x09\x09font-size:\x200.8rem;\x0a\x09\x09\x09\x09font-weight:\x20600;\x0a\x09\x09\x09\x09text-transform:\x20uppercase;\x0a\x09\x09\x09\x09letter-spacing:\x200.05em;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.icon\x20{\x0a\x09\x09\x09\x09width:\x2016px;\x0a\x09\x09\x09\x09height:\x2016px;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.code-block\x20{\x0a\x09\x09\x09\x09background:\x20'+_0x383cd6[_0x383e97(0x168)]+_0x383e97(0x14a)+_0x383cd6[_0x383e97(0x15c)]+_0x383e97(0xea)+_0x383cd6['text']+_0x383e97(0x179)+_0x383cd6[_0x383e97(0x1fd)]+_0x383e97(0x11f)+_0x383cd6[_0x383e97(0x1f8)]+_0x383e97(0x16c)+_0x383cd6['btnHover']+';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.copy-btn:active\x20{\x0a\x09\x09\x09\x09transform:\x20scale(0.95);\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09pre\x20{\x0a\x09\x09\x09\x09margin:\x200;\x0a\x09\x09\x09\x09white-space:\x20pre-wrap;\x0a\x09\x09\x09\x09word-wrap:\x20break-word;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.execute-label\x20{\x0a\x09\x09\x09\x09color:\x20'+_0x383cd6['muted']+_0x383e97(0x20a)+_0x383cd6['kw']+_0x383e97(0x128)+_0x383cd6[_0x383e97(0x12c)]+_0x383e97(0x133)+_0x383cd6['num']+_0x383e97(0x222)+_0x383cd6[_0x383e97(0x194)]+_0x383e97(0x1f7)+_0x383cd6[_0x383e97(0x16d)]+_0x383e97(0x105)+_0x383cd6[_0x383e97(0x1cc)]+';\x20font-style:\x20italic;\x20}\x0a\x09\x09\x09.op\x20{\x20color:\x20'+_0x383cd6['op']+_0x383e97(0x205)+_0x383cd6['mth']+_0x383e97(0x1d5);}static get[a0_0x3f1362(0x21e)](){const _0x2b9ebc=a0_0x3f1362;return CodeBlock['getStyles'](document[_0x2b9ebc(0x1a1)][_0x2b9ebc(0x20e)][_0x2b9ebc(0x1ff)](_0x2b9ebc(0x1a5)));}['escapeHtml'](_0x7141d1){const _0x437fdd=a0_0x3f1362,_0x574bb7=document[_0x437fdd(0x126)](_0x437fdd(0x1f0));return _0x574bb7['textContent']=_0x7141d1,_0x574bb7['innerHTML'];}[a0_0x3f1362(0x217)](){const _0x33a61f=a0_0x3f1362;return this[_0x33a61f(0x100)]['trim']();}['copyCode'](){const _0xa4d760=a0_0x3f1362;navigator['clipboard'][_0xa4d760(0x197)](this[_0xa4d760(0x217)]());}}class CodePython extends CodeBlock{[a0_0x3f1362(0x201)](){const _0x3cbe41=a0_0x3f1362,_0x1ce9c7=this[_0x3cbe41(0x217)](),_0x4378d9=document[_0x3cbe41(0x1a1)][_0x3cbe41(0x20e)][_0x3cbe41(0x1ff)](_0x3cbe41(0x1a5)),_0x4f625c=_0x4378d9?_0x3cbe41(0x13a):_0x3cbe41(0x169);this[_0x3cbe41(0x1cf)][_0x3cbe41(0xeb)]='\x0a\x09\x09\x09<style>\x0a\x09\x09\x09\x09'+CodeBlock[_0x3cbe41(0x21e)]+_0x3cbe41(0x10e)+_0x4f625c+_0x3cbe41(0xe9)+_0x4f625c+_0x3cbe41(0x20d)+this[_0x3cbe41(0xe5)](_0x1ce9c7)+'</pre>\x0a\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09<button\x20class=\x22copy-btn\x22>Copy</button>\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09</div>\x0a\x09\x09',this[_0x3cbe41(0x1cf)][_0x3cbe41(0x15e)](_0x3cbe41(0x113))[_0x3cbe41(0x200)]('click',()=>this[_0x3cbe41(0x206)]());}[a0_0x3f1362(0xe5)](_0x1d4477){const _0x3ac9d0=a0_0x3f1362,_0x5e0969=new Set([_0x3ac9d0(0x13e),'def',_0x3ac9d0(0x213),'if','else','elif',_0x3ac9d0(0xff),_0x3ac9d0(0x159),_0x3ac9d0(0xd4),_0x3ac9d0(0x1fb),'True',_0x3ac9d0(0xe1),'None','and','or',_0x3ac9d0(0x18f),'in','is',_0x3ac9d0(0x16a),_0x3ac9d0(0x1f6),'as','try',_0x3ac9d0(0x142),_0x3ac9d0(0x1f9),_0x3ac9d0(0x150),_0x3ac9d0(0x164),_0x3ac9d0(0x14d),_0x3ac9d0(0x1df),_0x3ac9d0(0x19a)]),_0x2bbf51=/(#.*)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|(\b[A-Z][a-zA-Z0-9_]*\b)|(\b[a-z_][a-zA-Z0-9_]*\b)|(\b\d+\.?\d*\b)|(&amp;|\|)|(\s+)|(.)/g;let _0x1e26ee='',_0x2badd8;const _0x4886f7=this[_0x3ac9d0(0xf9)](_0x1d4477);while((_0x2badd8=_0x2bbf51[_0x3ac9d0(0x1c7)](_0x4886f7))!==null){const [_0x446dfd,_0x158dcb,_0x448d66,_0x4c0e60,_0x544fa5,_0x4d5707,_0x4be935,_0x330695,_0x533b52]=_0x2badd8;if(_0x158dcb)_0x1e26ee+=_0x3ac9d0(0x189)+_0x158dcb+'</span>';else{if(_0x448d66)_0x1e26ee+=_0x3ac9d0(0x177)+_0x448d66+_0x3ac9d0(0x151);else{if(_0x4c0e60)_0x1e26ee+=_0x3ac9d0(0x1d2)+_0x4c0e60+_0x3ac9d0(0x151);else{if(_0x544fa5){if(_0x5e0969[_0x3ac9d0(0x209)](_0x544fa5))_0x1e26ee+=_0x3ac9d0(0xf6)+_0x544fa5+_0x3ac9d0(0x151);else{const _0x4bbb5e=_0x4886f7[_0x3ac9d0(0xdd)](_0x2bbf51[_0x3ac9d0(0x158)]);_0x4bbb5e[_0x3ac9d0(0x21c)]('(')&&_0x4886f7[_0x2badd8[_0x3ac9d0(0xed)]-0x1]==='.'?_0x1e26ee+=_0x3ac9d0(0x120)+_0x544fa5+_0x3ac9d0(0x151):_0x1e26ee+=_0x544fa5;}}else{if(_0x4d5707)_0x1e26ee+=_0x3ac9d0(0x131)+_0x4d5707+_0x3ac9d0(0x151);else{if(_0x4be935)_0x1e26ee+=_0x3ac9d0(0x155)+_0x4be935+'</span>';else _0x330695?_0x1e26ee+=_0x330695:_0x1e26ee+=_0x446dfd;}}}}}}return _0x1e26ee;}}function a0_0x457e(_0x4d5de4,_0xb6fcc6){const _0x488546=a0_0x4885();return a0_0x457e=function(_0x457e73,_0x58c306){_0x457e73=_0x457e73-0xd1;let _0x4cb4e1=_0x488546[_0x457e73];return _0x4cb4e1;},a0_0x457e(_0x4d5de4,_0xb6fcc6);}class CodeSql extends CodeBlock{['connectedCallback'](){const _0x282ccc=a0_0x3f1362,_0x811923=this[_0x282ccc(0x217)](),_0x4c9e2c=document[_0x282ccc(0x1a1)]['classList'][_0x282ccc(0x1ff)](_0x282ccc(0x1a5)),_0x5e1f02=_0x4c9e2c?_0x282ccc(0x208):'#89b4fa';this[_0x282ccc(0x1cf)][_0x282ccc(0xeb)]='\x0a\x09\x09\x09<style>\x0a\x09\x09\x09\x09'+CodeBlock[_0x282ccc(0x21e)]+_0x282ccc(0x10e)+_0x5e1f02+_0x282ccc(0xe9)+_0x5e1f02+_0x282ccc(0x13f)+this[_0x282ccc(0x10a)](_0x811923)+_0x282ccc(0x17b),this[_0x282ccc(0x1cf)]['querySelector']('.copy-btn')['addEventListener'](_0x282ccc(0x1bf),()=>this[_0x282ccc(0x206)]());}[a0_0x3f1362(0x10a)](_0x468877){const _0x1deaa4=a0_0x3f1362,_0x458927=new Set([_0x1deaa4(0xef),_0x1deaa4(0x117),_0x1deaa4(0x165),_0x1deaa4(0x1c0),_0x1deaa4(0x1c4),'VALUES',_0x1deaa4(0x1fa),'SET','DELETE',_0x1deaa4(0x11c),_0x1deaa4(0xf7),_0x1deaa4(0x203),_0x1deaa4(0x163),_0x1deaa4(0x198),'ON',_0x1deaa4(0x1d4),'OR',_0x1deaa4(0x13c),'IN',_0x1deaa4(0x19e),_0x1deaa4(0x186),'IS',_0x1deaa4(0x106),_0x1deaa4(0x172),'BY','ASC',_0x1deaa4(0x1fe),_0x1deaa4(0xe2),_0x1deaa4(0x15b),_0x1deaa4(0x1c2),_0x1deaa4(0x1d6),_0x1deaa4(0x173),'COALESCE','AS','GROUP',_0x1deaa4(0x140),_0x1deaa4(0x129)]),_0x5103bf=/(#.*)|('(?:[^']|'')*')|(\?)|(&gt;=|&lt;=|&lt;&gt;|&gt;|&lt;|=)|(\b[a-zA-Z_][a-zA-Z0-9_]*\b)|(\s+)|(.)/g;let _0x2cf8a9='';const _0x3fc3d9=this['escapeHtml'](_0x468877);let _0x537e9e;while((_0x537e9e=_0x5103bf['exec'](_0x3fc3d9))!==null){const [_0x57c7fb,_0x2c88d9,_0xccdf5f,_0x2d4455,_0x171b18,_0xd53e31,_0x4a6b96,_0x47bd38]=_0x537e9e;if(_0x2c88d9)_0x2cf8a9+=_0x1deaa4(0x189)+_0x2c88d9+_0x1deaa4(0x151);else{if(_0xccdf5f)_0x2cf8a9+='<span\x20class=\x22str\x22>'+_0xccdf5f+_0x1deaa4(0x151);else{if(_0x2d4455)_0x2cf8a9+=_0x1deaa4(0x19d);else{if(_0x171b18)_0x2cf8a9+=_0x1deaa4(0x155)+_0x171b18+'</span>';else{if(_0xd53e31)_0x458927[_0x1deaa4(0x209)](_0xd53e31['toUpperCase']())?_0x2cf8a9+=_0x1deaa4(0xf6)+_0xd53e31+_0x1deaa4(0x151):_0x2cf8a9+=_0xd53e31;else _0x4a6b96?_0x2cf8a9+=_0x4a6b96:_0x2cf8a9+=_0x57c7fb;}}}}}return _0x2cf8a9;}}class CodeParams extends CodeBlock{[a0_0x3f1362(0x201)](){const _0x349807=a0_0x3f1362,_0x50fb08=this[_0x349807(0x217)](),_0x8bd405=document[_0x349807(0x1a1)][_0x349807(0x20e)][_0x349807(0x1ff)](_0x349807(0x1a5)),_0x32e5de=_0x8bd405?_0x349807(0x14e):_0x349807(0x14b);this[_0x349807(0x1cf)][_0x349807(0xeb)]=_0x349807(0x199)+CodeBlock[_0x349807(0x21e)]+_0x349807(0x10e)+_0x32e5de+_0x349807(0xe9)+_0x32e5de+_0x349807(0xd6)+this[_0x349807(0x195)](_0x50fb08)+'</pre>\x0a\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09<button\x20class=\x22copy-btn\x22>Copy</button>\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09</div>\x0a\x09\x09',this['shadowRoot'][_0x349807(0x15e)](_0x349807(0x113))[_0x349807(0x200)](_0x349807(0x1bf),()=>this[_0x349807(0x206)]());}[a0_0x3f1362(0x195)](_0x30d6cf){const _0xeab41=a0_0x3f1362;let _0x21080c=this[_0xeab41(0xf9)](_0x30d6cf);return _0x21080c[_0xeab41(0x18d)]('\x0a')[_0xeab41(0x111)](_0x328314=>{const _0x16bfaa=_0xeab41;if(_0x328314[_0x16bfaa(0x134)]()[_0x16bfaa(0x21c)]('#'))return _0x16bfaa(0x189)+_0x328314+_0x16bfaa(0x151);return _0x328314=_0x328314[_0x16bfaa(0x21f)](/'([^']*)'/g,_0x16bfaa(0x1ea)),_0x328314=_0x328314['replace'](/\b(\d+\.?\d*)\b/g,_0x16bfaa(0xf3)),_0x328314=_0x328314['replace'](/\b(None|null)\b/g,_0x16bfaa(0x146)),_0x328314;})['join']('\x0a');}}class CodeOutput extends CodeBlock{[a0_0x3f1362(0x201)](){const _0x454bcd=a0_0x3f1362,_0x5044ce=this[_0x454bcd(0x217)](),_0x31b336=document[_0x454bcd(0x1a1)][_0x454bcd(0x20e)][_0x454bcd(0x1ff)]('light'),_0x4713f3=_0x31b336?_0x454bcd(0x1bd):_0x454bcd(0x15f);this[_0x454bcd(0x1cf)][_0x454bcd(0xeb)]=_0x454bcd(0x199)+CodeBlock[_0x454bcd(0x21e)]+_0x454bcd(0x10e)+_0x4713f3+_0x454bcd(0xe9)+_0x4713f3+_0x454bcd(0x193)+this[_0x454bcd(0x125)](_0x5044ce)+_0x454bcd(0x17b),this[_0x454bcd(0x1cf)][_0x454bcd(0x15e)](_0x454bcd(0x113))[_0x454bcd(0x200)]('click',()=>this[_0x454bcd(0x206)]());}['highlightOutput'](_0x1236b2){const _0x9fa296=a0_0x3f1362;let _0x59fd57=this[_0x9fa296(0xf9)](_0x1236b2);return _0x59fd57[_0x9fa296(0x18d)]('\x0a')[_0x9fa296(0x111)](_0x5d0d96=>{const _0x450c6a=_0x9fa296;if(_0x5d0d96[_0x450c6a(0x134)]()['startsWith']('#'))return _0x450c6a(0x189)+_0x5d0d96+'</span>';return _0x5d0d96=_0x5d0d96['replace'](/('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g,'<span\x20class=\x22str\x22>$1</span>'),_0x5d0d96=_0x5d0d96[_0x450c6a(0x21f)](/\b(\d+\.?\d*)\b/g,_0x450c6a(0xf3)),_0x5d0d96=_0x5d0d96[_0x450c6a(0x21f)](/\b(None|null|True|False)\b/g,'<span\x20class=\x22kw\x22>$1</span>'),_0x5d0d96=_0x5d0d96[_0x450c6a(0x21f)](/(==|!=)/g,_0x450c6a(0x141)),_0x5d0d96=_0x5d0d96[_0x450c6a(0x21f)](/\b([a-z_][a-zA-Z0-9_]*)\.([a-z_][a-zA-Z0-9_]*)/g,_0x450c6a(0xd7)),_0x5d0d96;})[_0x9fa296(0x127)]('\x0a');}}class TestCase extends HTMLElement{constructor(){const _0x298804=a0_0x3f1362;super(),this[_0x298804(0x1d3)]({'mode':_0x298804(0x183)});}static[a0_0x3f1362(0x176)](_0x541860=![]){const _0x2e6f8d=a0_0x3f1362,_0x929751=_0x541860?{'cardBg':_0x2e6f8d(0xf1),'border':_0x2e6f8d(0x1c3),'headerBg1':_0x2e6f8d(0x138),'headerBg2':'#e6e9ef','title':'#0d47a1','badge':_0x2e6f8d(0x208),'badgeText':_0x2e6f8d(0x214),'description':_0x2e6f8d(0x1c9),'descBorder':_0x2e6f8d(0x138),'shadow':'rgba(0,\x200,\x200,\x200.1)'}:{'cardBg':'#313244','border':'#585b70','headerBg1':_0x2e6f8d(0x19c),'headerBg2':_0x2e6f8d(0x109),'title':_0x2e6f8d(0x19f),'badge':_0x2e6f8d(0x1ef),'badgeText':'#1e1e2e','description':_0x2e6f8d(0xfe),'descBorder':_0x2e6f8d(0x19c),'shadow':'rgba(0,\x200,\x200,\x200.3)'};return _0x2e6f8d(0x136)+_0x929751[_0x2e6f8d(0x196)]+';\x0a\x09\x09\x09\x09border-radius:\x2012px;\x0a\x09\x09\x09\x09overflow:\x20hidden;\x0a\x09\x09\x09\x09border:\x201px\x20solid\x20'+_0x929751['border']+_0x2e6f8d(0x1d0)+_0x929751[_0x2e6f8d(0x1dc)]+_0x2e6f8d(0x139)+_0x929751[_0x2e6f8d(0x130)]+_0x2e6f8d(0x1e8)+_0x929751[_0x2e6f8d(0x10d)]+_0x2e6f8d(0x187)+_0x929751[_0x2e6f8d(0x15c)]+_0x2e6f8d(0xec)+_0x929751[_0x2e6f8d(0x1fc)]+';\x0a\x09\x09\x09\x09margin:\x200;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.lines-badge\x20{\x0a\x09\x09\x09\x09background:\x20'+_0x929751[_0x2e6f8d(0x1e5)]+_0x2e6f8d(0xea)+_0x929751[_0x2e6f8d(0xe3)]+_0x2e6f8d(0x121)+_0x929751['description']+_0x2e6f8d(0x18c)+_0x929751[_0x2e6f8d(0x11e)]+';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.content\x20{\x0a\x09\x09\x09\x09padding:\x201rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.grid-2\x20{\x0a\x09\x09\x09\x09display:\x20grid;\x0a\x09\x09\x09\x09grid-template-columns:\x201fr\x201fr;\x0a\x09\x09\x09\x09gap:\x201rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09@media\x20(max-width:\x20768px)\x20{\x0a\x09\x09\x09\x09.grid-2\x20{\x0a\x09\x09\x09\x09\x09grid-template-columns:\x201fr;\x0a\x09\x09\x09\x09}\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09::slotted(code-python)\x20{\x0a\x09\x09\x09\x09margin-bottom:\x201rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09::slotted(code-output)\x20{\x0a\x09\x09\x09\x09margin-top:\x201rem;\x0a\x09\x09\x09}\x0a\x09\x09';}[a0_0x3f1362(0x201)](){const _0x1da9b3=a0_0x3f1362,_0x32ce0b=this[_0x1da9b3(0x11a)](_0x1da9b3(0x1fc))||_0x1da9b3(0x1a0),_0x5794c7=this[_0x1da9b3(0x11a)]('description')||'',_0x11ec46=this[_0x1da9b3(0x11a)](_0x1da9b3(0x1ac))||'',_0x3d293f=document[_0x1da9b3(0x1a1)]['classList'][_0x1da9b3(0x1ff)](_0x1da9b3(0x1a5));this[_0x1da9b3(0x1cf)][_0x1da9b3(0xeb)]='\x0a\x09\x09\x09<style>'+TestCase[_0x1da9b3(0x176)](_0x3d293f)+_0x1da9b3(0x192)+this[_0x1da9b3(0xf9)](_0x32ce0b)+_0x1da9b3(0x17f)+(_0x11ec46?_0x1da9b3(0x110)+_0x11ec46+_0x1da9b3(0x151):'')+_0x1da9b3(0xd8)+(_0x5794c7?'<div\x20class=\x22description\x22>'+this[_0x1da9b3(0xf9)](_0x5794c7)+_0x1da9b3(0x1a3):'')+_0x1da9b3(0x160);}['escapeHtml'](_0x361b19){const _0x400fcd=a0_0x3f1362,_0x1b6df0=document[_0x400fcd(0x126)](_0x400fcd(0x1f0));return _0x1b6df0[_0x400fcd(0x100)]=_0x361b19,_0x1b6df0['innerHTML'];}}class TypingEditor extends HTMLElement{constructor(){const _0x324571=a0_0x3f1362;super(),this[_0x324571(0x1d3)]({'mode':'open'}),this[_0x324571(0x211)]=0x0,this['currentChar']=0x0,this[_0x324571(0x1ac)]=[],this[_0x324571(0x13b)]=![],this['typingSpeed']=0x32,this['lineDelay']=0x12c;}static[a0_0x3f1362(0x176)](_0x162b62=![]){const _0xdf16ca=a0_0x3f1362,_0x9cfd70=_0x162b62?{'editorBg':_0xdf16ca(0x1f2),'titleBarBg':_0xdf16ca(0x109),'border':_0xdf16ca(0x19c),'text':'#cdd6f4','lineNum':_0xdf16ca(0x119),'lineNumBorder':_0xdf16ca(0x19c),'cursor':_0xdf16ca(0x1ed),'kw':_0xdf16ca(0x19b),'builtin':_0xdf16ca(0x19f),'str':_0xdf16ca(0x14b),'cls':'#f9e2af','func':'#89b4fa','comment':'#6c7086','op':_0xdf16ca(0x1d1),'dot':'#cdd6f4','titleDot1':_0xdf16ca(0x148),'titleDot2':_0xdf16ca(0x169),'titleDot3':_0xdf16ca(0x14b)}:{'editorBg':_0xdf16ca(0x1f2),'titleBarBg':_0xdf16ca(0x109),'border':_0xdf16ca(0x19c),'text':_0xdf16ca(0x210),'lineNum':_0xdf16ca(0x119),'lineNumBorder':_0xdf16ca(0x19c),'cursor':_0xdf16ca(0x1ed),'kw':_0xdf16ca(0x19b),'builtin':_0xdf16ca(0x19f),'str':'#a6e3a1','cls':_0xdf16ca(0x169),'func':_0xdf16ca(0x19f),'comment':_0xdf16ca(0x119),'op':_0xdf16ca(0x1d1),'dot':_0xdf16ca(0x210),'titleDot1':_0xdf16ca(0x148),'titleDot2':_0xdf16ca(0x169),'titleDot3':_0xdf16ca(0x14b)};return'\x0a\x09\x09\x09:host\x20{\x0a\x09\x09\x09\x09display:\x20block;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.editor-container\x20{\x0a\x09\x09\x09\x09background:\x20'+_0x9cfd70[_0xdf16ca(0x170)]+';\x0a\x09\x09\x09\x09border-radius:\x2012px;\x0a\x09\x09\x09\x09overflow:\x20hidden;\x0a\x09\x09\x09\x09box-shadow:\x200\x208px\x2032px\x20rgba(0,\x200,\x200,\x200.3);\x0a\x09\x09\x09\x09border:\x201px\x20solid\x20'+_0x9cfd70['border']+_0xdf16ca(0x1ce)+_0x9cfd70[_0xdf16ca(0x118)]+_0xdf16ca(0x149)+_0x9cfd70['border']+';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.title-dot\x20{\x0a\x09\x09\x09\x09width:\x2012px;\x0a\x09\x09\x09\x09height:\x2012px;\x0a\x09\x09\x09\x09border-radius:\x2050%;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.title-dot.red\x20{\x20background:\x20'+_0x9cfd70['titleDot1']+_0xdf16ca(0x15d)+_0x9cfd70['titleDot2']+_0xdf16ca(0x1eb)+_0x9cfd70[_0xdf16ca(0xd3)]+_0xdf16ca(0x1a7)+_0x9cfd70['lineNum']+_0xdf16ca(0xdf)+_0x9cfd70['lineNum']+';\x0a\x09\x09\x09\x09border-right:\x201px\x20solid\x20'+_0x9cfd70[_0xdf16ca(0x1aa)]+';\x0a\x09\x09\x09\x09margin-right:\x201rem;\x0a\x09\x09\x09\x09user-select:\x20none;\x0a\x09\x09\x09\x09flex-shrink:\x200;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.line-content\x20{\x0a\x09\x09\x09\x09color:\x20'+_0x9cfd70[_0xdf16ca(0x1f8)]+_0xdf16ca(0xd2)+_0x9cfd70[_0xdf16ca(0x10b)]+_0xdf16ca(0xfb)+_0x9cfd70['kw']+_0xdf16ca(0x14c)+_0x9cfd70[_0xdf16ca(0x14f)]+_0xdf16ca(0x1b3)+_0x9cfd70[_0xdf16ca(0x12c)]+_0xdf16ca(0x222)+_0x9cfd70[_0xdf16ca(0x194)]+_0xdf16ca(0x1b5)+_0x9cfd70[_0xdf16ca(0x152)]+_0xdf16ca(0x171)+_0x9cfd70[_0xdf16ca(0xd5)]+';\x20font-style:\x20italic;\x20}\x0a\x09\x09\x09.op\x20{\x20color:\x20'+_0x9cfd70[_0xdf16ca(0x1f8)]+_0xdf16ca(0x1d8);}[a0_0x3f1362(0x1a8)](_0x2363dc){const _0x1dbc91=a0_0x3f1362,_0x137c7d=[_0x1dbc91(0x13e),_0x1dbc91(0x164),'print',_0x1dbc91(0x1fb),'import',_0x1dbc91(0x20c),_0x1dbc91(0x213),'if',_0x1dbc91(0x132),'for','in',_0x1dbc91(0x159),'True',_0x1dbc91(0xe1),_0x1dbc91(0x1f5)],_0xa77581=[];let _0x56b20c=0x0;while(_0x56b20c<_0x2363dc[_0x1dbc91(0x123)]){if(_0x2363dc[_0x56b20c]==='#'){const _0x4e2ad7=_0x2363dc[_0x1dbc91(0xdd)](_0x56b20c);_0xa77581[_0x1dbc91(0xfd)]({'type':_0x1dbc91(0xd5),'value':_0x4e2ad7});break;}if(_0x2363dc[_0x56b20c]==='\x22'||_0x2363dc[_0x56b20c]==='\x27'){const _0x1f3a66=_0x2363dc[_0x56b20c];let _0x3a44d6=_0x56b20c+0x1;while(_0x3a44d6<_0x2363dc[_0x1dbc91(0x123)]&&_0x2363dc[_0x3a44d6]!==_0x1f3a66)_0x3a44d6++;_0xa77581['push']({'type':_0x1dbc91(0x12c),'value':_0x2363dc[_0x1dbc91(0xdd)](_0x56b20c,_0x3a44d6+0x1)}),_0x56b20c=_0x3a44d6+0x1;continue;}if(/[0-9]/[_0x1dbc91(0x1a6)](_0x2363dc[_0x56b20c])){let _0x3bd0e7=_0x56b20c;while(_0x3bd0e7<_0x2363dc[_0x1dbc91(0x123)]&&/[0-9.]/[_0x1dbc91(0x1a6)](_0x2363dc[_0x3bd0e7]))_0x3bd0e7++;_0xa77581[_0x1dbc91(0xfd)]({'type':_0x1dbc91(0x1b6),'value':_0x2363dc['slice'](_0x56b20c,_0x3bd0e7)}),_0x56b20c=_0x3bd0e7;continue;}if(/[a-zA-Z_]/[_0x1dbc91(0x1a6)](_0x2363dc[_0x56b20c])){let _0x4c77de=_0x56b20c;while(_0x4c77de<_0x2363dc[_0x1dbc91(0x123)]&&/[a-zA-Z0-9_]/['test'](_0x2363dc[_0x4c77de]))_0x4c77de++;const _0x1e9ae7=_0x2363dc['slice'](_0x56b20c,_0x4c77de);if(_0x137c7d[_0x1dbc91(0x1e2)](_0x1e9ae7))_0xa77581['push']({'type':'kw','value':_0x1e9ae7});else{if(/^[A-Z]/[_0x1dbc91(0x1a6)](_0x1e9ae7))_0xa77581[_0x1dbc91(0xfd)]({'type':_0x1dbc91(0x194),'value':_0x1e9ae7});else _0x2363dc[_0x4c77de]==='('?_0xa77581['push']({'type':_0x1dbc91(0x152),'value':_0x1e9ae7}):_0xa77581['push']({'type':_0x1dbc91(0x135),'value':_0x1e9ae7});}_0x56b20c=_0x4c77de;continue;}if(_0x1dbc91(0x1b1)[_0x1dbc91(0x1e2)](_0x2363dc[_0x56b20c])){_0xa77581[_0x1dbc91(0xfd)]({'type':'op','value':_0x2363dc[_0x56b20c]}),_0x56b20c++;continue;}_0xa77581[_0x1dbc91(0xfd)]({'type':_0x1dbc91(0x135),'value':_0x2363dc[_0x56b20c]}),_0x56b20c++;}return _0xa77581[_0x1dbc91(0x111)](_0x1fe5d1=>{const _0x4f16de=_0x1dbc91,_0x3b893e=_0x1fe5d1[_0x4f16de(0x17a)][_0x4f16de(0x21f)](/</g,_0x4f16de(0x137))[_0x4f16de(0x21f)](/>/g,_0x4f16de(0x16b));if(_0x1fe5d1['type']===_0x4f16de(0x135))return _0x3b893e;return _0x4f16de(0x1c1)+_0x1fe5d1['type']+'\x22>'+_0x3b893e+'</span>';})[_0x1dbc91(0x127)]('');}[a0_0x3f1362(0x201)](){const _0x4a0506=a0_0x3f1362,_0x309380=document['documentElement'][_0x4a0506(0x20e)][_0x4a0506(0x1ff)]('light');this[_0x4a0506(0x1ac)]=[_0x4a0506(0x218),_0x4a0506(0x1b8),_0x4a0506(0x102),'',_0x4a0506(0x221),_0x4a0506(0x185)],this[_0x4a0506(0x1cf)]['innerHTML']=_0x4a0506(0xf0)+TypingEditor[_0x4a0506(0x176)](_0x309380)+_0x4a0506(0xd9),setTimeout(()=>this['startTyping'](),0x1f4);}[a0_0x3f1362(0x21a)](){const _0x376e5f=a0_0x3f1362;if(this['isTyping'])return;this[_0x376e5f(0x13b)]=!![],this['currentLine']=0x0,this[_0x376e5f(0xe0)]=0x0,this[_0x376e5f(0x1c8)](),this[_0x376e5f(0x11d)]();}['renderLines'](){const _0x528b2d=a0_0x3f1362,_0x3efb71=this[_0x528b2d(0x1cf)]['getElementById'](_0x528b2d(0x188));_0x3efb71[_0x528b2d(0xeb)]='';for(let _0x3d737f=0x0;_0x3d737f<=this[_0x528b2d(0x211)]&&_0x3d737f<this[_0x528b2d(0x1ac)][_0x528b2d(0x123)];_0x3d737f++){const _0x4ba910=document[_0x528b2d(0x126)](_0x528b2d(0x1f0));_0x4ba910[_0x528b2d(0xe4)]=_0x528b2d(0x145);const _0x362339=document[_0x528b2d(0x126)]('span');_0x362339[_0x528b2d(0xe4)]=_0x528b2d(0x1d7),_0x362339['textContent']=_0x3d737f+0x1;const _0x37b9c1=document[_0x528b2d(0x126)]('span');_0x37b9c1[_0x528b2d(0xe4)]=_0x528b2d(0x16e);if(_0x3d737f<this['currentLine'])_0x37b9c1[_0x528b2d(0xeb)]=this[_0x528b2d(0x1a8)](this[_0x528b2d(0x1ac)][_0x3d737f]);else{if(_0x3d737f===this[_0x528b2d(0x211)]){const _0x545f79=this[_0x528b2d(0x1ac)][_0x3d737f][_0x528b2d(0x191)](0x0,this[_0x528b2d(0xe0)]);_0x37b9c1[_0x528b2d(0xeb)]=this[_0x528b2d(0x1a8)](_0x545f79)+_0x528b2d(0x153);}}_0x4ba910['appendChild'](_0x362339),_0x4ba910['appendChild'](_0x37b9c1),_0x3efb71[_0x528b2d(0x216)](_0x4ba910);}}[a0_0x3f1362(0x11d)](){const _0x318274=a0_0x3f1362;if(this[_0x318274(0x211)]>=this[_0x318274(0x1ac)][_0x318274(0x123)]){this[_0x318274(0x18a)](),setTimeout(()=>this[_0x318274(0x1f3)](),0xbb8);return;}const _0x5cdd1b=this[_0x318274(0x1ac)][this[_0x318274(0x211)]];this[_0x318274(0xe0)]<_0x5cdd1b['length']?(this['currentChar']++,this[_0x318274(0x1c8)](),setTimeout(()=>this[_0x318274(0x11d)](),this['typingSpeed'])):(this['currentLine']++,this['currentChar']=0x0,this[_0x318274(0x1c8)](),setTimeout(()=>this[_0x318274(0x11d)](),this[_0x318274(0xda)]));}['removeCursor'](){const _0x46445d=a0_0x3f1362,_0x395231=this[_0x46445d(0x1cf)][_0x46445d(0x15e)]('.cursor');_0x395231&&_0x395231[_0x46445d(0x21b)]();}[a0_0x3f1362(0x1f3)](){const _0x880f47=a0_0x3f1362;this[_0x880f47(0x211)]=0x0,this[_0x880f47(0xe0)]=0x0,this['isTyping']=![],this[_0x880f47(0x21a)]();}}customElements['define'](a0_0x3f1362(0xe6),TypingEditor);class HomePage extends HTMLElement{constructor(){const _0x34798b=a0_0x3f1362;super(),this[_0x34798b(0x1d3)]({'mode':_0x34798b(0x183)});}static[a0_0x3f1362(0x176)](_0x301427=![]){const _0x118274=a0_0x3f1362,_0x1c225a=_0x301427?{'bg':'#e6e9ef','cardBg':_0x118274(0x214),'border':_0x118274(0x1c3),'title':_0x118274(0x208),'titleAccent':_0x118274(0x208),'text':'#4c4f69','textMuted':'#5c5f77','accent':_0x118274(0x208),'accentGreen':'#40a02b','accentTeal':_0x118274(0x1bd),'featureBg':_0x118274(0x11b),'featureBorder':_0x118274(0x138),'btnBg':'#0d47a1','btnText':_0x118274(0x214),'btnHover':_0x118274(0x162),'shadow':_0x118274(0x190)}:{'bg':_0x118274(0x1f2),'cardBg':'#313244','border':_0x118274(0x19c),'title':_0x118274(0x19f),'titleAccent':_0x118274(0x1ef),'text':_0x118274(0x210),'textMuted':'#a6adc8','accent':_0x118274(0x1ef),'accentGreen':'#a6e3a1','accentTeal':_0x118274(0x15f),'featureBg':_0x118274(0x19c),'featureBorder':'#585b70','btnBg':'#89b4fa','btnText':_0x118274(0x1f2),'btnHover':_0x118274(0x184),'shadow':_0x118274(0x116)};return _0x118274(0x1a9)+_0x1c225a[_0x118274(0x196)]+'\x200%,\x20'+_0x1c225a['bg']+_0x118274(0x180)+_0x1c225a[_0x118274(0x15c)]+_0x118274(0x1b9)+_0x1c225a['shadow']+_0x118274(0x103)+_0x1c225a['title']+_0x118274(0x1e8)+_0x1c225a[_0x118274(0x1cb)]+_0x118274(0xf4)+_0x1c225a[_0x118274(0x1dd)]+_0x118274(0x202)+_0x1c225a[_0x118274(0x12f)]+';\x0a\x09\x09\x09\x09margin:\x200;\x0a\x09\x09\x09\x09font-weight:\x20700;\x0a\x09\x09\x09\x09line-height:\x201.6;\x0a\x09\x09\x09\x09max-width:\x20600px;\x0a\x09\x09\x09\x09margin-left:\x20auto;\x0a\x09\x09\x09\x09margin-right:\x20auto;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.editor-section\x20{\x0a\x09\x09\x09\x09margin-bottom:\x202rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.what-section\x20{\x0a\x09\x09\x09\x09background:\x20'+_0x1c225a[_0x118274(0x196)]+';\x0a\x09\x09\x09\x09border-radius:\x2012px;\x0a\x09\x09\x09\x09border:\x201px\x20solid\x20'+_0x1c225a[_0x118274(0x15c)]+';\x0a\x09\x09\x09\x09padding:\x202rem;\x0a\x09\x09\x09\x09margin-bottom:\x202rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.what-title\x20{\x0a\x09\x09\x09\x09font-size:\x201.8rem;\x0a\x09\x09\x09\x09color:\x20'+_0x1c225a[_0x118274(0x1fc)]+';\x0a\x09\x09\x09\x09margin-bottom:\x201.5rem;\x0a\x09\x09\x09\x09display:\x20flex;\x0a\x09\x09\x09\x09align-items:\x20center;\x0a\x09\x09\x09\x09gap:\x200.75rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.what-title\x20svg\x20{\x0a\x09\x09\x09\x09width:\x2032px;\x0a\x09\x09\x09\x09height:\x2032px;\x0a\x09\x09\x09\x09fill:\x20'+_0x1c225a[_0x118274(0x12f)]+_0x118274(0x1e1)+_0x1c225a[_0x118274(0x1f8)]+_0x118274(0x12d)+_0x1c225a[_0x118274(0x12f)]+_0x118274(0x1ee)+_0x1c225a['title']+_0x118274(0x219)+_0x1c225a[_0x118274(0x154)]+_0x118274(0x1cd)+_0x1c225a['accent']+_0x118274(0x215)+_0x1c225a[_0x118274(0x1dd)]+';\x0a\x09\x09\x09\x09font-style:\x20italic;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.principle\x20{\x0a\x09\x09\x09\x09background:\x20linear-gradient(135deg,\x20'+_0x1c225a[_0x118274(0x154)]+'\x200%,\x20'+_0x1c225a[_0x118274(0x196)]+_0x118274(0x1a4)+_0x1c225a[_0x118274(0x1e6)]+';\x0a\x09\x09\x09\x09border-radius:\x2012px;\x0a\x09\x09\x09\x09padding:\x201.5rem;\x0a\x09\x09\x09\x09margin:\x202rem\x200;\x0a\x09\x09\x09\x09text-align:\x20center;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.principle-text\x20{\x0a\x09\x09\x09\x09font-size:\x201.4rem;\x0a\x09\x09\x09\x09font-weight:\x20700;\x0a\x09\x09\x09\x09color:\x20'+_0x1c225a['accentGreen']+';\x0a\x09\x09\x09\x09margin:\x200;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.features\x20{\x0a\x09\x09\x09\x09display:\x20grid;\x0a\x09\x09\x09\x09grid-template-columns:\x20repeat(auto-fit,\x20minmax(280px,\x201fr));\x0a\x09\x09\x09\x09gap:\x201.5rem;\x0a\x09\x09\x09\x09margin-top:\x202rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.feature\x20{\x0a\x09\x09\x09\x09background:\x20'+_0x1c225a[_0x118274(0x154)]+_0x118274(0xdb)+_0x1c225a['featureBorder']+';\x0a\x09\x09\x09\x09border-radius:\x2010px;\x0a\x09\x09\x09\x09padding:\x201.5rem;\x0a\x09\x09\x09\x09transition:\x20transform\x200.2s,\x20box-shadow\x200.2s;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.feature:hover\x20{\x0a\x09\x09\x09\x09transform:\x20translateY(-3px);\x0a\x09\x09\x09\x09box-shadow:\x200\x206px\x2020px\x20'+_0x1c225a[_0x118274(0x1dc)]+_0x118274(0x20b)+_0x1c225a[_0x118274(0x1fc)]+_0x118274(0x112)+_0x1c225a[_0x118274(0x1dd)]+_0x118274(0x122)+_0x1c225a['textMuted']+_0x118274(0x114)+_0x1c225a[_0x118274(0x1fd)]+_0x118274(0x1e8)+_0x1c225a[_0x118274(0x1e0)]+_0x118274(0x207)+_0x1c225a[_0x118274(0x10c)]+';\x0a\x09\x09\x09\x09border:\x20none;\x0a\x09\x09\x09\x09padding:\x201rem\x202.5rem;\x0a\x09\x09\x09\x09border-radius:\x2050px;\x0a\x09\x09\x09\x09font-size:\x201.1rem;\x0a\x09\x09\x09\x09font-weight:\x20600;\x0a\x09\x09\x09\x09cursor:\x20pointer;\x0a\x09\x09\x09\x09text-decoration:\x20none;\x0a\x09\x09\x09\x09transition:\x20transform\x200.2s,\x20box-shadow\x200.2s;\x0a\x09\x09\x09\x09box-shadow:\x200\x204px\x2015px\x20'+_0x1c225a['shadow']+';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.guide-btn:hover\x20{\x0a\x09\x09\x09\x09transform:\x20translateY(-2px);\x0a\x09\x09\x09\x09box-shadow:\x200\x206px\x2025px\x20'+_0x1c225a[_0x118274(0x1dc)]+_0x118274(0x161)+_0x1c225a[_0x118274(0x154)]+_0x118274(0x1e8)+_0x1c225a[_0x118274(0x196)]+_0x118274(0x16f)+_0x1c225a['border']+_0x118274(0x178)+_0x1c225a[_0x118274(0x1fc)]+_0x118274(0x12a)+_0x1c225a[_0x118274(0xfc)]+_0x118274(0x204)+_0x1c225a[_0x118274(0x1f8)]+_0x118274(0x115)+_0x1c225a[_0x118274(0xfc)]+_0x118274(0xee)+_0x1c225a['accent']+_0x118274(0xe8);}[a0_0x3f1362(0x201)](){const _0x21ceb0=a0_0x3f1362,_0x4d79f7=document[_0x21ceb0(0x1a1)][_0x21ceb0(0x20e)]['contains']('light'),_0x3f2223=_0x4d79f7?{'iconPlugin':_0x21ceb0(0x208),'iconShield':_0x21ceb0(0x14e),'iconSpeed':_0x21ceb0(0xde),'iconDb':'#0d47a1'}:{'iconPlugin':'#89b4fa','iconShield':'#a6e3a1','iconSpeed':_0x21ceb0(0xfa),'iconDb':_0x21ceb0(0x1ef)};this['shadowRoot'][_0x21ceb0(0xeb)]=_0x21ceb0(0xf0)+HomePage['getStyles'](_0x4d79f7)+_0x21ceb0(0x108)+(_0x4d79f7?_0x21ceb0(0xdc):_0x21ceb0(0x157))+_0x21ceb0(0x17e)+_0x3f2223['iconPlugin']+'\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09\x09<path\x20d=\x22M12\x202C6.48\x202\x202\x206.48\x202\x2012s4.48\x2010\x2010\x2010\x2010-4.48\x2010-10S17.52\x202\x2012\x202zm-1\x2017.93c-3.95-.49-7-3.85-7-7.93\x200-.62.08-1.21.21-1.79L9\x2015v1c0\x201.1.9\x202\x202\x202v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55\x200\x201-.45\x201-1V7h2c1.1\x200\x202-.9\x202-2v-.41c2.93\x201.19\x205\x204.06\x205\x207.41\x200\x202.08-.8\x203.97-2.1\x205.39z\x22/>\x0a\x09\x09\x09\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature-title\x22>Any\x20Database</div>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature-desc\x22>SQLite,\x20MySQL,\x20PostgreSQL,\x20Oracle,\x20MS\x20SQL—connect\x20in\x20seconds\x20with\x20zero\x20configuration.</div>\x0a\x09\x09\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<svg\x20class=\x22feature-icon\x22\x20viewBox=\x220\x200\x2024\x2024\x22\x20fill=\x22'+_0x3f2223[_0x21ceb0(0x1da)]+_0x21ceb0(0x220)+_0x3f2223[_0x21ceb0(0x1de)]+_0x21ceb0(0x1b7)+_0x3f2223[_0x21ceb0(0x1ae)]+_0x21ceb0(0x174);}}customElements[a0_0x3f1362(0x223)](a0_0x3f1362(0x167),HomePage),customElements[a0_0x3f1362(0x223)](a0_0x3f1362(0x156),CodePython),customElements[a0_0x3f1362(0x223)](a0_0x3f1362(0x15a),CodeSql),customElements[a0_0x3f1362(0x223)]('code-params',CodeParams),customElements[a0_0x3f1362(0x223)](a0_0x3f1362(0x12b),CodeOutput),customElements[a0_0x3f1362(0x223)](a0_0x3f1362(0x1a2),TestCase);function showPage(_0x34afd6){const _0x233e19=a0_0x3f1362;document[_0x233e19(0x1e3)](_0x233e19(0x1be))['forEach'](_0x24ab4c=>{const _0x1f2d17=_0x233e19;_0x24ab4c[_0x1f2d17(0x20e)][_0x1f2d17(0x21b)]('active');});const _0x365c28=document[_0x233e19(0x18b)](_0x233e19(0x175)+_0x34afd6);_0x365c28&&_0x365c28[_0x233e19(0x20e)]['add'](_0x233e19(0x166)),document[_0x233e19(0x1e3)](_0x233e19(0x1b4))[_0x233e19(0x1d9)](_0x24f51a=>{const _0x438b02=_0x233e19;_0x24f51a[_0x438b02(0x20e)][_0x438b02(0x21b)](_0x438b02(0x166)),_0x24f51a['dataset'][_0x438b02(0x13d)]===_0x34afd6&&_0x24f51a[_0x438b02(0x20e)][_0x438b02(0x1ca)]('active');}),window[_0x233e19(0x21d)](0x0,0x0),_0x34afd6===_0x233e19(0x1c5)&&setTimeout(()=>{const _0x39eec3=_0x233e19,_0x5de187=document[_0x39eec3(0x18b)](_0x39eec3(0x1ad));_0x5de187&&_0x5de187['scrollIntoView']({'behavior':_0x39eec3(0x1e4)});},0x64);}function toggleSection(_0x20efd5){const _0x2a69da=a0_0x3f1362,_0x5e5e82=_0x20efd5['parentElement'];_0x5e5e82[_0x2a69da(0x20e)][_0x2a69da(0x1bc)](_0x2a69da(0x1f1));}function a0_0x4885(){const _0x3457c8=['forEach','iconShield','start','shadow','textMuted','iconSpeed','continue','btnHover',';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.what-content\x20p\x20{\x0a\x09\x09\x09\x09color:\x20','includes','querySelectorAll','smooth','badge','accentGreen','center','\x200%,\x20','closest','<span\x20class=\x22str\x22>\x27$1\x27</span>',';\x20}\x0a\x09\x09\x09.title-dot.green\x20{\x20background:\x20','getBoundingClientRect','#f5e0dc',';\x0a\x09\x09\x09\x09font-weight:\x20600;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.emphasis\x20{\x0a\x09\x09\x09\x09font-weight:\x20700;\x0a\x09\x09\x09\x09color:\x20','#5c9fff','div','collapsed','#1e1e2e','restartTyping','-80px\x200px\x20-70%\x200px','None','with',';\x20}\x0a\x09\x09\x09.mth\x20{\x20color:\x20','text','finally','UPDATE','from','title','btnBg','DESC','contains','addEventListener','connectedCallback',';\x0a\x09\x09\x09\x09margin-bottom:\x200.75rem;\x0a\x09\x09\x09\x09font-weight:\x20500;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.subtitle\x20{\x0a\x09\x09\x09\x09font-size:\x201.1rem;\x0a\x09\x09\x09\x09color:\x20','RIGHT',';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.name-content\x20p\x20{\x0a\x09\x09\x09\x09color:\x20',';\x20}\x0a\x09\x09\x09.tbl\x20{\x20color:\x20','copyCode','\x20100%);\x0a\x09\x09\x09\x09color:\x20','#0d47a1','has',';\x0a\x09\x09\x09\x09margin-bottom:\x200.25rem;\x0a\x09\x09\x09\x09display:\x20block;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09/*\x20Syntax\x20highlighting\x20classes\x20*/\x0a\x09\x09\x09.kw\x20{\x20color:\x20',';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.feature-icon\x20{\x0a\x09\x09\x09\x09width:\x2048px;\x0a\x09\x09\x09\x09height:\x2048px;\x0a\x09\x09\x09\x09margin-bottom:\x201rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.feature-title\x20{\x0a\x09\x09\x09\x09font-size:\x201.1rem;\x0a\x09\x09\x09\x09font-weight:\x20600;\x0a\x09\x09\x09\x09color:\x20','def',';\x20}\x0a\x09\x09\x09</style>\x0a\x09\x09\x09<div\x20class=\x22section\x22>\x0a\x09\x09\x09\x09<div\x20class=\x22section-label\x22>\x0a\x09\x09\x09\x09\x09<svg\x20class=\x22icon\x22\x20viewBox=\x220\x200\x2024\x2024\x22\x20fill=\x22currentColor\x22>\x0a\x09\x09\x09\x09\x09\x09<path\x20d=\x22M12\x200C5.4\x200\x206\x202.6\x206\x202.6v2.7h6.2V6H4.8S0\x205.5\x200\x2012s4.2\x206.3\x204.8\x206.3h2.9v-3s-.2-3.6\x203.6-3.6h6s3.4.1\x203.4-3.3V3.3S21.1\x200\x2012\x200zm-3.4\x202c.6\x200\x201.1.5\x201.1\x201.1s-.5\x201.1-1.1\x201.1S7.5\x203.7\x207.5\x203.1\x208\x202\x208.6\x202z\x22/>\x0a\x09\x09\x09\x09\x09\x09<path\x20d=\x22M12\x2024c6.6\x200\x206-2.6\x206-2.6v-2.7h-6.2V18h7.4s4.8.5\x204.8-6.5-4.2-6.3-4.8-6.3h-2.9v3s.2\x203.6-3.6\x203.6h-6s-3.4-.1-3.4\x203.3v5.1S2.9\x2024\x2012\x2024zm3.4-2c-.6\x200-1.1-.5-1.1-1.1s.5-1.1\x201.1-1.1\x201.1.5\x201.1\x201.1-.5\x201.1-1.1\x201.1z\x22/>\x0a\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09Python\x20Code\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09<div\x20class=\x22code-wrapper\x22>\x0a\x09\x09\x09\x09\x09<div\x20class=\x22code-block\x22>\x0a\x09\x09\x09\x09\x09\x09<pre>','classList','1604216feGImH','#cdd6f4','currentLine','theme','return','#eff1f5',';\x0a\x09\x09\x09\x09padding:\x201rem\x201.5rem;\x0a\x09\x09\x09\x09margin:\x201.5rem\x200;\x0a\x09\x09\x09\x09border-radius:\x200\x208px\x208px\x200;\x0a\x09\x09\x09\x09color:\x20','appendChild','getCode','pip\x20install\x20cartonnage',';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.pain-points\x20{\x0a\x09\x09\x09\x09background:\x20','startTyping','remove','startsWith','scrollTo','styles','replace','\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09\x09<path\x20d=\x22M12\x201L3\x205v6c0\x205.55\x203.84\x2010.74\x209\x2012\x205.16-1.26\x209-6.45\x209-12V5l-9-4zm0\x2010.99h7c-.53\x204.12-3.28\x207.79-7\x208.94V12H5V6.3l7-3.11v8.8z\x22/>\x0a\x09\x09\x09\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature-title\x22>Secure\x20by\x20Design</div>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature-desc\x22>SQL\x20injection\x20eliminated\x20through\x20parameterized\x20queries.\x20Security\x20you\x20don\x27t\x20have\x20to\x20think\x20about.</div>\x0a\x09\x09\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<svg\x20class=\x22feature-icon\x22\x20viewBox=\x220\x200\x2024\x2024\x22\x20fill=\x22','emp\x20=\x20Employees().where(employee_id\x20=\x20100).select()',';\x20}\x0a\x09\x09\x09.cls\x20{\x20color:\x20','define','bottom','#d20f39',';\x0a\x09\x09\x09\x09white-space:\x20pre;\x0a\x09\x09\x09\x09flex:\x201;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.cursor\x20{\x0a\x09\x09\x09\x09display:\x20inline-block;\x0a\x09\x09\x09\x09width:\x202px;\x0a\x09\x09\x09\x09height:\x201.2em;\x0a\x09\x09\x09\x09background:\x20','titleDot3','import','comment',';\x20}\x0a\x09\x09\x09</style>\x0a\x09\x09\x09<div\x20class=\x22section\x22>\x0a\x09\x09\x09\x09<div\x20class=\x22section-label\x22>\x0a\x09\x09\x09\x09\x09<svg\x20class=\x22icon\x22\x20viewBox=\x220\x200\x2024\x2024\x22\x20fill=\x22currentColor\x22>\x0a\x09\x09\x09\x09\x09\x09<path\x20d=\x22M3\x203h18v18H3V3zm16\x2016V5H5v14h14zM7\x207h2v2H7V7zm0\x204h2v2H7v-2zm0\x204h2v2H7v-2zm4-8h6v2h-6V7zm0\x204h6v2h-6v-2zm0\x204h6v2h-6v-2z\x22/>\x0a\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09Parameters\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09<div\x20class=\x22code-wrapper\x22>\x0a\x09\x09\x09\x09\x09<div\x20class=\x22code-block\x22>\x0a\x09\x09\x09\x09\x09\x09<span\x20class=\x22execute-label\x22>&gt;\x20Execute\x20parameters:</span>\x0a\x09\x09\x09\x09\x09\x09<pre>','<span\x20class=\x22cls\x22>$1</span>.<span\x20class=\x22mth\x22>$2</span>','\x0a\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09','</style>\x0a\x09\x09\x09<div\x20class=\x22editor-container\x22>\x0a\x09\x09\x09\x09<div\x20class=\x22title-bar\x22>\x0a\x09\x09\x09\x09\x09<span\x20class=\x22title-dot\x20red\x22></span>\x0a\x09\x09\x09\x09\x09<span\x20class=\x22title-dot\x20yellow\x22></span>\x0a\x09\x09\x09\x09\x09<span\x20class=\x22title-dot\x20green\x22></span>\x0a\x09\x09\x09\x09\x09<span\x20class=\x22title-text\x22>main.py</span>\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09<div\x20class=\x22editor-content\x22\x20id=\x22editor-content\x22>\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09</div>\x0a\x09\x09','lineDelay',';\x0a\x09\x09\x09\x09border:\x201px\x20solid\x20','cartonnage_dark','slice','#fe640b',';\x0a\x09\x09\x09\x09font-size:\x200.85rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.editor-content\x20{\x0a\x09\x09\x09\x09padding:\x201rem\x200;\x0a\x09\x09\x09\x09min-height:\x20180px;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.code-line\x20{\x0a\x09\x09\x09\x09display:\x20flex;\x0a\x09\x09\x09\x09line-height:\x201.6;\x0a\x09\x09\x09\x09font-size:\x200.9rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.line-number\x20{\x0a\x09\x09\x09\x09width:\x2050px;\x0a\x09\x09\x09\x09text-align:\x20right;\x0a\x09\x09\x09\x09padding-right:\x201rem;\x0a\x09\x09\x09\x09color:\x20','currentChar','False','LIMIT','badgeText','className','highlightPython','typing-editor','#4c4f69',';\x0a\x09\x09\x09\x09font-weight:\x20600;\x0a\x09\x09\x09}\x0a\x09\x09',';\x20}\x0a\x09\x09\x09\x09.code-block\x20{\x20border-left:\x203px\x20solid\x20',';\x0a\x09\x09\x09\x09color:\x20','innerHTML',';\x0a\x09\x09\x09\x09display:\x20flex;\x0a\x09\x09\x09\x09justify-content:\x20space-between;\x0a\x09\x09\x09\x09align-items:\x20center;\x0a\x09\x09\x09\x09flex-wrap:\x20wrap;\x0a\x09\x09\x09\x09gap:\x200.5rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.title\x20{\x0a\x09\x09\x09\x09font-size:\x201.1rem;\x0a\x09\x09\x09\x09font-weight:\x20600;\x0a\x09\x09\x09\x09color:\x20','index',';\x0a\x09\x09\x09\x09font-style:\x20italic;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.name-content\x20strong\x20{\x0a\x09\x09\x09\x09color:\x20','SELECT','\x0a\x09\x09\x09<style>','#e6e9ef','1058442PpNbIv','<span\x20class=\x22num\x22>$1</span>','\x20100%);\x0a\x09\x09\x09\x09-webkit-background-clip:\x20text;\x0a\x09\x09\x09\x09-webkit-text-fill-color:\x20transparent;\x0a\x09\x09\x09\x09background-clip:\x20text;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.tagline\x20{\x0a\x09\x09\x09\x09font-size:\x201.4rem;\x0a\x09\x09\x09\x09color:\x20','isIntersecting','<span\x20class=\x22kw\x22>','LEFT','dark','escapeHtml','#fab387',';\x0a\x09\x09\x09\x09animation:\x20blink\x201s\x20infinite;\x0a\x09\x09\x09\x09vertical-align:\x20text-bottom;\x0a\x09\x09\x09\x09margin-left:\x201px;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09@keyframes\x20blink\x20{\x0a\x09\x09\x09\x090%,\x2050%\x20{\x20opacity:\x201;\x20}\x0a\x09\x09\x09\x0951%,\x20100%\x20{\x20opacity:\x200;\x20}\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09/*\x20Syntax\x20highlighting\x20*/\x0a\x09\x09\x09.kw\x20{\x20color:\x20','accentTeal','push','#a6adc8','for','textContent','376938YjJFIb','class\x20Employees(Record):\x20pass',';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.logo\x20{\x0a\x09\x09\x09\x09font-size:\x203.5rem;\x0a\x09\x09\x09\x09font-weight:\x20800;\x0a\x09\x09\x09\x09margin-bottom:\x200.5rem;\x0a\x09\x09\x09\x09background:\x20linear-gradient(135deg,\x20','66nQqdwa',';\x20}\x0a\x09\x09\x09.cmt\x20{\x20color:\x20','NULL','DOMContentLoaded','</style>\x0a\x0a\x09\x09\x09<div\x20class=\x22home-container\x22>\x0a\x09\x09\x09\x09<div\x20class=\x22content-wrapper\x22>\x0a\x09\x09\x09\x09\x09<div\x20class=\x22hero\x22>\x0a\x09\x09\x09\x09\x09\x09<div\x20style=\x22display:\x20flex;\x20justify-content:\x20center;\x20width:\x20100%;\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<img\x20src=\x22','#313244','highlightSQL','cursor','btnText','headerBg2','\x0a\x09\x09\x09\x09.section-label\x20{\x20color:\x20','166556XDvemf','<span\x20class=\x22lines-badge\x22>Lines\x20','map',';\x0a\x09\x09\x09\x09margin-bottom:\x200.5rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.feature-desc\x20{\x0a\x09\x09\x09\x09color:\x20','.copy-btn',';\x0a\x09\x09\x09\x09margin:\x200\x200\x201.5rem\x200;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.guide-btn\x20{\x0a\x09\x09\x09\x09display:\x20inline-flex;\x0a\x09\x09\x09\x09align-items:\x20center;\x0a\x09\x09\x09\x09gap:\x200.75rem;\x0a\x09\x09\x09\x09background:\x20linear-gradient(135deg,\x20',';\x0a\x09\x09\x09\x09font-size:\x201.05rem;\x0a\x09\x09\x09\x09line-height:\x201.8;\x0a\x09\x09\x09\x09margin-bottom:\x201rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.name-content\x20p:last-child\x20{\x0a\x09\x09\x09\x09margin-bottom:\x200;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.name-content\x20em\x20{\x0a\x09\x09\x09\x09color:\x20','rgba(0,\x200,\x200,\x200.3)','FROM','titleBarBg','#6c7086','getAttribute','#dce0e8','JOIN','typeNextChar','descBorder',';\x0a\x09\x09\x09\x09border:\x20none;\x0a\x09\x09\x09\x09border-radius:\x204px;\x0a\x09\x09\x09\x09padding:\x200.25rem\x200.5rem;\x0a\x09\x09\x09\x09color:\x20','<span\x20class=\x22mth\x22>',';\x0a\x09\x09\x09\x09padding:\x200.25rem\x200.75rem;\x0a\x09\x09\x09\x09border-radius:\x2020px;\x0a\x09\x09\x09\x09font-size:\x200.75rem;\x0a\x09\x09\x09\x09font-weight:\x20600;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.description\x20{\x0a\x09\x09\x09\x09padding:\x201rem\x201.5rem;\x0a\x09\x09\x09\x09color:\x20',';\x0a\x09\x09\x09\x09font-size:\x200.95rem;\x0a\x09\x09\x09\x09line-height:\x201.6;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.cta-section\x20{\x0a\x09\x09\x09\x09text-align:\x20center;\x0a\x09\x09\x09\x09margin-top:\x202.5rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.cta-text\x20{\x0a\x09\x09\x09\x09font-size:\x201.3rem;\x0a\x09\x09\x09\x09font-weight:\x20600;\x0a\x09\x09\x09\x09color:\x20','length','#585b70','highlightOutput','createElement','join',';\x20font-weight:\x20600;\x20}\x0a\x09\x09\x09.str\x20{\x20color:\x20','COUNT',';\x0a\x09\x09\x09\x09margin-bottom:\x201.25rem;\x0a\x09\x09\x09\x09display:\x20flex;\x0a\x09\x09\x09\x09align-items:\x20center;\x0a\x09\x09\x09\x09gap:\x200.75rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.name-title\x20svg\x20{\x0a\x09\x09\x09\x09width:\x2028px;\x0a\x09\x09\x09\x09height:\x2028px;\x0a\x09\x09\x09\x09fill:\x20','code-output','str',';\x0a\x09\x09\x09\x09font-size:\x201.1rem;\x0a\x09\x09\x09\x09line-height:\x201.8;\x0a\x09\x09\x09\x09margin-bottom:\x201.25rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.what-content\x20p:last-child\x20{\x0a\x09\x09\x09\x09margin-bottom:\x200;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.highlight\x20{\x0a\x09\x09\x09\x09color:\x20','onclick','accent','headerBg1','<span\x20class=\x22num\x22>','else',';\x20}\x0a\x09\x09\x09.num\x20{\x20color:\x20','trim','plain','\x0a\x09\x09\x09:host\x20{\x0a\x09\x09\x09\x09display:\x20block;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.test-case\x20{\x0a\x09\x09\x09\x09background:\x20','&lt;','#ccd0da',';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.header\x20{\x0a\x09\x09\x09\x09background:\x20linear-gradient(135deg,\x20','#b5890a','isTyping','NOT','page','class',';\x20}\x0a\x09\x09\x09</style>\x0a\x09\x09\x09<div\x20class=\x22section\x22>\x0a\x09\x09\x09\x09<div\x20class=\x22section-label\x22>\x0a\x09\x09\x09\x09\x09<svg\x20class=\x22icon\x22\x20viewBox=\x220\x200\x2024\x2024\x22\x20fill=\x22currentColor\x22>\x0a\x09\x09\x09\x09\x09\x09<path\x20d=\x22M12\x203C7.58\x203\x204\x204.79\x204\x207v10c0\x202.21\x203.58\x204\x208\x204s8-1.79\x208-4V7c0-2.21-3.58-4-8-4zm0\x202c3.87\x200\x206\x201.5\x206\x202s-2.13\x202-6\x202-6-1.5-6-2\x202.13-2\x206-2zm6\x2012c0\x20.5-2.13\x202-6\x202s-6-1.5-6-2v-2.23c1.61.78\x203.72\x201.23\x206\x201.23s4.39-.45\x206-1.23V17zm0-5c0\x20.5-2.13\x202-6\x202s-6-1.5-6-2V9.77c1.61.78\x203.72\x201.23\x206\x201.23s4.39-.45\x206-1.23V12z\x22/>\x0a\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09Generated\x20SQL\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09<div\x20class=\x22code-wrapper\x22>\x0a\x09\x09\x09\x09\x09<div\x20class=\x22code-block\x22>\x0a\x09\x09\x09\x09\x09\x09<span\x20class=\x22execute-label\x22>&gt;\x20Execute\x20statement:</span>\x0a\x09\x09\x09\x09\x09\x09<pre>','HAVING','<span\x20class=\x22op\x22>$1</span>','except','setItem','3mzfHkA','code-line','<span\x20class=\x22kw\x22>$1</span>','38566PdyoPe','#f38ba8',';\x0a\x09\x09\x09\x09padding:\x200.75rem\x201rem;\x0a\x09\x09\x09\x09display:\x20flex;\x0a\x09\x09\x09\x09align-items:\x20center;\x0a\x09\x09\x09\x09gap:\x200.5rem;\x0a\x09\x09\x09\x09border-bottom:\x201px\x20solid\x20',';\x0a\x09\x09\x09\x09border-radius:\x208px;\x0a\x09\x09\x09\x09padding:\x201rem;\x0a\x09\x09\x09\x09overflow-x:\x20auto;\x0a\x09\x09\x09\x09font-family:\x20\x27Fira\x20Code\x27,\x20\x27SF\x20Mono\x27,\x20\x27Monaco\x27,\x20\x27Consolas\x27,\x20monospace;\x0a\x09\x09\x09\x09font-size:\x200.85rem;\x0a\x09\x09\x09\x09line-height:\x201.5;\x0a\x09\x09\x09\x09border:\x201px\x20solid\x20','#a6e3a1',';\x20font-weight:\x20600;\x20}\x0a\x09\x09\x09.builtin\x20{\x20color:\x20','break','#40a02b','builtin','raise','</span>','func','<span\x20class=\x22cursor\x22></span>','featureBg','<span\x20class=\x22op\x22>','code-python','cartonnage_light','lastIndex','while','code-sql','OFFSET','border',';\x20}\x0a\x09\x09\x09.title-dot.yellow\x20{\x20background:\x20','querySelector','#94e2d5','\x0a\x0a\x09\x09\x09\x09<div\x20class=\x22content\x22>\x0a\x09\x09\x09\x09\x09<slot\x20name=\x22python\x22></slot>\x0a\x09\x09\x09\x09\x09<div\x20class=\x22grid-2\x22>\x0a\x09\x09\x09\x09\x09\x09<slot\x20name=\x22sql\x22></slot>\x0a\x09\x09\x09\x09\x09\x09<slot\x20name=\x22params\x22></slot>\x0a\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09<slot\x20name=\x22output\x22></slot>\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09</div>\x0a\x09\x09',';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.guide-btn:active\x20{\x0a\x09\x09\x09\x09transform:\x20translateY(0);\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.guide-btn\x20svg\x20{\x0a\x09\x09\x09\x09width:\x2020px;\x0a\x09\x09\x09\x09height:\x2020px;\x0a\x09\x09\x09\x09fill:\x20currentColor;\x0a\x09\x09\x09\x09transition:\x20transform\x200.2s;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.guide-btn:hover\x20svg\x20{\x0a\x09\x09\x09\x09transform:\x20translateX(4px);\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.name-section\x20{\x0a\x09\x09\x09\x09background:\x20linear-gradient(135deg,\x20','#7287fd','INNER','pass','WHERE','active','home-page','codeBg','#f9e2af','assert','&gt;',';\x0a\x09\x09\x09\x09cursor:\x20pointer;\x0a\x09\x09\x09\x09font-size:\x200.7rem;\x0a\x09\x09\x09\x09opacity:\x200;\x0a\x09\x09\x09\x09transition:\x20opacity\x200.2s;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.code-wrapper:hover\x20.copy-btn\x20{\x0a\x09\x09\x09\x09opacity:\x201;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.copy-btn:hover\x20{\x0a\x09\x09\x09\x09background:\x20','mth','line-content','\x20100%);\x0a\x09\x09\x09\x09border-radius:\x2012px;\x0a\x09\x09\x09\x09border:\x201px\x20solid\x20','editorBg',';\x20}\x0a\x09\x09\x09.comment\x20{\x20color:\x20','ORDER','LOWER','\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09\x09<path\x20d=\x22M4\x206h18V4H4c-1.1\x200-2\x20.9-2\x202v11H0v3h14v-3H4V6zm19\x202h-6c-.55\x200-1\x20.45-1\x201v10c0\x20.55.45\x201\x201\x201h6c.55\x200\x201-.45\x201-1V9c0-.55-.45-1-1-1zm-1\x209h-4v-7h4v7z\x22/>\x0a\x09\x09\x09\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature-title\x22>Expressive\x20API</div>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature-desc\x22>Chainable\x20methods,\x20intuitive\x20filters,\x20and\x20readable\x20code\x20that\x20documents\x20itself.</div>\x0a\x09\x09\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09\x09<div\x20class=\x22cta-section\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<p\x20class=\x22cta-text\x22>Ready\x20to\x20get\x20started?</p>\x0a\x09\x09\x09\x09\x09\x09\x09<button\x20class=\x22guide-btn\x22\x20onclick=\x22showPage(\x27docs\x27)\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09View\x20Documentation\x0a\x09\x09\x09\x09\x09\x09\x09\x09<svg\x20viewBox=\x220\x200\x2024\x2024\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09\x09<path\x20d=\x22M8.59\x2016.59L13.17\x2012\x208.59\x207.41\x2010\x206l6\x206-6\x206-1.41-1.41z\x22/>\x0a\x09\x09\x09\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09\x09\x09</button>\x0a\x09\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09</div>\x0a\x09\x09','page-','getStyles','<span\x20class=\x22str\x22>',';\x0a\x09\x09\x09\x09padding:\x202rem;\x0a\x09\x09\x09\x09margin-bottom:\x202rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.name-title\x20{\x0a\x09\x09\x09\x09font-size:\x201.5rem;\x0a\x09\x09\x09\x09color:\x20',';\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.code-wrapper\x20{\x0a\x09\x09\x09\x09position:\x20relative;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.copy-btn\x20{\x0a\x09\x09\x09\x09position:\x20absolute;\x0a\x09\x09\x09\x09top:\x200.5rem;\x0a\x09\x09\x09\x09right:\x200.5rem;\x0a\x09\x09\x09\x09background:\x20','value','</pre>\x0a\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09<button\x20class=\x22copy-btn\x22>Copy</button>\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09</div>\x0a\x09\x09','10totmzO','scrollIntoView','.jpeg\x22\x20alt=\x22Cartonnage\x20ORM\x22\x20style=\x22display:\x20block;\x20max-width:\x20300px;\x20width:\x20100%;\x20border-radius:\x2050%;\x20margin-bottom:\x201rem;\x22>\x0a\x09\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09\x09<p\x20class=\x22tagline\x22>Simple.\x20Expressive.\x20Powerful.\x20Forever.</p>\x0a\x09\x09\x09\x09\x09\x09<p\x20class=\x22subtitle\x22>The\x20Database-First\x20ORM\x20that\x20speaks\x20your\x20database\x20fluently—live\x20and\x20runtime-bound,\x20built\x20for\x20existing\x20databases.</p>\x0a\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09<div\x20class=\x22editor-section\x22>\x0a\x09\x09\x09\x09\x09\x09<typing-editor></typing-editor>\x0a\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09<div\x20class=\x22name-section\x22>\x0a\x09\x09\x09\x09\x09\x09<h3\x20class=\x22name-title\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<svg\x20viewBox=\x220\x200\x2024\x2024\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<path\x20d=\x22M12\x202L2\x207l10\x205\x2010-5-10-5zM2\x2017l10\x205\x2010-5M2\x2012l10\x205\x2010-5\x22/>\x0a\x09\x09\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09\x09\x09\x22Cartonnage\x22\x20in\x20history\x20...\x0a\x09\x09\x09\x09\x09\x09</h3>\x0a\x09\x09\x09\x09\x09\x09<div\x20class=\x22name-content\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<p>\x0a\x09\x09\x09\x09\x09\x09\x09\x09In\x20ancient\x20Egypt,\x20<em>Cartonnage</em>\x20was\x20the\x20sacred\x20protective\x20covering\x20crafted\x20from\x20layers\x20of\x20linen\x20and\x20papyrus,\x20plastered\x20and\x20painted\x20with\x20divine\x20symbols,\x20that\x20enveloped\x20and\x20preserved\x20the\x20mummies\x20of\x20pharaohs.\x0a\x09\x09\x09\x09\x09\x09\x09</p>\x0a\x09\x09\x09\x09\x09\x09\x09<p>\x0a\x09\x09\x09\x09\x09\x09\x09\x09This\x20ORM\x20embodies\x20the\x20same\x20philosophy:\x20<strong>a\x20protective\x20layer\x20that\x20wraps\x20your\x20precious\x20data</strong>,\x20shielding\x20it\x20from\x20SQL\x20injection\x20and\x20database\x20complexity\x20while\x20preserving\x20its\x20integrity.\x20Like\x20Cartonnage\x20molded\x20perfectly\x20to\x20each\x20mummy,\x20this\x20ORM\x20molds\x20naturally\x20to\x20your\x20data\x20models.\x20And\x20just\x20as\x20Cartonnage\x20was\x20adorned\x20with\x20gold\x20and\x20divine\x20imagery\x20to\x20honor\x20what\x20lay\x20within,\x20this\x20ORM\x20presents\x20an\x20elegant,\x20expressive\x20API\x20—\x20beautiful\x20on\x20the\x20surface,\x20powerful\x20beneath.\x0a\x09\x09\x09\x09\x09\x09\x09</p>\x0a\x09\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09<div\x20class=\x22what-section\x22>\x0a\x09\x09\x09\x09\x09\x09<h2\x20class=\x22what-title\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<svg\x20viewBox=\x220\x200\x2024\x2024\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<path\x20d=\x22M12\x202C6.48\x202\x202\x206.48\x202\x2012s4.48\x2010\x2010\x2010\x2010-4.48\x2010-10S17.52\x202\x2012\x202zm-2\x2015l-5-5\x201.41-1.41L10\x2014.17l7.59-7.59L19\x208l-9\x209z\x22/>\x0a\x09\x09\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09\x09\x09What\x20is\x20\x22Cartonnage\x22?\x0a\x09\x09\x09\x09\x09\x09</h2>\x0a\x0a\x09\x09\x09\x09\x09\x09<div\x20class=\x22what-content\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<p>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<b>Cartonnage\x20is\x20The\x20Database-First\x20ORM</b>\x20that\x20speaks\x20your\x20database\x20fluently—live\x20and\x20runtime-bound,\x20built\x20for\x20existing\x20databases.\x0a\x09\x09\x09\x09\x09\x09\x09</p>\x0a\x09\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09\x09<h2\x20class=\x22what-title\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<svg\x20viewBox=\x220\x200\x2024\x2024\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<path\x20d=\x22M12\x202C6.48\x202\x202\x206.48\x202\x2012s4.48\x2010\x2010\x2010\x2010-4.48\x2010-10S17.52\x202\x2012\x202zm-2\x2015l-5-5\x201.41-1.41L10\x2014.17l7.59-7.59L19\x208l-9\x209z\x22/>\x0a\x09\x09\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09\x09\x09For\x20whom\x20?\x0a\x09\x09\x09\x09\x09\x09</h2>\x0a\x09\x09\x09\x09\x09\x09<div\x20class=\x22what-content\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22audience-questions\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<p><b>Why\x20get\x20caught\x20in\x20the\x20SQL\x20vs\x20ORM\x20debate\x20while\x20simply\x20you\x20can\x20use\x20Cartonnage?</b></p>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<p>Software\x20Engineers,\x20Data\x20engineers,\x20DevOps\x20Engineers,\x20...\x20who\x20wants\x20to\x20speak\x20to\x20database\x20fluently\x20from\x20Python\x20without\x20hassles\x20and\x20with\x20zero\x20schema\x20definition,\x20maintenance,\x20or\x20migration.</p>\x0a\x09\x09\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09\x09\x09<div\x20class=\x22what-content\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22pain-points\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09What\x20starts\x20as\x20a\x20productivity\x20tool\x20quickly\x20becomes\x20its\x20own\x20burden.\x0a\x09\x09\x09\x09\x09\x09\x09\x09Configuration\x20files.\x20Schema\x20definitions.\x20Installation\x20headaches.\x0a\x09\x09\x09\x09\x09\x09\x09\x09Migration\x20scripts.\x20Endless\x20maintenance.\x20The\x20learning\x20curve\x20that\x20was\x0a\x09\x09\x09\x09\x09\x09\x09\x09supposed\x20to\x20flatten\x20only\x20gets\x20steeper.\x0a\x09\x09\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22principle\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<p\x20class=\x22principle-text\x22>Cartonnage\x20is\x20built\x20with\x20a\x20single,\x20unwavering\x20principle:<br>simplicity\x20that\x20scales.</p>\x0a\x09\x09\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09\x09\x09<p>\x0a\x09\x09\x09\x09\x09\x09\x09\x09No\x20bloated\x20abstractions.\x20No\x20framework\x20lock-in.\x20No\x20documentation\x20rabbit\x20holes.\x0a\x09\x09\x09\x09\x09\x09\x09\x09Just\x20a\x20clean,\x20expressive\x20API\x20that\x20does\x20exactly\x20what\x20you\x20expect—and\x20nothing\x20you\x20don\x27t.\x0a\x09\x09\x09\x09\x09\x09\x09</p>\x0a\x0a\x09\x09\x09\x09\x09\x09\x09<p>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<span\x20class=\x22emphasis\x22>Plug\x20into\x20any\x20database\x20in\x20seconds.</span>\x20Handle\x20your\x0a\x09\x09\x09\x09\x09\x09\x09\x09data\x20operations\x20with\x20code\x20that\x20reads\x20like\x20plain\x20English.\x20Sleep\x20soundly\x0a\x09\x09\x09\x09\x09\x09\x09\x09knowing\x20SQL\x20injection\x20vulnerabilities\x20are\x20eliminated\x20by\x20design,\x20not\x20by\x20discipline.\x0a\x09\x09\x09\x09\x09\x09\x09</p>\x0a\x0a\x09\x09\x09\x09\x09\x09\x09<p>\x0a\x09\x09\x09\x09\x09\x09\x09\x09This\x20isn\x27t\x20another\x20tool\x20you\x20have\x20to\x20learn.\x20It\x27s\x20the\x20tool\x20that\x20gets\x20out\x20of\x20your\x0a\x09\x09\x09\x09\x09\x09\x09\x09way\x20and\x20lets\x20you\x20<span\x20class=\x22highlight\x22>build</span>.\x0a\x09\x09\x09\x09\x09\x09\x09</p>\x0a\x09\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09\x09<div\x20class=\x22features\x22>\x0a\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<svg\x20class=\x22feature-icon\x22\x20viewBox=\x220\x200\x2024\x2024\x22\x20fill=\x22','</h3>\x0a\x09\x09\x09\x09\x09','\x20100%);\x0a\x09\x09\x09\x09border-radius:\x2016px;\x0a\x09\x09\x09\x09border:\x201px\x20solid\x20','getItem','doc-','open','#b4befe','print(emp.first_name)','BETWEEN','\x20100%);\x0a\x09\x09\x09\x09padding:\x201rem\x201.5rem;\x0a\x09\x09\x09\x09border-bottom:\x201px\x20solid\x20','editor-content','<span\x20class=\x22cmt\x22>','removeCursor','getElementById',';\x0a\x09\x09\x09\x09font-size:\x200.9rem;\x0a\x09\x09\x09\x09border-bottom:\x201px\x20solid\x20','split','.docs-sidebar','not','rgba(0,\x200,\x200,\x200.08)','substring','</style>\x0a\x0a\x09\x09\x09<div\x20class=\x22test-case\x22>\x0a\x09\x09\x09\x09<div\x20class=\x22header\x22>\x0a\x09\x09\x09\x09\x09<h3\x20class=\x22title\x22>',';\x20}\x0a\x09\x09\x09</style>\x0a\x09\x09\x09<div\x20class=\x22section\x22>\x0a\x09\x09\x09\x09<div\x20class=\x22section-label\x22>\x0a\x09\x09\x09\x09\x09<svg\x20class=\x22icon\x22\x20viewBox=\x220\x200\x2024\x2024\x22\x20fill=\x22currentColor\x22>\x0a\x09\x09\x09\x09\x09\x09<path\x20d=\x22M9\x2016.17L4.83\x2012l-1.42\x201.41L9\x2019\x2021\x207l-1.41-1.41L9\x2016.17z\x22/>\x0a\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09Expected\x20Output\x20/\x20Assert\x0a\x09\x09\x09\x09</div>\x0a\x09\x09\x09\x09<div\x20class=\x22code-wrapper\x22>\x0a\x09\x09\x09\x09\x09<div\x20class=\x22code-block\x22>\x0a\x09\x09\x09\x09\x09\x09<pre>','cls','highlightParams','cardBg','writeText','OUTER','\x0a\x09\x09\x09<style>\x0a\x09\x09\x09\x09','lambda','#cba6f7','#45475a','<span\x20class=\x22num\x22>?</span>','LIKE','#89b4fa','Test\x20Case','documentElement','test-case','</div>','\x20100%);\x0a\x09\x09\x09\x09border:\x202px\x20solid\x20','light','test',';\x20}\x0a\x0a\x09\x09\x09.title-text\x20{\x0a\x09\x09\x09\x09margin-left:\x200.75rem;\x0a\x09\x09\x09\x09color:\x20','highlightSyntax','\x0a\x09\x09\x09:host\x20{\x0a\x09\x09\x09\x09display:\x20block;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.home-container\x20{\x0a\x09\x09\x09\x09min-height:\x20calc(100vh\x20-\x2060px);\x0a\x09\x09\x09\x09display:\x20flex;\x0a\x09\x09\x09\x09flex-direction:\x20column;\x0a\x09\x09\x09\x09justify-content:\x20center;\x0a\x09\x09\x09\x09align-items:\x20center;\x0a\x09\x09\x09\x09padding:\x202rem;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.content-wrapper\x20{\x0a\x09\x09\x09\x09max-width:\x20800px;\x0a\x09\x09\x09\x09width:\x20100%;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.hero\x20{\x0a\x09\x09\x09\x09text-align:\x20center;\x0a\x09\x09\x09\x09padding:\x203rem\x202rem;\x0a\x09\x09\x09\x09background:\x20linear-gradient(135deg,\x20','lineNumBorder','1726230VRRFxX','lines','sec-class-declarations','iconDb','#df8e1d','#7c7f93','=():.','top',';\x20}\x0a\x09\x09\x09.str\x20{\x20color:\x20','.nav-tab',';\x20}\x0a\x09\x09\x09.func\x20{\x20color:\x20','num','\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09\x09<path\x20d=\x22M19\x203H5c-1.1\x200-2\x20.9-2\x202v14c0\x201.1.9\x202\x202\x202h14c1.1\x200\x202-.9\x202-2V5c0-1.1-.9-2-2-2zm-5\x2014H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z\x22/>\x0a\x09\x09\x09\x09\x09\x09\x09\x09</svg>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature-title\x22>Zero\x20Boilerplate</div>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature-desc\x22>No\x20schemas\x20to\x20define.\x20No\x20migrations\x20to\x20run.\x20Just\x20Python\x20classes\x20that\x20map\x20to\x20your\x20tables.</div>\x0a\x09\x09\x09\x09\x09\x09\x09</div>\x0a\x0a\x09\x09\x09\x09\x09\x09\x09<div\x20class=\x22feature\x22>\x0a\x09\x09\x09\x09\x09\x09\x09\x09<svg\x20class=\x22feature-icon\x22\x20viewBox=\x220\x200\x2024\x2024\x22\x20fill=\x22','Record.database__\x20=\x20SQLite3(connection)\x20#\x20Oracle()\x20|\x20MySQL()\x20|\x20Postgres()\x20|\x20MicrosoftSQL()',';\x0a\x09\x09\x09\x09margin-bottom:\x202rem;\x0a\x09\x09\x09\x09box-shadow:\x200\x204px\x2020px\x20','.section-header,\x20test-case','22810CMKnMB','toggle','#179299','.page','click','INSERT','<span\x20class=\x22','EXISTS','#bcc0cc','INTO','docs','toLowerCase','exec','renderLines','#5c5f77','add','titleAccent','cmt',';\x0a\x09\x09\x09\x09border-left:\x204px\x20solid\x20',';\x0a\x09\x09\x09\x09font-family:\x20\x27Fira\x20Code\x27,\x20\x27SF\x20Mono\x27,\x20\x27Monaco\x27,\x20\x27Consolas\x27,\x20monospace;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.title-bar\x20{\x0a\x09\x09\x09\x09background:\x20','shadowRoot',';\x0a\x09\x09\x09\x09transition:\x20transform\x200.2s,\x20box-shadow\x200.2s;\x0a\x09\x09\x09}\x0a\x0a\x09\x09\x09.test-case:hover\x20{\x0a\x09\x09\x09\x09transform:\x20translateY(-2px);\x0a\x09\x09\x09\x09box-shadow:\x200\x208px\x2025px\x20','#89dceb','<span\x20class=\x22cls\x22>','attachShadow','AND',';\x20}\x0a\x09\x09','UPPER','line-number',';\x20}\x0a\x09\x09\x09.num\x20{\x20color:\x20#fab387;\x20}\x0a\x09\x09'];a0_0x4885=function(){return _0x3457c8;};return a0_0x4885();}function scrollToDoc(_0x3ba83a){const _0xbc18ec=a0_0x3f1362;let _0x4a901e=document[_0xbc18ec(0x18b)](_0x3ba83a);if(!_0x4a901e){const _0x49eddc=_0x3ba83a[_0xbc18ec(0x21f)](_0xbc18ec(0x182),'')[_0xbc18ec(0x21f)](/-/g,'\x20'),_0x27ce91=document[_0xbc18ec(0x1e3)]('test-case');for(const _0x118d55 of _0x27ce91){const _0x52c6e6=_0x118d55[_0xbc18ec(0x11a)](_0xbc18ec(0x1fc))[_0xbc18ec(0x1c6)]()[_0xbc18ec(0x21f)](/[^a-z0-9]+/g,'-')[_0xbc18ec(0x21f)](/-+/g,'-')['replace'](/^-|-$/g,'');if(_0x3ba83a===_0xbc18ec(0x182)+_0x52c6e6){_0x4a901e=_0x118d55;break;}}}_0x4a901e&&(_0x4a901e[_0xbc18ec(0x17d)]({'behavior':_0xbc18ec(0x1e4),'block':_0xbc18ec(0x1db)}),document[_0xbc18ec(0x1e3)]('.sidebar-item')[_0xbc18ec(0x1d9)](_0x400bbf=>{const _0x2277a7=_0xbc18ec;_0x400bbf[_0x2277a7(0x20e)]['remove']('active');}),event['target']['classList'][_0xbc18ec(0x1ca)](_0xbc18ec(0x166)));}document['addEventListener'](a0_0x3f1362(0x107),function(){const _0x399d31=a0_0x3f1362;document[_0x399d31(0x1e3)](_0x399d31(0x1a2))[_0x399d31(0x1d9)](_0x13687a=>{const _0x460611=_0x399d31,_0x5e14fd=_0x13687a[_0x460611(0x11a)]('title');if(_0x5e14fd){const _0x1b4258=_0x460611(0x182)+_0x5e14fd[_0x460611(0x1c6)]()[_0x460611(0x21f)](/[^a-z0-9]+/g,'-')[_0x460611(0x21f)](/-+/g,'-')['replace'](/^-|-$/g,'');_0x13687a['id']=_0x1b4258;}});});function toggleTheme(){const _0x483011=a0_0x3f1362,_0x51314c=document[_0x483011(0x1a1)][_0x483011(0x20e)]['toggle'](_0x483011(0x1a5));localStorage[_0x483011(0x143)](_0x483011(0x212),_0x51314c?_0x483011(0x1a5):'dark'),rerenderComponents();}function rerenderComponents(){const _0x4e58ca=a0_0x3f1362;document[_0x4e58ca(0x1e3)]('home-page,\x20typing-editor,\x20test-case,\x20code-python,\x20code-sql,\x20code-params,\x20code-output')[_0x4e58ca(0x1d9)](_0x2c12f2=>{const _0x11bb13=_0x4e58ca;_0x2c12f2[_0x11bb13(0x201)]&&_0x2c12f2['connectedCallback']();});}(function(){const _0x2e9844=a0_0x3f1362,_0x20c33a=localStorage[_0x2e9844(0x181)](_0x2e9844(0x212));_0x20c33a===_0x2e9844(0xf8)?document[_0x2e9844(0x1a1)][_0x2e9844(0x20e)][_0x2e9844(0x21b)]('light'):document[_0x2e9844(0x1a1)][_0x2e9844(0x20e)][_0x2e9844(0x1ca)](_0x2e9844(0x1a5));}()),document['addEventListener'](a0_0x3f1362(0x107),function(){rerenderComponents();}),document[a0_0x3f1362(0x200)](a0_0x3f1362(0x107),function(){const _0x2bbf68=a0_0x3f1362,_0x15dff9={'root':null,'rootMargin':_0x2bbf68(0x1f4),'threshold':0x0},_0x28b8e3=new IntersectionObserver(_0x2496f6=>{_0x2496f6['forEach'](_0x5378be=>{const _0x73cbdb=a0_0x457e;if(_0x5378be[_0x73cbdb(0xf5)]){const _0x1d3ef9=_0x5378be['target']['id'];document[_0x73cbdb(0x1e3)]('.sidebar-item')[_0x73cbdb(0x1d9)](_0x5224db=>{const _0x3f6b10=_0x73cbdb;_0x5224db[_0x3f6b10(0x20e)]['remove'](_0x3f6b10(0x166));}),document[_0x73cbdb(0x1e3)]('.sidebar-item')['forEach'](_0x5bde52=>{const _0x33087d=_0x73cbdb,_0x482663=_0x5bde52[_0x33087d(0x11a)](_0x33087d(0x12e));if(_0x482663&&_0x482663[_0x33087d(0x1e2)]('\x27'+_0x1d3ef9+'\x27')){_0x5bde52[_0x33087d(0x20e)][_0x33087d(0x1ca)](_0x33087d(0x166));const _0x18d2c8=_0x5bde52[_0x33087d(0x1e9)]('.sidebar-section');_0x18d2c8&&_0x18d2c8[_0x33087d(0x20e)][_0x33087d(0x21b)](_0x33087d(0x1f1));const _0x252983=document[_0x33087d(0x15e)](_0x33087d(0x18e));if(_0x252983){const _0x1bc467=_0x5bde52[_0x33087d(0x1ec)](),_0x18e1b9=_0x252983[_0x33087d(0x1ec)](),_0x1daa18=_0x1bc467[_0x33087d(0x1b2)]<_0x18e1b9[_0x33087d(0x1b2)],_0x1424e8=_0x1bc467[_0x33087d(0x224)]>_0x18e1b9[_0x33087d(0x224)];(_0x1daa18||_0x1424e8)&&_0x5bde52[_0x33087d(0x17d)]({'behavior':'smooth','block':_0x33087d(0x1e7)});}}});}});},_0x15dff9);document['querySelectorAll'](_0x2bbf68(0x1ba))[_0x2bbf68(0x1d9)](_0x3194d7=>{_0x3194d7['id']&&_0x28b8e3['observe'](_0x3194d7);});});
+	</script>
+
+	<!-- Footer -->
+	<footer style="background: var(--bg-secondary); border-top: 1px solid var(--border-color); padding: 2rem 1rem; text-align: center; margin-top: 3rem;">
+		<div style="max-width: 1000px; margin: 0 auto;">
+			<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
+				© 2026 Cartonnage ORM. Licensed under <a href="https://opensource.org/licenses/MIT" target="_blank" style="color: var(--accent-blue); text-decoration: none;">MIT</a>
+			</p>
+			<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0.5rem 0 0 0;">
+				Website copyright © <a href="https://eg.linkedin.com/in/akelsaman" target="_blank" style="color: var(--accent-blue); text-decoration: none; font-weight: 500;">Ahmed Kamal ELSamman</a>
+			</p>
+		</div>
+	</footer>
+
+</body>
+</html>
