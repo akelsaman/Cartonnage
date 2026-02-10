@@ -1,3 +1,26 @@
+![Cartonnage](https://github.com/akelsaman/Cartonnage/blob/master/docs/cartonnage_dark.jpeg)
+
+# What is Cartonnage ?
+**The Database-First ORM** that speaks your database fluently-live and runtime-bound, built for exisitng databases.
+
+# For whom ?
+
+### Why get caught in the SQL vs ORM debate while simply you can use Cartonnage ?
+
+Software Engineers, DevOps Engineers, Data Engineers, ... who wants to speak to database fluently from Python without hassles and with zero schema definition, maintenance, or migration.
+
+### Note:
+
+**I have started to write Cartonnage 8 years ago with more than 126 commits till the moment.**
+
+**All the examples** used in **cartonnage_test.py**, **official website**, or in this **README.md** documentation is written by human developer :) and **AI didn't** contribute to it.
+**AI only** helped me to **copy and format** the examples **from cartonnage_test.py into this README.md.**
+
+# "Cartonnage" in history ...
+In ancient **Egypt**, Cartonnage was the sacred protective covering crafted from layers of linen and papyrus, plastered and painted with divine symbols, that enveloped and preserved the mummies of pharaohs.
+
+This ORM embodies the same philosophy: **a protective layer that wraps your precious data**, shielding it from SQL injection and database complexity while preserving its integrity. Like Cartonnage molded perfectly to each mummy, this ORM molds naturally to your data models. And just as Cartonnage was adorned with gold and divine imagery to honor what lay within, this ORM presents an elegant, expressive API — beautiful on the surface, powerful beneath.
+
 # Installation:
 ```
 pip install cartonnage
@@ -21,22 +44,6 @@ https://cartonnage-orm.com
 
 # Github page:
 https://akelsaman.github.io/Cartonnage
-
-# What is Cartonnage ?
-**The Database-First ORM** that speaks your database fluently-live and runtime-bound, built for exisitng databases.
-
-# For whom ?
-
-### Why get caught in the SQL vs ORM debate while simply you can use Cartonnage ?
-
-Software Engineers, DevOps Engineers, Data Engineers, ... who wants to speak to database fluently from Python without hassles and with zero schema definition, maintenance, or migration.
-
-### Note:
-
-**I have started to write Cartonnage 8 years ago with more than 126 commits till the moment.**
-
-**All the examples** used in **cartonnage_test.py**, **official website**, or in this **README.md** documentation is written by human developer :) and **AI didn't** contribute to it.
-**AI only** helped me to **copy and format** the examples **from cartonnage_test.py into this README.md.**
 
 # Show Case:
 
