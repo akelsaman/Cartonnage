@@ -26,10 +26,10 @@ https://akelsaman.github.io/Cartonnage
 **The Database-First ORM** that speaks your database fluently-live and runtime-bound, built for exisitng databases.
 
 # For whom ?
+
+### Why get caught in the SQL vs ORM debate while simply you can use Cartonnage ?
+
 Software Engineers, DevOps Engineers, Data Engineers, ... who wants to speak to database fluently from Python without hassles and with zero schema definition, maintenance, or migration.
-
-**Why get caught in the SQL vs ORM debate while simply you can use Cartonnage ?**
-
 
 ### Note:
 
