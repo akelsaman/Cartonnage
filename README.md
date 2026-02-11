@@ -107,11 +107,13 @@ There are **many business apps/solutions** that have many tables with **no decla
 
 ![Cartonnage Benchmark](https://github.com/akelsaman/Cartonnage/blob/master/docs/cartonnage_benchmark.png)
 
-I was looking for a **neutral/unbiased benchmark** for ORMs in Python, I had found this **repo** that implements a well defined benchmark on Pony and SQLAlchemy bsed on **TPC-C framework**.
+I was looking for a **neutral/unbiased benchmark** for ORMs in Python, I had found this **repo** that implements a well defined benchmark on Pony and SQLAlchemy based on **TPC-C framework**.
+
+[TPC-C benchmark](https://www.tpc.org/tpcc/detail5.asp)
 
 [Python_ORM_Benchmark](https://github.com/DominovTut/Python_ORM_Benchmark/tree/master)
 
-To make the benchmark **more neutral** I had ask **Claude -Opus 4.5-** to **clone** the repo, **write the same benchmark implementation** for Cartonnage beside Pony and SQL in the **same folder**.
+To make the benchmark **more neutral** I had asked **Claude -Opus 4.5-** to **clone** the repo, **write the same benchmark implementation** for Cartonnage beside Pony and SQL in the **same folder**.
 
 **Claude implemented and executed** the benchmark tests and returned with the benchmark **results**.
 
