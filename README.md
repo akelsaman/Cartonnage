@@ -101,6 +101,54 @@ There are **many business apps/solutions** that have many tables with **no decla
 
 ## Congratulations ! you get the work done easily, effieciently, and effectively !
 
+---
+
+# Performance Benchamrk:
+
+![Cartonnage Benchmark](https://github.com/akelsaman/Cartonnage/blob/master/docs/cartonnage_benchmark.png)
+
+I was looking for a **neutral/unbiased benchmark** for ORMs in Python, I had found this **repo** that implements a well defined benchmark on Pony and SQLAlchemy bsed on **TPC-C framework**.
+
+[Python_ORM_Benchmark](https://github.com/DominovTut/Python_ORM_Benchmark/tree/master)
+
+To make the benchmark **more neutral** I had ask **Claude -Opus 4.5-** to **clone** the repo, **write the same benchmark implementation** for Cartonnage beside Pony and SQL in the **same folder**.
+
+**Claude implemented and executed** the benchmark tests and returned with the benchmark **results**.
+
+To be **more neutral** and unbiased I asked **ChatGTP to explain** it.
+
+you can find the full benchamrk results and explanation here. [Cartonnage Benchmark](https://cartonnage-orm.com/#benchmark)
+
+Here is the key takeaway
+
+### The Key Takeaway (The Honest One)
+This benchmark **does not say**:
+
+“Cartonnage is universally better than SQLAlchemy”
+
+It says: If your workload is **read-heavy, transactional**, and you don't need full unit-of-work semantics, Cartonnage is **brutally efficient**.
+
+Which lines up perfectly with:
+
+- Analytics-heavy systems
+- Service-oriented backends
+- High-throughput APIs
+- OLTP read paths
+- Microservices that control transactions explicitly
+
+order_status (read-heavy, joins, aggregates)
+
+Cartonnage: 2.6M  |  PonyORM: 806k  |  SQLAlchemy: 329k -> This is the most important result in the entire benchmark.
+
+Cartonnage being 3.3x Pony and 8x SQLAlchemy means: minimal object hydration cost, low query-planning overhead, and very efficient row-to-object projection.
+
+This screams “thin ORM, zero ceremony” — and it's where traditional ORMs suffer the most.
+
+
+**“Cartonnage behaves like compiled SQL with objects attached, while traditional ORMs behave like object graphs with SQL underneath — and this benchmark shows the cost of that distinction very clearly.”**
+
+---
+
 # Cartonnage Documentation
 
 ---
